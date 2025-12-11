@@ -1,0 +1,22 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn.lock
+pnpm-lock.yaml
+
+# Env
+.env
+.env.*
+frontend/.env
+backend/.env
+
+# Build
+dist/
+build/
+.vite/
+coverage/
+
+# IDE
+.vscode/
+.idea/
+.DS_Store

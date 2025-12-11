@@ -1,0 +1,33 @@
+VITATRACK/
+├─ backend/                 # Node + Express API
+│  ├─ node_modules/
+│  ├─ src/
+│  │  ├─ index.ts           # Express app entry
+│  │  ├─ routes/            # Route definitions (auth, profile, plans, etc.)
+│  │  ├─ controllers/       # Request handlers
+│  │  ├─ services/          # Supabase, plan logic, external services
+│  │  └─ config/            # env/config helpers
+│  ├─ package.json
+│  ├─ package-lock.json
+│  └─ .gitignore
+├─ web/                     # Frontend (React + Vite)
+│  ├─ node_modules/
+│  ├─ public/
+│  ├─ src/
+│  │  ├─ assets/
+│  │  ├─ components/
+│  │  ├─ pages/
+│  │  ├─ services/          # API client for backend
+│  │  ├─ index.css
+│  │  └─ main.tsx
+│  ├─ .gitignore
+│  ├─ eslint.config.js
+│  ├─ index.html
+│  ├─ package.json
+│  ├─ package-lock.json
+│  ├─ tsconfig.app.json
+│  ├─ tsconfig.json
+│  ├─ tsconfig.node.json
+│  └─ vite.config.ts
+├─ .gitignore
+└─ file_structure.txt
