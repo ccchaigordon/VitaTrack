@@ -1,10 +1,10 @@
 const express = require('express');
 const cors = require('cors');
-const supabaseAuth = require('./src/middleware/auth');
+const supabaseAuth = require('./src/routes/auth');
 const detectIntent = require('./src/utils/detectIntent');
-const { queryGemini } = require('./src/lib/geminiClient');
+const { queryGemini } = require('./src/services/geminiClient');
 const { GoogleGenAI } = require("@google/genai");
-const supabaseServer = require('./src/lib/supabaseClient');
+const supabaseServer = require('./src/services/supabaseClient');
 
 const app = express();
 app.use(cors());

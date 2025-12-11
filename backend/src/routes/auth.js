@@ -1,4 +1,4 @@
-const supabaseServer = require('../lib/supabaseClient');
+const supabaseServer = require('../services/supabaseClient');
 
 async function supabaseAuth(req, res, next) {
   try {
