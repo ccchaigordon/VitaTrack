@@ -30,7 +30,6 @@ app.post("/chat", async (req, res) => { // later put upload.any()
   const intent = detectIntent(message);
   
   if (intent === "log_meal") {
-    // Example: Message = "I ate chicken rice and milk tea for lunch"
     const mealText = message;
     const extraction = await extractMealInfo(mealText);
 
