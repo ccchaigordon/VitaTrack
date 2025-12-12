@@ -1,6 +1,6 @@
 const { queryGemini } = require('../services/geminiClient');
 
-async function extractMealInfo(message) {
+async function extractMealInfoFromMsg(message) {
     const prompt = `
         You are a meal information extractor.
 
@@ -21,4 +21,4 @@ async function extractMealInfo(message) {
   return await queryGemini(prompt);
 }
 
-module.exports = extractMealInfo;
+module.exports = extractMealInfoFromMsg;
