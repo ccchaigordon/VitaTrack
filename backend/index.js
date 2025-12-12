@@ -1,0 +1,79 @@
+const express = require('express');
+const cors = require('cors');
+const supabaseAuth = require('./src/routes/auth');
+const detectIntent = require('./src/utils/detectIntent');
+const { queryGemini } = require('./src/services/geminiClient');
+const { GoogleGenAI } = require("@google/genai");
+const supabaseServer = require('./src/services/supabaseClient');
+
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+const multer = require('multer');
+const upload = multer();
+
+const ai = new GoogleGenAI({});
+
+app.post("/chat", async (req, res) => { // later put upload.any()
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: "Message is required" });
+
+  //const user = req.user;
+  const intent = detectIntent(message);
+
+  // Placeholder logic — we’ll upgrade it step by step
+  if (intent === "log_meal") {
+    // Example: Message = "I ate chicken rice and milk tea for lunch"
+    const mealText = message;
+
+    const { data, error } = await supabaseServer
+      .from("meal_logs")
+      .insert({
+        description: mealText,
+        user_id: 1001, // Placeholder user ID
+        created_at: new Date()
+      });
+
+    if (error) {
+      console.error("Meal log error:", error);
+      return res.status(500).json({ reply: "Failed to log meal." });
+    }
+
+    return res.json({
+      reply: `🍽️ Meal logged (placeholder). `
+    });
+  }
+
+  if (intent === "log_workout") {
+    return res.json({
+      reply: `🏋️ Workout logged (placeholder). `
+    });
+  }
+
+  if (intent === "recommendation") {
+    return res.json({
+      reply: `🔍 Looking for suggestions... (placeholder)`
+    });
+  }
+
+  if (intent === 'chat') {
+    console.log('Querying Gemini for message:', message);
+    const prompt = `You are a friendly wellness assistant. Respond to: "${message}"`;
+    const gResponse = await queryGemini(prompt);
+    console.log('Gemini response:', gResponse);
+    return res.json({ reply: gResponse });
+  }
+
+  // Default normal chat placeholder
+  return res.json({
+    reply: `👋 Hello! How can I support your wellness today? (placeholder)`
+  });
+});
+
+
+const PORT = process.env.PORT || 4000;
+
+app.listen(PORT, () => {
+  console.log(`Vitatrack API running at http://localhost:${PORT}`);
+});
