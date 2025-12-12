@@ -3,6 +3,10 @@ const supabaseServer = require('../services/supabaseClient');
 
 const router = express.Router();
 
+function fallbackUsernameFromUserId(userId) {
+  return `user_${String(userId).replace(/-/g, '').slice(0, 12)}`;
+}
+
 function isProfileComplete(profile) {
   if (!profile) return false;
   const required = [
@@ -24,9 +28,66 @@ function getRlsClient(req) {
   return supabaseServer.createUserSupabaseClient(req.user.accessToken);
 }
 
+async function ensureUserBootstrap(req) {
+
+  // Make the API resilient by creating missing rows using the service role client.
+  const userId = req.user.id;
+  const email = req.user.email || null;
+  const provider = req.user?.raw?.app_metadata?.provider || 'email';
+
+  // Ensure users row exists
+  const { data: existingUser, error: existingUserErr } = await supabaseServer
+    .from('users')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (existingUserErr) {
+    // Tables not created yet
+    throw new Error(
+      `Supabase table error: ${existingUserErr.message}. Did you run the SQL to create users/user_profiles/plans?`
+    );
+  }
+
+  if (!existingUser) {
+    const { data: defaultPlan, error: planErr } = await supabaseServer
+      .from('plans')
+      .select('plan_id')
+      .eq('is_default', true)
+      .maybeSingle();
+    if (planErr) throw new Error(planErr.message);
+
+    const { error: insertUserErr } = await supabaseServer.from('users').insert({
+      user_id: userId,
+      email,
+      username: fallbackUsernameFromUserId(userId),
+      signup_method: provider,
+      status: 'active',
+      current_plan_id: defaultPlan?.plan_id ?? null
+    });
+    if (insertUserErr) throw new Error(insertUserErr.message);
+  }
+
+  // Ensure profile row exists
+  const { data: existingProfile, error: existingProfileErr } = await supabaseServer
+    .from('user_profiles')
+    .select('user_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (existingProfileErr) throw new Error(existingProfileErr.message);
+
+  if (!existingProfile) {
+    const { error: insertProfileErr } = await supabaseServer
+      .from('user_profiles')
+      .insert({ user_id: userId });
+    if (insertProfileErr) throw new Error(insertProfileErr.message);
+  }
+}
+
 // GET /api/me
 router.get('/me', async (req, res) => {
   try {
+    await ensureUserBootstrap(req);
     const supabase = getRlsClient(req);
 
     const { data: userRow, error: userErr } = await supabase
@@ -35,9 +96,15 @@ router.get('/me', async (req, res) => {
         'user_id,email,username,full_name,signup_method,created_at,status,current_plan_id'
       )
       .eq('user_id', req.user.id)
-      .single();
+      .maybeSingle();
 
     if (userErr) return res.status(500).json({ error: userErr.message });
+    if (!userRow) {
+      return res.status(500).json({
+        error:
+          'User row not found (RLS). Verify RLS policies on public.users allow select where user_id = auth.uid().'
+      });
+    }
 
     const { data: profileRow, error: profileErr } = await supabase
       .from('user_profiles')
@@ -45,7 +112,7 @@ router.get('/me', async (req, res) => {
         'user_id,age,gender,country_region,height_cm,weight_kg,activity_level,workout_days_per_week,diet_type,allergies,goals,updated_at'
       )
       .eq('user_id', req.user.id)
-      .single();
+      .maybeSingle();
 
     if (profileErr) return res.status(500).json({ error: profileErr.message });
 
@@ -55,7 +122,7 @@ router.get('/me', async (req, res) => {
         .from('plans')
         .select('plan_id,plan_name,plan_description,plan_price,is_default,is_active')
         .eq('plan_id', userRow.current_plan_id)
-        .single();
+        .maybeSingle();
       if (planErr) return res.status(500).json({ error: planErr.message });
       plan = planRow;
     }
@@ -75,6 +142,7 @@ router.get('/me', async (req, res) => {
 // PUT /api/me/profile
 router.put('/me/profile', async (req, res) => {
   try {
+    await ensureUserBootstrap(req);
     const supabase = getRlsClient(req);
 
     const allowedProfile = [
@@ -102,9 +170,10 @@ router.put('/me/profile', async (req, res) => {
       .select(
         'user_id,age,gender,country_region,height_cm,weight_kg,activity_level,workout_days_per_week,diet_type,allergies,goals,updated_at'
       )
-      .single();
+      .maybeSingle();
 
     if (profileErr) return res.status(400).json({ error: profileErr.message });
+    if (!updatedProfile) return res.status(500).json({ error: 'Profile row not found (RLS)' });
 
     // Allow updating username/full_name separately (users table)
     const userPatch = {};
@@ -118,7 +187,7 @@ router.put('/me/profile', async (req, res) => {
         .update(userPatch)
         .eq('user_id', req.user.id)
         .select('user_id,email,username,full_name,signup_method,created_at,status,current_plan_id')
-        .single();
+        .maybeSingle();
       if (userErr) return res.status(400).json({ error: userErr.message });
       updatedUser = userRow;
     }
@@ -185,6 +254,7 @@ router.post('/me/plan', async (req, res) => {
 });
 
 module.exports = router;
+
 
 
 
