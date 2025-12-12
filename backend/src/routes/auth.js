@@ -20,7 +20,8 @@ async function supabaseAuth(req, res, next) {
     req.user = {
       id: data.user.id,
       email: data.user.email,
-      raw: data.user
+      raw: data.user,
+      accessToken: token
     };
 
     next();
