@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const supabaseAuth = require('./src/routes/auth');
 const detectIntent = require('./src/utils/detectIntent');
+const extractMealInfo = require('./src/utils/extractMealInfo');
+const cleanLLMJSON = require('./src/utils/cleanLLMJSON');
 const { queryGemini } = require('./src/services/geminiClient');
 const { GoogleGenAI } = require("@google/genai");
 const supabaseServer = require('./src/services/supabaseClient');
@@ -21,16 +23,39 @@ app.post("/chat", async (req, res) => { // later put upload.any()
 
   //const user = req.user;
   const intent = detectIntent(message);
-
-  // Placeholder logic — we’ll upgrade it step by step
+  
   if (intent === "log_meal") {
     // Example: Message = "I ate chicken rice and milk tea for lunch"
     const mealText = message;
+    const extraction = await extractMealInfo(mealText);
+
+    let mealData;
+
+    try {
+      mealData = cleanLLMJSON(extraction);      
+    } catch (err) {
+      console.error("JSON parse error:", err);
+      return res.json({ reply: "I couldn't understand the meal details." });
+    }
+
+    // Check for missing nutrition info
+    const requiredFields = ["protein", "carbs", "fat", "calories"];
+    const missingFields = requiredFields.filter(field => mealData[field] === null);
+
+    if (missingFields.length > 0) {
+      return res.json({
+        reply: `I need more information to log this meal. Missing: ${missingFields.join(", ")}. Could you tell me the portions or more details about your meal?`
+      });
+    }
 
     const { data, error } = await supabaseServer
       .from("meal_logs")
       .insert({
-        description: mealText,
+        meal_name: mealData.meal_name,
+        protein: mealData.protein,
+        carbs: mealData.carbs,
+        fat: mealData.fat,
+        calories: mealData.calories,
         user_id: 1001, // Placeholder user ID
         created_at: new Date()
       });

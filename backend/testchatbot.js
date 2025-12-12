@@ -13,4 +13,4 @@ async function testChat(message) {
 }
 
 // Test message
-testChat("Hi, how are you?");
+testChat("I ate 1 plate of chicken rice (protein: 32g, carbs: 78g, fat: 12g, calories: 650) and 1 cup of milk tea (protein: 2g, carbs: 30g, fat: 3g, calories: 150) for lunch.");
