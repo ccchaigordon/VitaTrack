@@ -6,8 +6,7 @@ pnpm-lock.yaml
 
 # Env
 .env
-.env.*
-frontend/.env
+web/.env
 backend/.env
 
 # Build
@@ -20,3 +19,6 @@ coverage/
 .vscode/
 .idea/
 .DS_Store
+*.pdf
+scripts
+docs

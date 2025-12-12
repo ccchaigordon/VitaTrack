@@ -7,9 +7,14 @@ const cleanLLMJSON = require('./src/utils/cleanLLMJSON');
 const { queryGemini } = require('./src/services/geminiClient');
 const { GoogleGenAI } = require("@google/genai");
 const supabaseServer = require('./src/services/supabaseClient');
+const udmRoutes = require('./src/routes/udm');
 
 const app = express();
-app.use(cors());
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173'
+  })
+);
 app.use(express.json());
 
 const multer = require('multer');
@@ -95,6 +100,9 @@ app.post("/chat", async (req, res) => { // later put upload.any()
     reply: `👋 Hello! How can I support your wellness today? (placeholder)`
   });
 });
+
+// User & Data Management APIs (auth-required)
+app.use('/api', supabaseAuth, udmRoutes);
 
 
 const PORT = process.env.PORT || 4000;
