@@ -41,6 +41,7 @@ export function OnboardingPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [username, setUsername] = useState(suggestedUsername);
+  const [usernameLocked, setUsernameLocked] = useState(false);
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -65,7 +66,9 @@ export function OnboardingPage() {
           return;
         }
         // Pre-fill known values
-        setUsername(me.user?.username ?? suggestedUsername);
+        const existingUsername = me.user?.username ?? "";
+        setUsername(existingUsername || suggestedUsername);
+        setUsernameLocked(Boolean(existingUsername));
         setFullName(me.user?.full_name ?? "");
         if (me.profile) {
           if (me.profile.age != null) setAge(String(me.profile.age));
@@ -192,6 +195,7 @@ export function OnboardingPage() {
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-900"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
+                  disabled={usernameLocked}
                   required
                 />
               </div>

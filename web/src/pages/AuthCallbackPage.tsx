@@ -6,6 +6,7 @@ import { getErrorMessage } from "../utils/errors";
 
 type MeResponse = {
   profileComplete: boolean;
+  user?: { username?: string | null };
 };
 
 export function AuthCallbackPage() {
@@ -28,6 +29,21 @@ export function AuthCallbackPage() {
         }
 
         const me = await apiFetch<MeResponse>("/me");
+
+        const pendingUsername =
+          sessionStorage.getItem("vitatrack_oauth_username")?.trim() ?? "";
+        const currentUsername = me?.user?.username ?? null;
+        if (pendingUsername && !currentUsername) {
+          sessionStorage.removeItem("vitatrack_oauth_username");
+          try {
+            await apiFetch("/me/profile", {
+              method: "PUT",
+              json: { username: pendingUsername },
+            });
+          } catch {
+            // allow users to create username once if they didn't set it already
+          }
+        }
         if (!mounted) return;
         nav(me.profileComplete ? "/dashboard" : "/onboarding", {
           replace: true,

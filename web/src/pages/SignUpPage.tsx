@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { AuthLayout } from "../components/AuthLayout";
 import { getSupabase, setAuthPersistence } from "../services/supabase";
 import { getErrorMessage } from "../utils/errors";
+import { apiFetch } from "../services/api";
 
 export function SignUpPage() {
   const nav = useNavigate();
@@ -21,6 +22,11 @@ export function SignUpPage() {
     setInfoMsg(null);
     setLoading(true);
     try {
+      const desiredUsername = username.trim();
+      if (!desiredUsername) {
+        setErrorMsg("Username is required");
+        return;
+      }
       setAuthPersistence(keepLoggedIn);
       const supabase = getSupabase();
 
@@ -29,6 +35,9 @@ export function SignUpPage() {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            username: desiredUsername,
+          },
         },
       });
       if (error) throw new Error(error.message);
@@ -41,6 +50,10 @@ export function SignUpPage() {
       }
 
       // If session exists, proceed to onboarding and let onboarding update username/full_name.
+      await apiFetch("/me/profile", {
+        method: "PUT",
+        json: { username: desiredUsername },
+      });
       nav("/onboarding", { replace: true, state: { username } });
     } catch (err: unknown) {
       setErrorMsg(getErrorMessage(err, "Sign up failed"));
@@ -53,7 +66,9 @@ export function SignUpPage() {
     setErrorMsg(null);
     setLoading(true);
     try {
+      const desiredUsername = username.trim();
       setAuthPersistence(keepLoggedIn);
+      sessionStorage.setItem("vitatrack_oauth_username", desiredUsername);
       const supabase = getSupabase();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
@@ -64,6 +79,8 @@ export function SignUpPage() {
       if (error) throw new Error(error.message);
     } catch (err: unknown) {
       setErrorMsg(getErrorMessage(err, "Google sign-up failed"));
+      setLoading(false);
+    } finally {
       setLoading(false);
     }
   }
@@ -118,7 +135,7 @@ export function SignUpPage() {
             />
             <button
               type="button"
-              className="text-xs text-slate-500"
+              className="text-xs text-slate-500 cursor-pointer"
               onClick={() => setShowPassword((s) => !s)}
             >
               {showPassword ? "Hide" : "Show"}
@@ -150,7 +167,7 @@ export function SignUpPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+          className="w-full rounded-lg bg-black px-4 py-2.5 text-sm font-medium text-white disabled:opacity-60 cursor-pointer"
         >
           Sign up
         </button>
@@ -165,13 +182,13 @@ export function SignUpPage() {
           type="button"
           onClick={onGoogle}
           disabled={loading}
-          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 disabled:opacity-60"
+          className="w-full rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-900 disabled:opacity-60 cursor-pointer"
         >
           Continue with Google
         </button>
 
-        <div className="pt-2 text-sm text-slate-500">
-          Already have an account??{" "}
+        <div className="pt-2 text-sm text-slate-500 text-center">
+          Already have an account?{" "}
           <Link className="font-medium text-slate-900 underline" to="/signin">
             Sign in
           </Link>

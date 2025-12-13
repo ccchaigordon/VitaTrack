@@ -162,7 +162,7 @@ export function SignInPage() {
           Sign in with Google
         </button>
 
-        <div className="pt-2 text-sm text-slate-500">
+        <div className="pt-2 text-sm text-slate-500 text-center">
           Need an account?{" "}
           <Link className="font-medium text-slate-900 underline" to="/signup">
             Create one

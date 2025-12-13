@@ -60,7 +60,7 @@ async function ensureUserBootstrap(req) {
     const { error: insertUserErr } = await supabaseServer.from('users').insert({
       user_id: userId,
       email,
-      username: fallbackUsernameFromUserId(userId),
+      username: null,
       signup_method: provider,
       status: 'active',
       current_plan_id: defaultPlan?.plan_id ?? null
@@ -163,25 +163,55 @@ router.put('/me/profile', async (req, res) => {
       if (k in req.body) profilePatch[k] = req.body[k];
     }
 
-    const { data: updatedProfile, error: profileErr } = await supabase
-      .from('user_profiles')
-      .update(profilePatch)
-      .eq('user_id', req.user.id)
-      .select(
-        'user_id,age,gender,country_region,height_cm,weight_kg,activity_level,workout_days_per_week,diet_type,allergies,goals,updated_at'
-      )
-      .maybeSingle();
+    let updatedProfile = null;
+    if (Object.keys(profilePatch).length > 0) {
+      const { data: profileRow, error: profileErr } = await supabase
+        .from('user_profiles')
+        .update(profilePatch)
+        .eq('user_id', req.user.id)
+        .select(
+          'user_id,age,gender,country_region,height_cm,weight_kg,activity_level,workout_days_per_week,diet_type,allergies,goals,updated_at'
+        )
+        .maybeSingle();
 
-    if (profileErr) return res.status(400).json({ error: profileErr.message });
+      if (profileErr) return res.status(400).json({ error: profileErr.message });
+      updatedProfile = profileRow;
+    } else {
+      const { data: profileRow, error: profileErr } = await supabase
+        .from('user_profiles')
+        .select(
+          'user_id,age,gender,country_region,height_cm,weight_kg,activity_level,workout_days_per_week,diet_type,allergies,goals,updated_at'
+        )
+        .eq('user_id', req.user.id)
+        .maybeSingle();
+      if (profileErr) return res.status(400).json({ error: profileErr.message });
+      updatedProfile = profileRow;
+    }
+
     if (!updatedProfile) return res.status(500).json({ error: 'Profile row not found (RLS)' });
 
-    // Allow updating username/full_name separately (users table)
+    // Allow updating username/full_name separately (username onyl can create once)
     const userPatch = {};
     if ('username' in req.body) userPatch.username = req.body.username;
     if ('full_name' in req.body) userPatch.full_name = req.body.full_name;
 
     let updatedUser = null;
     if (Object.keys(userPatch).length > 0) {
+      if ('username' in userPatch) {
+        const desired = String(userPatch.username || '').trim();
+        if (!desired) return res.status(400).json({ error: 'username is required' });
+        const { data: current, error: currentErr } = await supabase
+          .from('users')
+          .select('username')
+          .eq('user_id', req.user.id)
+          .maybeSingle();
+        if (currentErr) return res.status(400).json({ error: currentErr.message });
+        if (current?.username && current.username !== desired) {
+          return res.status(400).json({ error: 'Username cannot be changed once set' });
+        }
+        userPatch.username = desired;
+      }
+
       const { data: userRow, error: userErr } = await supabase
         .from('users')
         .update(userPatch)
