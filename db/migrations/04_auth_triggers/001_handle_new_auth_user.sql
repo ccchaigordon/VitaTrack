@@ -6,17 +6,16 @@ set search_path = public
 as $$
 declare
   default_plan uuid;
-  generated_username text;
   provider text;
+  desired_username text;
 begin
   select plan_id into default_plan
   from public.plans
   where is_default = true
   limit 1;
 
-  generated_username := 'user_' || left(replace(new.id::text, '-', ''), 12);
-
   provider := coalesce(new.raw_app_meta_data->>'provider', 'email');
+  desired_username := nullif(new.raw_user_meta_data->>'username', '');
 
   insert into public.users (
     user_id, email, username, signup_method, created_at, status, current_plan_id
@@ -24,7 +23,7 @@ begin
   values (
     new.id,
     new.email,
-    generated_username,
+    desired_username,
     provider,
     now(),
     'active',
@@ -37,6 +36,9 @@ begin
   on conflict (user_id) do nothing;
 
   return new;
+exception
+  when unique_violation then
+    raise exception 'Username already taken';
 end;
 $$;
 
