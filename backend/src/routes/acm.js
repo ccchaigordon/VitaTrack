@@ -5,6 +5,7 @@ const detectIntent = require('../utils/detectIntent');
 const cleanLLMJSON = require('../utils/cleanLLMJSON');
 const extractMealInfoFromFiles = require('../utils/extractMealInfoFromFiles');
 const extractMealInfoFromMsg = require('../utils/extractMealInfoFromMsg');
+const fetchNutritionFromSpoonacular = require('../services/spoonacularClient');
 const multer = require('multer');
 const upload = multer();
 
@@ -81,65 +82,99 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
       {
         "meal_name": "2 slices whole wheat toast, 1 boiled egg, 1 banana, 1 cup black coffee",
         "meal_time": "breakfast",
-        "protein": 12,
-        "carbs": 45,
-        "fat": 10,
-        "calories": 320
+        "protein": null,
+        "carbs": null,
+        "fat": null,
+        "calories": null
       },
       {
         "meal_name": "Chicken rice (150g chicken, 200g rice), 1 small bowl of mixed vegetables, 1 cup milk tea (medium sugar)",
         "meal_time": "lunch",
-        "protein": 35,
-        "carbs": 90,
-        "fat": 20,
-        "calories": 650
+        "protein": null,
+        "carbs": null,
+        "fat": null,
+        "calories": null
       },
       {
         "meal_name": "1 apple, 10 almonds",
         "meal_time": "snack",
-        "protein": 3,
-        "carbs": 20,
-        "fat": 7,
-        "calories": 150
+        "protein": null,
+        "carbs": null,
+        "fat": null,
+        "calories": null
       },
       {
         "meal_name": "Grilled salmon (200g), Steamed broccoli (100g), 1 small baked potato",
         "meal_time": "dinner",
-        "protein": 40,
-        "carbs": 50,
-        "fat": 18,
-        "calories": 550
+        "protein": null,
+        "carbs": null,
+        "fat": null,
+        "calories": null
       }
     ];
 
-    // for(const meal of mealData) {
-    //   // Check for missing nutrition info
-    //   const requiredFields = ["protein", "carbs", "fat", "calories"];
-    //   const missingFields = requiredFields.filter(field => meal[field] === null);
+    function splitMealItems(mealName) {
+      // Split by comma, semicolon, or 'and'
+      return mealName
+        .split(/\s*(?:,|;|\band\b)\s*/i)
+        .map(item => item.trim())
+        .filter(Boolean);
+    }
 
-    //   if (missingFields.length > 0) {
-    //     return res.json({
-    //       reply: `I need more information to log this meal. Missing: ${missingFields.join(", ")}. Could you tell me the portions or more details about your meal?`
-    //     });
-    //   }
+    const mealCache = {};
 
-    //   const { data, error } = await supabaseServer
-    //     .from("meal_logs")
-    //     .insert({
-    //       meal_name: meal.meal_name,
-    //       protein: meal.protein,
-    //       carbs: meal.carbs,
-    //       fat: meal.fat,
-    //       calories: meal.calories,
-    //       user_id: 1001, // Placeholder user ID
-    //       created_at: new Date()
-    //     });
+    async function fetchNutritionCached(foodDescription) {
+      console.log("Fetching nutrition for:", foodDescription);
+      if (mealCache[foodDescription]) return mealCache[foodDescription];
 
-    //   if (error) {
-    //     console.error("Meal log error:", error);
-    //     return res.status(500).json({ reply: "Failed to log meal." });
-    //   }
-    // }    
+      const nutrition = await fetchNutritionFromSpoonacular(foodDescription) || 
+                        { protein: null, carbs: null, fat: null, calories: null, estimated: true, source: "spoonacular" };
+
+      mealCache[foodDescription] = nutrition;
+      return nutrition;
+    }
+
+    for(const meal of mealData) {
+      // Check for missing nutrition info
+      const requiredFields = ["protein", "carbs", "fat", "calories"];
+      const missingFields = requiredFields.filter(field => meal[field] === null);
+
+      if (missingFields.length > 0) {     
+        const ingredients = splitMealItems(meal.meal_name);
+
+        let totalNutrition = { protein: 0, carbs: 0, fat: 0, calories: 0 };
+        
+        for (const item of ingredients) {
+          const nutrition = await fetchNutritionCached(item);
+          totalNutrition.protein += nutrition.protein;
+          totalNutrition.carbs += nutrition.carbs;
+          totalNutrition.fat += nutrition.fat;
+          totalNutrition.calories += nutrition.calories;
+        }
+
+        meal.protein = totalNutrition.protein;
+        meal.carbs = totalNutrition.carbs;
+        meal.fat = totalNutrition.fat;
+        meal.calories = totalNutrition.calories;
+      }
+
+      const { data, error } = await supabaseServer
+        .from("meal_logs")
+        .insert({
+          meal_name: meal.meal_name,
+          protein: meal.protein,
+          carbs: meal.carbs,
+          fat: meal.fat,
+          calories: meal.calories,
+          user_id: 1001, // Placeholder user ID
+          created_at: new Date()
+        });
+
+      if (error) {
+        console.error("Meal log error:", error);
+        return res.status(500).json({ reply: "Failed to log meal." });
+      }
+    }    
 
     return res.json({
       reply: `🍽️ Meal logged (placeholder). `
