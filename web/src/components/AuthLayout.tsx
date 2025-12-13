@@ -8,6 +8,16 @@ type Props = PropsWithChildren<{
 
 type GlobModule = { default: string };
 
+const SLIDE_MS = 8000;
+
+const carouselStore: {
+  pos: number;
+  lastAdvanceAt: number;
+} = {
+  pos: 0,
+  lastAdvanceAt: Date.now(),
+};
+
 function useAuthImages() {
   return useMemo(() => {
     const mods = import.meta.glob<GlobModule>(
@@ -26,19 +36,39 @@ function useAuthImages() {
 
 export function AuthLayout({ title, subtitle, children }: Props) {
   const images = useAuthImages();
-  const [pos, setPos] = useState(0);
+  const [pos, setPos] = useState(() => carouselStore.pos);
   const [disableAnim, setDisableAnim] = useState(false);
 
   useEffect(() => {
     if (images.length <= 1) return;
-    const t = window.setInterval(() => {
+
+    let intervalId: number | undefined;
+
+    const advance = () => {
+      carouselStore.lastAdvanceAt = Date.now();
       setPos((p) => p + 1);
-    }, 8000);
-    return () => window.clearInterval(t);
+    };
+
+    const elapsed = Date.now() - carouselStore.lastAdvanceAt;
+    const remaining = SLIDE_MS - (elapsed % SLIDE_MS);
+
+    const timeoutId = window.setTimeout(() => {
+      advance();
+      intervalId = window.setInterval(advance, SLIDE_MS);
+    }, Math.max(0, remaining));
+
+    return () => {
+      if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+      if (intervalId !== undefined) window.clearInterval(intervalId);
+    };
   }, [images.length]);
 
   const slides = images.length > 0 ? [...images, images[0]] : images;
   const visibleIdx = images.length === 0 ? 0 : pos % images.length;
+
+  useEffect(() => {
+    carouselStore.pos = pos;
+  }, [pos]);
 
   useEffect(() => {
     if (images.length <= 1) return;
