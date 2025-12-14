@@ -8,6 +8,7 @@ const extractMealInfoFromMsg = require('../utils/extractMealInfoFromMsg');
 const fetchNutritionFromSpoonacular = require('../services/spoonacularClient');
 const multer = require('multer');
 const upload = multer();
+const { PDFParse } = require('pdf-parse');
 
 const router = express.Router();
 
@@ -26,6 +27,7 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
     const mealText = message;
     let textFiles = [];
     let csvFiles = [];
+    let pdfFiles = [];
     let imageFiles = [];
     let combinedText = [];
     let imagesForGemini = [];
@@ -38,14 +40,37 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
           csvFiles.push(file);
         } else if (file.mimetype.startsWith("image/")) {
           imageFiles.push(file);
+        } else if (file.mimetype === "application/pdf") {
+          pdfFiles.push(file);
         }
       }
 
       const textContents = textFiles.map(f => f.buffer.toString("utf-8"));
       const csvContents = csvFiles.map(f => f.buffer.toString("utf-8"));
+      const pdfContents = [];
+
+      for (const pdf of pdfFiles) {
+        try {
+          const parser = new PDFParse({ data: pdf.buffer });
+
+          const result = await parser.getText();
+
+          if (!result.text || result.text.trim().length === 0) {
+            //const result = await parser.getImage();
+            //pdfContents.push(result.pages[0].images[0].data);
+          } else {
+            pdfContents.push(result.text);
+          }
+
+          await parser.destroy();
+        } catch (err) {
+          console.error("PDF parse error:", err);
+          pdfContents.push("[Failed to extract text from PDF]");
+        }
+      }
 
       // Combine all textual content into one string for Gemini
-      combinedText = [...textContents, ...csvContents].join("\n\n");
+      combinedText = [...textContents, ...csvContents, ...pdfContents].join("\n\n");
 
       imagesForGemini = imageFiles.map(f => ({
         filename: f.originalname,
@@ -59,59 +84,59 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
 
     let extraction;
     
-    // if ((textFiles.length + csvFiles.length + imageFiles.length) > 0) {
-    //   extraction = await extractMealInfoFromFiles(message, combinedText, imagesForGemini);
-    // } else {
-    //   extraction = await extractMealInfoFromMsg(message); // fallback: just the text message
-    // }
+    if ((textFiles.length + csvFiles.length + imageFiles.length + pdfFiles.length) > 0) {
+      extraction = await extractMealInfoFromFiles(message, combinedText, imagesForGemini);
+    } else {
+      extraction = await extractMealInfoFromMsg(message); // fallback: just the text message
+    }
     
-    // console.log("Extraction result:", extraction);
+    console.log("Extraction result:", extraction);
 
     let mealData;
 
-    // try {
-    //   mealData = cleanLLMJSON(extraction);      
-    //   console.log("Cleaned meal data:", mealData);
-    // } catch (err) {
-    //   console.error("JSON parse error:", err);
-    //   return res.json({ reply: "I couldn't understand the meal details." });
-    // }
+    try {
+      mealData = cleanLLMJSON(extraction);      
+      console.log("Cleaned meal data:", mealData);
+    } catch (err) {
+      console.error("JSON parse error:", err);
+      return res.json({ reply: "I couldn't understand the meal details." });
+    }
 
     // Mock data for testing
-    mealData = [
-      {
-        "meal_name": "2 slices whole wheat toast, 1 boiled egg, 1 banana, 1 cup black coffee",
-        "meal_time": "breakfast",
-        "protein": null,
-        "carbs": null,
-        "fat": null,
-        "calories": null
-      },
-      {
-        "meal_name": "Chicken rice (150g chicken, 200g rice), 1 small bowl of mixed vegetables, 1 cup milk tea (medium sugar)",
-        "meal_time": "lunch",
-        "protein": null,
-        "carbs": null,
-        "fat": null,
-        "calories": null
-      },
-      {
-        "meal_name": "1 apple, 10 almonds",
-        "meal_time": "snack",
-        "protein": null,
-        "carbs": null,
-        "fat": null,
-        "calories": null
-      },
-      {
-        "meal_name": "Grilled salmon (200g), Steamed broccoli (100g), 1 small baked potato",
-        "meal_time": "dinner",
-        "protein": null,
-        "carbs": null,
-        "fat": null,
-        "calories": null
-      }
-    ];
+    // mealData = [
+    //   {
+    //     "meal_name": "2 slices whole wheat toast, 1 boiled egg, 1 banana, 1 cup black coffee",
+    //     "meal_time": "breakfast",
+    //     "protein": null,
+    //     "carbs": null,
+    //     "fat": null,
+    //     "calories": null
+    //   },
+    //   {
+    //     "meal_name": "Chicken rice (150g chicken, 200g rice), 1 small bowl of mixed vegetables, 1 cup milk tea (medium sugar)",
+    //     "meal_time": "lunch",
+    //     "protein": null,
+    //     "carbs": null,
+    //     "fat": null,
+    //     "calories": null
+    //   },
+    //   {
+    //     "meal_name": "1 apple, 10 almonds",
+    //     "meal_time": "snack",
+    //     "protein": null,
+    //     "carbs": null,
+    //     "fat": null,
+    //     "calories": null
+    //   },
+    //   {
+    //     "meal_name": "Grilled salmon (200g), Steamed broccoli (100g), 1 small baked potato",
+    //     "meal_time": "dinner",
+    //     "protein": null,
+    //     "carbs": null,
+    //     "fat": null,
+    //     "calories": null
+    //   }
+    // ];
 
     function splitMealItems(mealName) {
       // Split by comma, semicolon, or 'and'
@@ -134,12 +159,23 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
       return nutrition;
     }
 
-    for(const meal of mealData) {
+    let mealDataParsed;
+
+    try {
+      mealDataParsed = typeof mealData === "string" ? JSON.parse(mealData) : mealData;
+    } catch (err) {
+      console.error("Failed to parse mealData:", err);
+      return res.status(500).json({ reply: "Invalid meal data format." });
+    }
+
+    for(const meal of mealDataParsed) {
       // Check for missing nutrition info
       const requiredFields = ["protein", "carbs", "fat", "calories"];
       const missingFields = requiredFields.filter(field => meal[field] === null);
 
-      if (missingFields.length > 0) {     
+      if (missingFields.length > 0) {    
+        
+        console.log("Entering missing fields")
         const ingredients = splitMealItems(meal.meal_name);
 
         let totalNutrition = { protein: 0, carbs: 0, fat: 0, calories: 0 };
@@ -157,6 +193,8 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
         meal.fat = totalNutrition.fat;
         meal.calories = totalNutrition.calories;
       }
+
+      console.log("Entry for meal log:", meal);
 
       const { data, error } = await supabaseServer
         .from("meal_logs")
