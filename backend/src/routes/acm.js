@@ -5,6 +5,8 @@ const detectIntent = require('../utils/detectIntent');
 const cleanLLMJSON = require('../utils/cleanLLMJSON');
 const extractMealInfoFromFiles = require('../utils/extractMealInfoFromFiles');
 const extractMealInfoFromMsg = require('../utils/extractMealInfoFromMsg');
+const extractWorkoutInfoFromFiles = require('../utils/extractWorkoutInfoFromFiles');
+const extractWorkoutInfoFromMsg = require('../utils/extractWorkoutInfoFromMsg');
 const fetchNutritionFromSpoonacular = require('../services/spoonacularClient');
 const multer = require('multer');
 const upload = multer();
@@ -24,7 +26,6 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
   const intent = detectIntent(message);
   
   if (intent === "log_meal") {
-    const mealText = message;
     let textFiles = [];
     let csvFiles = [];
     let pdfFiles = [];
@@ -45,9 +46,17 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
         }
       }
 
-      const textContents = textFiles.map(f => f.buffer.toString("utf-8"));
-      const csvContents = csvFiles.map(f => f.buffer.toString("utf-8"));
-      const pdfContents = [];
+      const textContentsWithSource = textFiles.map(f => ({
+        text: f.buffer.toString("utf-8"),
+        source: "text_file"
+      }));
+
+      const csvContentsWithSource = csvFiles.map(f => ({
+        text: f.buffer.toString("utf-8"),
+        source: "csv_file"
+      }));
+
+      const pdfContentsWithSource = [];
 
       for (const pdf of pdfFiles) {
         try {
@@ -59,25 +68,27 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
             //const result = await parser.getImage();
             //pdfContents.push(result.pages[0].images[0].data);
           } else {
-            pdfContents.push(result.text);
+            pdfContentsWithSource.push({ text: result.text, source: "pdf_file" });
           }
 
           await parser.destroy();
         } catch (err) {
           console.error("PDF parse error:", err);
-          pdfContents.push("[Failed to extract text from PDF]");
+          pdfContentsWithSource.push({ text: "[Failed to extract text from PDF]", source: "pdf_file" });
         }
-      }
+      }      
 
-      // Combine all textual content into one string for Gemini
-      combinedText = [...textContents, ...csvContents, ...pdfContents].join("\n\n");
+      const labeledTextBlocks = [...textContentsWithSource, ...csvContentsWithSource, ...pdfContentsWithSource]
+       .map(item => `[SOURCE=${item.source}]\n${item.text}`);
+
+      combinedText = labeledTextBlocks.join("\n\n");
 
       imagesForGemini = imageFiles.map(f => ({
         filename: f.originalname,
         mimeType: f.mimetype,
         base64: f.buffer.toString("base64")
       }));
-    }
+    } 
 
     console.log("Combined text for Gemini:", combinedText);
     console.log("Images for Gemini:", imagesForGemini.map(img => img.filename));
@@ -169,14 +180,13 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
     }
 
     for(const meal of mealDataParsed) {
+      const mealSource = meal.source || "unknown";
+
       // Check for missing nutrition info
       const requiredFields = ["protein", "carbs", "fat", "calories"];
       const missingFields = requiredFields.filter(field => meal[field] === null);
 
       if (missingFields.length > 0) {    
-        
-        console.log("Entering missing fields")
-        const ingredients = splitMealItems(meal.meal_name);
 
         let totalNutrition = { protein: 0, carbs: 0, fat: 0, calories: 0 };
         
@@ -204,6 +214,7 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
           carbs: meal.carbs,
           fat: meal.fat,
           calories: meal.calories,
+          source: mealSource,
           user_id: 1001, // Placeholder user ID
           created_at: new Date()
         });
@@ -220,6 +231,136 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
   }
 
   if (intent === "log_workout") {
+    let textFiles = [];
+    let csvFiles = [];
+    let pdfFiles = [];
+    let imageFiles = [];
+    let combinedText = [];
+    let imagesForGemini = [];
+
+    if (files && files.length > 0) {
+      for (const file of files) {
+        if (file.mimetype === "text/plain") {
+          textFiles.push(file);
+        } else if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv")) {
+          csvFiles.push(file);
+        } else if (file.mimetype.startsWith("image/")) {
+          imageFiles.push(file);
+        } else if (file.mimetype === "application/pdf") {
+          pdfFiles.push(file);
+        }
+      }
+
+      const textContentsWithSource = textFiles.map(f => ({
+        text: f.buffer.toString("utf-8"),
+        source: "text_file"
+      }));
+
+      const csvContentsWithSource = csvFiles.map(f => ({
+        text: f.buffer.toString("utf-8"),
+        source: "csv_file"
+      }));
+
+      const pdfContentsWithSource = [];
+
+      for (const pdf of pdfFiles) {
+        try {
+          const parser = new PDFParse({ data: pdf.buffer });
+
+          const result = await parser.getText();
+
+          if (!result.text || result.text.trim().length === 0) {
+            //const result = await parser.getImage();
+            //pdfContents.push(result.pages[0].images[0].data);
+          } else {
+            pdfContentsWithSource.push({ text: result.text, source: "pdf_file" });
+          }
+
+          await parser.destroy();
+        } catch (err) {
+          console.error("PDF parse error:", err);
+          pdfContentsWithSource.push({ text: "[Failed to extract text from PDF]", source: "pdf_file" });
+        }
+      }      
+
+      const labeledTextBlocks = [...textContentsWithSource, ...csvContentsWithSource, ...pdfContentsWithSource]
+       .map(item => `[SOURCE=${item.source}]\n${item.text}`);
+
+      combinedText = labeledTextBlocks.join("\n\n");
+
+      imagesForGemini = imageFiles.map(f => ({
+        filename: f.originalname,
+        mimeType: f.mimetype,
+        base64: f.buffer.toString("base64")
+      }));
+    }
+
+    console.log("Combined text for Gemini:", combinedText);
+    console.log("Images for Gemini:", imagesForGemini.map(img => img.filename));
+
+    let extraction;
+    
+    if ((textFiles.length + csvFiles.length + imageFiles.length + pdfFiles.length) > 0) {
+      extraction = await extractWorkoutInfoFromFiles(message, combinedText, imagesForGemini);
+    } else {
+      extraction = await extractWorkoutInfoFromMsg(message); // fallback: just the text message
+    }
+    
+    console.log("Extraction result:", extraction);
+
+    let workoutData;
+
+    try {
+      workoutData = cleanLLMJSON(extraction);      
+      console.log("Cleaned workout data:", workoutData);
+    } catch (err) {
+      console.error("JSON parse error:", err);
+      return res.json({ reply: "I couldn't understand the workout details." });
+    }
+
+    let workoutDataParsed;
+
+    try {
+      workoutDataParsed = typeof workoutData === "string" ? JSON.parse(workoutData) : workoutData;
+    } catch (err) {
+      console.error("Failed to parse workoutData:", err);
+      return res.status(500).json({ reply: "Invalid workout data format." });
+    }
+
+    for(const workout of workoutDataParsed) {
+      const workoutSource = workout.source || "unknown";
+
+      // Check for missing nutrition info
+      const requiredFields = ["exercise_name", "sets", "reps", "duration", "calories_burned"];
+      const missingFields = requiredFields.filter(field => workout[field] === null);
+
+      if (missingFields.length > 0) {
+        if (missingFields.includes("calories_burned")) {
+          return res.json({ reply: `Please provide the following missing information: ${missingFields.join(", ")}. To calculate calories burned, please use this link: https://www.calculator.net/calories-burned-calculator.html` })
+        } else {
+          return res.json({ reply: `Please provide the following missing information: ${missingFields.join(", ")}.` })
+        }        
+      };
+
+      const { data, error } = await supabaseServer
+        .from("workout_logs")
+        .insert({
+          exercise_name: workout.exercise_name,
+          sets: workout.sets,
+          reps: workout.reps,
+          duration: workout.duration,
+          calories_burned: workout.calories_burned,
+          source: workoutSource,
+          user_id: 1001, // Placeholder user ID
+          created_at: new Date()
+        });
+
+      if (error) {
+        console.error("Workout log error:", error);
+        return res.status(500).json({ reply: "Failed to log workout." });
+      }
+    }
+
     return res.json({
       reply: `🏋️ Workout logged (placeholder). `
     });

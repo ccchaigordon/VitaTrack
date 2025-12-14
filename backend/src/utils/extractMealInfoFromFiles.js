@@ -17,6 +17,7 @@ async function extractMealInfoFromFiles(message, combinedText, images) {
     - If multiple meals are present (breakfast, lunch, snack, dinner), extract each meal separately.
     - Use the actual food items as "meal_name", not "Breakfast", "Lunch", etc.
     - Extract protein, carbs, fat, calories for each meal.
+    - Include the original SOURCE tag (e.g., text_file, csv_file, pdf_file) for each meal.
     - If any field is missing, set it to null.
     - Return ONLY valid JSON in the following format:
 
@@ -27,6 +28,7 @@ async function extractMealInfoFromFiles(message, combinedText, images) {
         "carbs": NUMBER,
         "fat": NUMBER,
         "calories": NUMBER
+        "source": "source_tag"
       }
     ]
   `;
