@@ -10,6 +10,7 @@ const extractWorkoutInfoFromMsg = require('../utils/extractWorkoutInfoFromMsg');
 const fetchNutritionFromSpoonacular = require('../services/spoonacularClient');
 const parsePdfFiles = require('../utils/pdfParser');
 const processFiles = require('../utils/fileProcessor');
+const extractMealTime = require('../utils/extractMealTime');
 const multer = require('multer');
 const upload = multer();
 const { PDFParse } = require('pdf-parse');
@@ -27,6 +28,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   //const user = req.user;
   const intent = detectIntent(message);
   
+  // Log meal
   if (intent === "log_meal") {
     let combinedText = "";
     let imagesForGemini = [];
@@ -160,6 +162,7 @@ router.post("/chat", upload.any(), async (req, res) => {
           fat: meal.fat,
           calories: meal.calories,
           source: mealSource,
+          meal_time: meal.meal_time,
           user_id: 1001, // Placeholder user ID
           created_at: new Date()
         });
@@ -255,6 +258,38 @@ router.post("/chat", upload.any(), async (req, res) => {
   }
 
   if (intent === "recommendation") {
+    let mealTime = "";
+    let user_id = 1001; // dummy user ID
+
+    mealTime = extractMealTime(message);
+    console.log("Inferred meal time for recommendation:", mealTime);
+
+    const { data: meals, error } = await supabaseServer
+      .from("meal_logs")
+      .select("*")
+      .eq("user_id", user_id);
+
+    if (error || !meals.length) {
+      throw new Error("No meal data found");
+    }
+
+    // Filter by rules based on meal time
+    function filterMealsByTime(meals, mealTime) {
+      if (mealTime === "breakfast") {
+        return meals.filter(m => m.calories >= 300 && m.calories <= 550);
+      }
+      if (mealTime === "lunch") {
+        return meals.filter(m => m.calories >= 500 && m.calories <= 750);
+      }
+      if (mealTime === "dinner") {
+        return meals.filter(m => m.calories >= 500 && m.calories <= 800);
+      }
+      return meals;
+    }
+
+    const filteredMeals = filterMealsByTime(meals, mealTime);
+
+
     return res.json({
       reply: `🔍 Looking for suggestions... (placeholder)`
     });
