@@ -9,8 +9,10 @@ function inferMealTimeByClock() {
   const hour = new Date().getHours();
 
   if (hour >= 5 && hour < 11) return "breakfast";
-  if (hour >= 11 && hour < 17) return "lunch";
-  if (hour >= 17 && hour < 22) return "dinner";
+  if (hour >= 11 && hour < 16) return "lunch";
+  if (hour >= 16 && hour < 18) return "snacks";
+  if (hour >= 18 && hour < 22) return "dinner";
+  if (hour >= 22 || hour < 5) return "supper";
 
   return null;
 }

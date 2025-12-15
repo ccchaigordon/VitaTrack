@@ -13,6 +13,7 @@
   "dependencies": {
     "@google/genai": "^1.31.0",
     "@supabase/supabase-js": "^2.87.1",
+    "@tensorflow/tfjs": "^4.22.0",
     "axios": "^1.13.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",

@@ -15,6 +15,10 @@ const multer = require('multer');
 const upload = multer();
 const { PDFParse } = require('pdf-parse');
 
+const tf = require('@tensorflow/tfjs');
+console.log('tf.linalg:', tf.linalg);
+
+
 const router = express.Router();
 
 router.post("/chat", upload.any(), async (req, res) => {
@@ -288,6 +292,71 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
 
     const filteredMeals = filterMealsByTime(meals, mealTime);
+
+    console.log("Filtered Meals:", filteredMeals);
+
+    const vectors = filteredMeals.map(m => [
+      m.calories,
+      m.protein,
+      m.carbs,
+      m.fat
+    ]);
+
+    function normalizeVector(v) {
+      const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
+      if (norm === 0) return v;
+      return v.map(x => x / norm);
+    }
+
+    function averageVector(vectors) {
+      const n = vectors.length;
+      const sum = vectors.reduce((acc, v) => acc.map((x, i) => x + v[i]), new Array(vectors[0].length).fill(0));
+      return sum.map(x => x / n);
+    }
+
+    const normalizedVectors = vectors.map(normalizeVector);
+    console.log("Normalized Vectors:", normalizedVectors);
+
+    const referenceVector = averageVector(normalizedVectors);
+    console.log("Reference Vector:", referenceVector);
+
+    const mealTensor = tf.tensor2d(normalizedVectors);
+    const refTensor = tf.tensor1d(referenceVector); 
+
+    // Cosine similarity = dot product of normalized vectors
+    const similarity = tf
+      .matMul(mealTensor, refTensor.expandDims(1))
+      .squeeze();
+
+    const similarityTensor = similarity;
+
+    const K = 3;
+
+    const { values, indices } = tf.topk(similarityTensor, K);
+
+    const topIndices = indices.arraySync();
+    const topScores = values.arraySync();
+
+    const recommendations = topIndices.map((idx, i) => ({
+      meal: filteredMeals[idx],       // original meal object from DB
+      similarity: topScores[i]
+    }));
+
+    console.log("Recommendations:", recommendations);
+
+    tf.dispose([
+      mealTensor,
+      refTensor,
+      normalizedVectors,
+      similarityTensor,
+      values,
+      indices
+    ]);
+
+
+
+
+
 
 
     return res.json({
