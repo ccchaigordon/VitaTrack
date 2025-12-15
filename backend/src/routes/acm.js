@@ -8,13 +8,15 @@ const extractMealInfoFromMsg = require('../utils/extractMealInfoFromMsg');
 const extractWorkoutInfoFromFiles = require('../utils/extractWorkoutInfoFromFiles');
 const extractWorkoutInfoFromMsg = require('../utils/extractWorkoutInfoFromMsg');
 const fetchNutritionFromSpoonacular = require('../services/spoonacularClient');
+const parsePdfFiles = require('../utils/pdfParser');
+const processFiles = require('../utils/fileProcessor');
 const multer = require('multer');
 const upload = multer();
 const { PDFParse } = require('pdf-parse');
 
 const router = express.Router();
 
-router.post("/chat", upload.any(), async (req, res) => { // later put upload.any()
+router.post("/chat", upload.any(), async (req, res) => {
   const { message } = req.body;
   const files = req.files;
   if (!message) return res.status(400).json({ error: "Message is required" });
@@ -26,80 +28,23 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
   const intent = detectIntent(message);
   
   if (intent === "log_meal") {
-    let textFiles = [];
-    let csvFiles = [];
-    let pdfFiles = [];
-    let imageFiles = [];
-    let combinedText = [];
+    let combinedText = "";
     let imagesForGemini = [];
 
     if (files && files.length > 0) {
-      for (const file of files) {
-        if (file.mimetype === "text/plain") {
-          textFiles.push(file);
-        } else if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv")) {
-          csvFiles.push(file);
-        } else if (file.mimetype.startsWith("image/")) {
-          imageFiles.push(file);
-        } else if (file.mimetype === "application/pdf") {
-          pdfFiles.push(file);
-        }
-      }
-
-      const textContentsWithSource = textFiles.map(f => ({
-        text: f.buffer.toString("utf-8"),
-        source: "text_file"
-      }));
-
-      const csvContentsWithSource = csvFiles.map(f => ({
-        text: f.buffer.toString("utf-8"),
-        source: "csv_file"
-      }));
-
-      const pdfContentsWithSource = [];
-
-      for (const pdf of pdfFiles) {
-        try {
-          const parser = new PDFParse({ data: pdf.buffer });
-
-          const result = await parser.getText();
-
-          if (!result.text || result.text.trim().length === 0) {
-            //const result = await parser.getImage();
-            //pdfContents.push(result.pages[0].images[0].data);
-          } else {
-            pdfContentsWithSource.push({ text: result.text, source: "pdf_file" });
-          }
-
-          await parser.destroy();
-        } catch (err) {
-          console.error("PDF parse error:", err);
-          pdfContentsWithSource.push({ text: "[Failed to extract text from PDF]", source: "pdf_file" });
-        }
-      }      
-
-      const labeledTextBlocks = [...textContentsWithSource, ...csvContentsWithSource, ...pdfContentsWithSource]
-       .map(item => `[SOURCE=${item.source}]\n${item.text}`);
-
-      combinedText = labeledTextBlocks.join("\n\n");
-
-      imagesForGemini = imageFiles.map(f => ({
-        filename: f.originalname,
-        mimeType: f.mimetype,
-        base64: f.buffer.toString("base64")
-      }));
-    } 
+      const result = await processFiles(files);
+      combinedText = result.combinedText;
+      imagesForGemini = result.imagesForGemini;
+    }
 
     console.log("Combined text for Gemini:", combinedText);
     console.log("Images for Gemini:", imagesForGemini.map(img => img.filename));
 
-    let extraction;
-    
-    if ((textFiles.length + csvFiles.length + imageFiles.length + pdfFiles.length) > 0) {
-      extraction = await extractMealInfoFromFiles(message, combinedText, imagesForGemini);
-    } else {
-      extraction = await extractMealInfoFromMsg(message); // fallback: just the text message
-    }
+    const hasFiles = files && files.length > 0;
+
+    const extraction = hasFiles
+      ? await extractMealInfoFromFiles(message, combinedText, imagesForGemini)
+      : await extractMealInfoFromMsg(message);
     
     console.log("Extraction result:", extraction);
 
@@ -231,80 +176,23 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
   }
 
   if (intent === "log_workout") {
-    let textFiles = [];
-    let csvFiles = [];
-    let pdfFiles = [];
-    let imageFiles = [];
-    let combinedText = [];
+   let combinedText = "";
     let imagesForGemini = [];
 
     if (files && files.length > 0) {
-      for (const file of files) {
-        if (file.mimetype === "text/plain") {
-          textFiles.push(file);
-        } else if (file.mimetype === "text/csv" || file.originalname.endsWith(".csv")) {
-          csvFiles.push(file);
-        } else if (file.mimetype.startsWith("image/")) {
-          imageFiles.push(file);
-        } else if (file.mimetype === "application/pdf") {
-          pdfFiles.push(file);
-        }
-      }
-
-      const textContentsWithSource = textFiles.map(f => ({
-        text: f.buffer.toString("utf-8"),
-        source: "text_file"
-      }));
-
-      const csvContentsWithSource = csvFiles.map(f => ({
-        text: f.buffer.toString("utf-8"),
-        source: "csv_file"
-      }));
-
-      const pdfContentsWithSource = [];
-
-      for (const pdf of pdfFiles) {
-        try {
-          const parser = new PDFParse({ data: pdf.buffer });
-
-          const result = await parser.getText();
-
-          if (!result.text || result.text.trim().length === 0) {
-            //const result = await parser.getImage();
-            //pdfContents.push(result.pages[0].images[0].data);
-          } else {
-            pdfContentsWithSource.push({ text: result.text, source: "pdf_file" });
-          }
-
-          await parser.destroy();
-        } catch (err) {
-          console.error("PDF parse error:", err);
-          pdfContentsWithSource.push({ text: "[Failed to extract text from PDF]", source: "pdf_file" });
-        }
-      }      
-
-      const labeledTextBlocks = [...textContentsWithSource, ...csvContentsWithSource, ...pdfContentsWithSource]
-       .map(item => `[SOURCE=${item.source}]\n${item.text}`);
-
-      combinedText = labeledTextBlocks.join("\n\n");
-
-      imagesForGemini = imageFiles.map(f => ({
-        filename: f.originalname,
-        mimeType: f.mimetype,
-        base64: f.buffer.toString("base64")
-      }));
+      const result = await processFiles(files);
+      combinedText = result.combinedText;
+      imagesForGemini = result.imagesForGemini;
     }
 
     console.log("Combined text for Gemini:", combinedText);
     console.log("Images for Gemini:", imagesForGemini.map(img => img.filename));
 
-    let extraction;
-    
-    if ((textFiles.length + csvFiles.length + imageFiles.length + pdfFiles.length) > 0) {
-      extraction = await extractWorkoutInfoFromFiles(message, combinedText, imagesForGemini);
-    } else {
-      extraction = await extractWorkoutInfoFromMsg(message); // fallback: just the text message
-    }
+    const hasFiles = files && files.length > 0;
+
+    const extraction = hasFiles
+      ? await extractMealInfoFromFiles(message, combinedText, imagesForGemini)
+      : await extractMealInfoFromMsg(message);
     
     console.log("Extraction result:", extraction);
 
