@@ -187,7 +187,7 @@ router.post("/chat", upload.any(), async (req, res) => { // later put upload.any
       const missingFields = requiredFields.filter(field => meal[field] === null);
 
       if (missingFields.length > 0) {    
-
+        const ingredients = splitMealItems(meal.meal_name);
         let totalNutrition = { protein: 0, carbs: 0, fat: 0, calories: 0 };
         
         for (const item of ingredients) {
