@@ -21,7 +21,7 @@ const carouselStore: {
 function useAuthImages() {
   return useMemo(() => {
     const mods = import.meta.glob<GlobModule>(
-      "../assets/auth_*.{png,jpg,jpeg,webp}",
+      "../assets/auth/auth_*.{png,jpg,jpeg,webp}",
       {
         eager: true,
       }
