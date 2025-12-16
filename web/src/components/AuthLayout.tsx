@@ -87,9 +87,8 @@ export function AuthLayout({ title, subtitle, children }: Props) {
     <div className="min-h-screen bg-white flex items-center lg:items-start">
       <div className="mx-auto grid min-h-screen max-w-6xl grid-cols-1 gap-10 p-6 items-center lg:grid-cols-2">
         <div className="flex flex-col">
-          <div className="mb-10 flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-700">
-            <span className="inline-block h-6 w-6 rounded-full bg-slate-900" />
-            <span>VitaTrack</span>
+          <div className="mb-10 flex items-center justify-center lg:justify-start gap-2 text-sm font-semibold tracking-wide text-slate-700">
+            <img src="/logo.png" alt="" className="h-10 w-auto" />
           </div>
 
           <h1 className="text-3xl font-semibold text-slate-900">{title}</h1>
