@@ -9,7 +9,7 @@ import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { ProfileEditPage } from "./pages/ProfileEditPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
-import { ChatApp } from "./pages/chatbot";
+import { ChatApp } from "./pages/ChatApp";
 import Navbar from "./components/navbar";
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
@@ -82,9 +82,18 @@ export function App() {
         }
       />
 
-      <Route path="*" element={<Navigate to="/signin" replace />} />
+      <Route
+        path="/chatbot"
+        element={
+          <RequireAuth>
+            <AuthenticatedLayout>
+              <ChatApp />
+            </AuthenticatedLayout>
+          </RequireAuth>
+        }
+      />
 
-      <Route path="/chatbot" element={<ChatApp />} />
+      <Route path="*" element={<Navigate to="/signin" replace />} />
     </Routes>
   );
 }
