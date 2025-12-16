@@ -45,7 +45,7 @@ async function ensureUserBootstrap(req) {
   if (existingUserErr) {
     // Tables not created yet
     throw new Error(
-      `Supabase table error: ${existingUserErr.message}. Did you run the SQL to create users/user_profiles/plans?`
+      `Supabase table error: ${existingUserErr.message}.`
     );
   }
 
@@ -127,8 +127,18 @@ router.get('/me', async (req, res) => {
       plan = planRow;
     }
 
+    // Idk where they store the avatar lol so just find all possible places
+    const identities = req.user?.raw?.identities || [];
+    const googleIdentity = identities.find(i => i.provider === 'google');
+    const avatarUrl = 
+      req.user?.raw?.user_metadata?.avatar_url ||
+      req.user?.raw?.user_metadata?.picture ||
+      googleIdentity?.identity_data?.avatar_url ||
+      googleIdentity?.identity_data?.picture ||
+      null;
+
     return res.json({
-      user: userRow,
+      user: { ...userRow, avatar_url: avatarUrl },
       profile: profileRow,
       plan,
       profileComplete: isProfileComplete(profileRow)
@@ -280,6 +290,41 @@ router.post('/me/plan', async (req, res) => {
   } catch (err) {
     console.error('POST /api/me/plan error:', err);
     return res.status(500).json({ error: 'Failed to update plan' });
+  }
+});
+
+// GET /api/check-username?username=xxx
+router.get('/check-username', async (req, res) => {
+  try {
+    const { username } = req.query;
+    if (!username || typeof username !== 'string') {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    const trimmed = username.trim().toLowerCase();
+    if (!trimmed) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+
+    // Check if username exists (case-insensitive)
+    const { data, error } = await supabaseServer
+      .from('users')
+      .select('user_id')
+      .ilike('username', trimmed)
+      .maybeSingle();
+
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
+
+    if (data && data.user_id !== req.user.id) {
+      return res.json({ available: false, message: 'This username is already taken' });
+    }
+
+    return res.json({ available: true });
+  } catch (err) {
+    console.error('GET /api/check-username error:', err);
+    return res.status(500).json({ error: 'Failed to check username' });
   }
 });
 
