@@ -1,17 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "../services/api";
 import { getSupabase } from "../services/supabase";
+import { useUser } from "../contexts/UserContext";
 import NavLogo from "../assets/NavLogo.png";
-
-type MeResponse = {
-  user: {
-    email: string | null;
-    username: string | null;
-    avatar_url: string | null;
-  } | null;
-  plan: { plan_name: string | null } | null;
-};
 
 function firstChar(v: string) {
   const s = v.trim();
@@ -104,12 +95,11 @@ function Avatar({
 
 export default function Navbar() {
   const nav = useNavigate();
+  const { me } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileAnimating, setMobileAnimating] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
-
-  const [me, setMe] = useState<MeResponse | null>(null);
 
   const displayName = useMemo(() => {
     const username = me?.user?.username?.trim();
@@ -124,22 +114,7 @@ export default function Navbar() {
   const planLabel = normalizePlanLabel(me?.plan?.plan_name);
   const avatarLetter = firstChar(displayName);
 
-  useEffect(() => {
-    let mounted = true;
-    apiFetch<MeResponse>("/me")
-      .then((r) => {
-        if (!mounted) return;
-        setMe(r);
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setMe(null);
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
+  // Close profile dropdown when clicking outside
   useEffect(() => {
     function onDocMouseDown(e: MouseEvent) {
       if (!profileOpen) return;
@@ -154,7 +129,13 @@ export default function Navbar() {
 
   async function signOut() {
     const supabase = getSupabase();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // If the session is invalid, clear storage manually
+      localStorage.clear();
+      sessionStorage.clear();
+    }
     nav("/signin", { replace: true });
   }
 

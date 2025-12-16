@@ -1,42 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiFetch } from "../services/api";
+import { useUser } from "../contexts/UserContext";
 import { getSupabase } from "../services/supabase";
-
-type MeResponse = {
-  user: {
-    email: string;
-    username: string | null;
-    full_name: string | null;
-  } | null;
-  profileComplete: boolean;
-};
 
 export function DashboardPage() {
   const nav = useNavigate();
-  const [me, setMe] = useState<MeResponse | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const { me, loading, error } = useUser();
 
   useEffect(() => {
-    let mounted = true;
-    apiFetch<MeResponse>("/me")
-      .then((r) => {
-        if (!mounted) return;
-        setMe(r);
-        if (!r.profileComplete) nav("/onboarding", { replace: true });
-      })
-      .catch((e) => {
-        if (!mounted) return;
-        setErrorMsg(e?.message || "Failed to load dashboard");
-      });
-    return () => {
-      mounted = false;
-    };
-  }, [nav]);
+    if (!loading && me && !me.profileComplete) {
+      nav("/onboarding", { replace: true });
+    }
+  }, [loading, me, nav]);
 
   async function logout() {
     const supabase = getSupabase();
-    await supabase.auth.signOut();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      localStorage.clear();
+      sessionStorage.clear();
+    }
     nav("/signin", { replace: true });
   }
 
@@ -61,13 +45,11 @@ export function DashboardPage() {
         </div>
 
         <div className="mt-6 rounded-xl border border-slate-200 p-4">
-          {errorMsg ? (
-            <div className="text-sm text-red-700">{errorMsg}</div>
-          ) : null}
-          {!me && !errorMsg ? (
+          {error ? <div className="text-sm text-red-700">{error}</div> : null}
+          {loading ? (
             <div className="text-sm text-slate-600">Loading…</div>
           ) : null}
-          {me ? (
+          {me && !loading ? (
             <div className="space-y-1 text-sm text-slate-700">
               <div>
                 <span className="font-medium">Email:</span>{" "}

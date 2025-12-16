@@ -26,17 +26,19 @@ export async function apiFetch<T>(
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
   headers.set('Authorization', `Bearer ${token}`);
+  headers.set('Accept', 'application/json');
 
   let body = options.body;
-  if (options.json !== undefined) {
+  if (options.json !== undefined || options.body) {
     headers.set('Content-Type', 'application/json');
-    body = JSON.stringify(options.json);
+    body = options.json !== undefined ? JSON.stringify(options.json) : options.body;
   }
 
   const res = await fetch(`${apiBase}${path}`, {
     ...options,
     headers,
-    body
+    body,
+    credentials: 'include',
   });
 
   const text = await res.text();
