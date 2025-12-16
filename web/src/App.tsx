@@ -7,6 +7,7 @@ import { OnboardingPage } from "./pages/OnboardingPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/chatbot";
+import Navbar from "./components/navbar";
 
 export function App() {
   return (
@@ -42,6 +43,7 @@ export function App() {
         path="/dashboard"
         element={
           <RequireAuth>
+            <Navbar />
             <DashboardPage />
           </RequireAuth>
         }

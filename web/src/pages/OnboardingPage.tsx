@@ -5,7 +5,7 @@ import { getErrorMessage } from "../utils/errors";
 import NavLogo from "../assets/NavLogo.png";
 
 type MeResponse = {
-  user: { username: string; full_name: string | null } | null;
+  user: { username: string | null; full_name: string | null } | null;
   profile: {
     age: number | null;
     gender: string | null;
@@ -105,6 +105,8 @@ export function OnboardingPage() {
   );
   const pendingStep = useRef<1 | 2 | 3 | 4 | null>(null);
 
+  const [username, setUsername] = useState("");
+  const [usernameExists, setUsernameExists] = useState(false);
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -127,6 +129,11 @@ export function OnboardingPage() {
         if (me.profileComplete) {
           nav("/dashboard", { replace: true });
           return;
+        }
+        const existingUsername = me.user?.username?.trim() ?? "";
+        if (existingUsername) {
+          setUsername(existingUsername);
+          setUsernameExists(true);
         }
         setFullName(me.user?.full_name ?? "");
         if (me.profile) {
@@ -158,6 +165,7 @@ export function OnboardingPage() {
 
   function validateStep(current: 1 | 2 | 3 | 4): string | null {
     if (current === 1) {
+      if (!usernameExists && !username.trim()) return "Username is required";
       if (!fullName.trim()) return "Full Name is required";
       if (!age.trim()) return "Age is required";
       if (!gender) return "Gender is required";
@@ -204,7 +212,7 @@ export function OnboardingPage() {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         full_name: fullName.trim(),
         age: toNumberOrNull(age),
         gender: gender,
@@ -217,6 +225,9 @@ export function OnboardingPage() {
         goals: goals.trim(),
         workout_days_per_week: toNumberOrNull(workoutDaysPerWeek) ?? null,
       };
+      if (!usernameExists && username.trim()) {
+        payload.username = username.trim();
+      }
 
       await apiFetch<{ profileComplete: boolean }>("/me/profile", {
         method: "PUT",
@@ -231,13 +242,34 @@ export function OnboardingPage() {
     }
   }
 
-  function next() {
+  async function next() {
     const err = validateStep(step as 1 | 2 | 3);
     if (err) {
       setErrorMsg(err);
       return;
     }
     setErrorMsg(null);
+
+    // Check username availability before proceeding
+    if (step === 1 && !usernameExists && username.trim()) {
+      setLoading(true);
+      try {
+        const result = await apiFetch<{ available: boolean; message?: string }>(
+          `/check-username?username=${encodeURIComponent(username.trim())}`
+        );
+        if (!result.available) {
+          setErrorMsg(result.message || "This username is already taken");
+          setLoading(false);
+          return;
+        }
+      } catch (e: unknown) {
+        setErrorMsg(getErrorMessage(e, "Failed to check username"));
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+    }
+
     if (step === 1) animateToStep(2, "left");
     else if (step === 2) animateToStep(3, "left");
   }
@@ -313,6 +345,27 @@ export function OnboardingPage() {
         <div className="mt-6 w-full max-w-md sm:mt-8">
           {step === 1 && (
             <div className="space-y-4 sm:space-y-5">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-gray-700 sm:mb-1.5 sm:text-sm">
+                  Username <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  disabled={usernameExists}
+                  placeholder={usernameExists ? "" : "Choose a unique username"}
+                  className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5 ${
+                    usernameExists ? "bg-gray-100 text-gray-500" : ""
+                  }`}
+                />
+                {usernameExists && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Username cannot be changed once set
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="mb-1 block text-xs font-medium text-gray-700 sm:mb-1.5 sm:text-sm">
                   Full Name <span className="text-red-500">*</span>
