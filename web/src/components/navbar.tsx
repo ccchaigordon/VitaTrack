@@ -55,7 +55,7 @@ function PlanBadge({
 }) {
   return (
     <span
-      className={`relative rounded-md bg-white px-2 py-0.5 text-[10px] font-semibold text-[#34A853] ${
+      className={`relative rounded-md bg-[#EAF1FF]/30 px-2 py-0.5 text-[10px] font-semibold text-[#34A853] ${
         gradient ? "plan-badge-gradient" : "plan-badge-solid"
       }`}
     >

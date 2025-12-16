@@ -41,7 +41,7 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="bg-white">
       <div className="mx-auto max-w-4xl p-6">
         <div className="flex items-center justify-between">
           <div>
