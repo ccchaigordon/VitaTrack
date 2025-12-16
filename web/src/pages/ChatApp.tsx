@@ -1,27 +1,27 @@
 import { useRef, useState } from "react";
-import Navbar from "../components/navbar";
-
 type Message = {
   role: "user" | "assistant";
   text: string;
   file: File[];
 };
 
-function ChatBubble({ role, text, files }: { 
-    role: "user" | "assistant"; 
-    text: string; 
-    files: File[]; 
-  }) {
-
+function ChatBubble({
+  role,
+  text,
+  files,
+}: {
+  role: "user" | "assistant";
+  text: string;
+  files: File[];
+}) {
   const isUser = role === "user";
 
   return (
-   <div className={`w-full flex ${isUser ? "justify-start" : "justify-end"}`}>
+    <div className={`w-full flex ${isUser ? "justify-start" : "justify-end"}`}>
       <div className="flex items-start gap-3 max-w-[70%]">
-
         {/* USER AVATAR */}
         {isUser && (
-          <img 
+          <img
             src="/src/assets/Chatbot/user.png"
             className="w-10 h-10 rounded-4 object-cover"
           />
@@ -29,13 +29,11 @@ function ChatBubble({ role, text, files }: {
 
         {/* COLUMN FOR FILES + BUBBLE */}
         <div className="flex flex-col">
-
           {/* FILE PREVIEWS ABOVE THE BUBBLE */}
           {files.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-3">
               {files.map((file, index) => (
                 <div key={index} className="max-w-[150px]">
-
                   {file.type.startsWith("image/") ? (
                     <img
                       src={URL.createObjectURL(file)}
@@ -51,7 +49,6 @@ function ChatBubble({ role, text, files }: {
                       📄 {file.name}
                     </a>
                   )}
-
                 </div>
               ))}
             </div>
@@ -60,9 +57,10 @@ function ChatBubble({ role, text, files }: {
           {/* TEXT BUBBLE */}
           <div
             className={`px-5 py-3 text-sm whitespace-pre-line shadow-sm
-              ${isUser
-                ? "bg-[#DDF3D8] text-gray-800 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
-                : "bg-white text-gray-700 rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
+              ${
+                isUser
+                  ? "bg-[#DDF3D8] text-gray-800 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
+                  : "bg-white text-gray-700 rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
               }`}
           >
             {text}
@@ -71,17 +69,14 @@ function ChatBubble({ role, text, files }: {
 
         {/* AI ICON */}
         {!isUser && (
-          <img 
-            src="/src/assets/Chatbot/AI.svg"
-            className="w-6 h-6 mt-1"
-          />
+          <img src="/src/assets/Chatbot/AI.svg" className="w-6 h-6 mt-1" />
         )}
       </div>
     </div>
   );
 }
 
-export function ChatApp () {
+export function ChatApp() {
   const [uploads, setUploads] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -126,7 +121,7 @@ export function ChatApp () {
       formData.append("files", file);
     });
 
-    setInput("");  
+    setInput("");
     setUploads([]);
 
     try {
@@ -147,28 +142,31 @@ export function ChatApp () {
       console.error(err);
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "Error: failed to contact server.", file: [] },
+        {
+          role: "assistant",
+          text: "Error: failed to contact server.",
+          file: [],
+        },
       ]);
     }
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen w-full bg-cover bg-center bg-no-repeat bg-fixed"
       style={{ backgroundImage: "url('/src/assets/Chatbot/5522.jpg')" }}
     >
-      {/* NAVBAR */}
-      <Navbar />
-
       <div className="flex justify-center px-4 sm:px-6 lg:px-8">
-
         {/* MAIN CHAT UI */}
-        <div className="flex gap-6 w-full 
-         rounded-3xl bg-[#F5F7DE] p-8 h-[86vh] shadow-xl">
-
+        <div
+          className="flex gap-6 w-full 
+         rounded-3xl bg-[#F5F7DE] p-8 h-[86vh] shadow-xl"
+        >
           {/* LEFT SIDEBAR */}
           <div className="bg-white p-6 rounded-3xl w-75">
-            <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">CHAT VITATRACK</h1>
+            <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">
+              CHAT VITATRACK
+            </h1>
 
             <button className="bg-[#1A381D] hover:bg-green-800 text-white text-[14px] px-4 py-2 w-full rounded-full cursor-pointer">
               + New Chat
@@ -176,16 +174,23 @@ export function ChatApp () {
 
             <div className="flex justify-between text-gray-500 text-[12px] mb-8 mt-8">
               <span>Your chats</span>
-              <span className="cursor-pointer hover:text-gray-700">Clear All</span>
+              <span className="cursor-pointer hover:text-gray-700">
+                Clear All
+              </span>
             </div>
 
             {/* Dummy chat list */}
             <div className="flex flex-col">
-              {[1,2,3,4].map((i) => (
-                <div key={i} className="flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
-                                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]">
+              {[1, 2, 3, 4].map((i) => (
+                <div
+                  key={i}
+                  className="flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
+                                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]"
+                >
                   <img src="/src/assets/Chatbot/Messages.svg" className="w-6" />
-                  <p className="text-[12px] text-gray-800">Chat is chatting the chat…</p>
+                  <p className="text-[12px] text-gray-800">
+                    Chat is chatting the chat…
+                  </p>
                 </div>
               ))}
             </div>
@@ -193,21 +198,30 @@ export function ChatApp () {
 
           {/* MAIN CHAT AREA */}
           <div className="bg-white/50 flex-1 rounded-3xl p-10 flex flex-col items-center justify-start">
-            
             {messages.length > 0 && (
               <div className="flex flex-col w-full gap-6 mb-6 overflow-y-auto pr-2 h-[60vh]">
                 {messages.map((msg, index) => (
-                  <ChatBubble key={index} role={msg.role} text={msg.text} files={msg.file} />
+                  <ChatBubble
+                    key={index}
+                    role={msg.role}
+                    text={msg.text}
+                    files={msg.file}
+                  />
                 ))}
               </div>
-            )} 
+            )}
 
             {/* Bubble */}
-            {messages.length === 0 && (              
+            {messages.length === 0 && (
               <div>
-                <img src="/src/assets/Chatbot/Logo.svg" className="w-[200px] mb-2 mt-4" />
+                <img
+                  src="/src/assets/Chatbot/Logo.svg"
+                  className="w-[200px] mb-2 mt-4"
+                />
 
-                <h2 className="text-xl font-semibold mb-8">Hi, How can I help You?</h2>
+                <h2 className="text-xl font-semibold mb-8">
+                  Hi, How can I help You?
+                </h2>
               </div>
             )}
 
@@ -234,7 +248,10 @@ export function ChatApp () {
                         onClick={() => handleRemoveUpload(index)}
                         className="text-red-500 hover:text-red-700 font-bold ml-2"
                       >
-                        <img src="/src/assets/Chatbot/Button-delete.svg" className="w-6 cursor-pointer" />
+                        <img
+                          src="/src/assets/Chatbot/Button-delete.svg"
+                          className="w-6 cursor-pointer"
+                        />
                       </button>
                     </div>
                   ))}
@@ -243,8 +260,14 @@ export function ChatApp () {
 
               {/* Input Row */}
               <div className="flex items-center w-full">
-                <button onClick={handleOpenFilePicker} className="cursor-pointer">
-                  <img src="/src/assets/Chatbot/Button-add.svg" className="w-6" />
+                <button
+                  onClick={handleOpenFilePicker}
+                  className="cursor-pointer"
+                >
+                  <img
+                    src="/src/assets/Chatbot/Button-add.svg"
+                    className="w-6"
+                  />
                 </button>
                 <input
                   ref={fileInputRef}
@@ -261,14 +284,16 @@ export function ChatApp () {
                   placeholder="What's in your mind?..."
                 />
                 <button className="cursor-pointer" onClick={sendMessage}>
-                  <img src="/src/assets/Chatbot/Button-send.svg" className="w-6" />
+                  <img
+                    src="/src/assets/Chatbot/Button-send.svg"
+                    className="w-6"
+                  />
                 </button>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>    
+    </div>
   );
-};
-
+}
