@@ -179,7 +179,7 @@ export default function Navbar() {
           <img src={NavLogo} alt="VitaTrack" className="h-9" />
         </a>
 
-        <div className="lg:hidden">
+        <div className="flex items-center gap-1 lg:hidden">
           <button
             type="button"
             onClick={openMobileMenu}
@@ -196,6 +196,21 @@ export default function Navbar() {
                 strokeLinejoin="round"
                 strokeWidth="2"
                 d="M4 6h16M4 12h16M4 18h16"
+              />
+            </svg>
+          </button>
+          <button className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <svg
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
           </button>
@@ -236,7 +251,7 @@ export default function Navbar() {
           </li>
         </ul>
 
-        <div className="flex flex-row gap-1 xl:gap-2">
+        <div className="hidden lg:flex flex-row gap-1 xl:gap-2">
           <button className="rounded-full px-3 text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
             <svg
               className="h-6 w-6"
@@ -252,7 +267,7 @@ export default function Navbar() {
               />
             </svg>
           </button>
-          <div className="relative hidden lg:block" ref={profileRef}>
+          <div className="relative" ref={profileRef}>
             <button
               type="button"
               onClick={() => setProfileOpen((v) => !v)}
