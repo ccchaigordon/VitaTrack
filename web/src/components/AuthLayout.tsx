@@ -115,7 +115,7 @@ export function AuthLayout({ title, subtitle, children }: Props) {
                   const isActive =
                     images.length > 0 && i % images.length === visibleIdx;
                   return (
-                    <div key={src} className="h-full w-full shrink-0">
+                    <div key={`${i}-${src}`} className="h-full w-full shrink-0">
                       <img
                         src={src}
                         alt=""
