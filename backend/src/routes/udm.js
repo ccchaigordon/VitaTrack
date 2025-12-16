@@ -45,7 +45,7 @@ async function ensureUserBootstrap(req) {
   if (existingUserErr) {
     // Tables not created yet
     throw new Error(
-      `Supabase table error: ${existingUserErr.message}. Did you run the SQL to create users/user_profiles/plans?`
+      `Supabase table error: ${existingUserErr.message}.`
     );
   }
 
