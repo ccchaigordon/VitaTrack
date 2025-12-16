@@ -277,6 +277,8 @@ router.post("/chat", upload.any(), async (req, res) => {
       throw new Error("No meal data found");
     }
 
+    console.log("Fetched Meals:", meals);
+
     // Filter by rules based on meal time
     function filterMealsByTime(meals, mealTime) {
       if (mealTime === "breakfast") {
@@ -291,16 +293,82 @@ router.post("/chat", upload.any(), async (req, res) => {
       return meals;
     }
 
-    const filteredMeals = filterMealsByTime(meals, mealTime);
+    const filteredMealsFromMealLogs = filterMealsByTime(meals, mealTime);
 
-    console.log("Filtered Meals:", filteredMeals);
+    console.log("Filtered Meals:", filteredMealsFromMealLogs);
 
-    const vectors = filteredMeals.map(m => [
+    const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
       m.calories,
       m.protein,
       m.carbs,
       m.fat
     ]);
+
+    meal_library_data = [
+      { recipe_id: 1,
+        title: "Grilled Chicken Salad",
+        nutrition_info: "Calories: 350, Protein: 30g, Carbs: 15g, Fat: 12g",
+        ingredients: "Chicken breast, mixed greens, cherry tomatoes, cucumber, olive oil, lemon juice" },
+      { recipe_id: 2,
+        title: "Quinoa and Black Bean Bowl",
+        nutrition_info: "Calories: 400, Protein: 20g, Carbs: 50g, Fat: 10g",
+        ingredients: "Quinoa, black beans, corn, avocado, salsa, cilantro" },
+      { recipe_id: 3,
+        title: "Baked Salmon with Asparagus",
+        nutrition_info: "Calories: 450, Protein: 35g, Carbs: 10g, Fat: 20g",
+        ingredients: "Salmon fillet, asparagus, garlic, olive oil, lemon wedges" },
+      { recipe_id: 4,
+        title: "Vegetable Stir-Fry with Tofu",
+        nutrition_info: "Calories: 300, Protein: 25g, Carbs: 30g, Fat: 8g",
+        ingredients: "Tofu, broccoli, bell peppers, snap peas, soy sauce, ginger, garlic" },
+    ]
+
+    function parseNutritionInfo(nutritionInfo) {
+      const result = {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0
+      };
+
+      const caloriesMatch = nutritionInfo.match(/Calories:\s*(\d+)/i);
+      const proteinMatch = nutritionInfo.match(/Protein:\s*(\d+)/i);
+      const carbsMatch = nutritionInfo.match(/Carbs:\s*(\d+)/i);
+      const fatMatch = nutritionInfo.match(/Fat:\s*(\d+)/i);
+
+      if (caloriesMatch) result.calories = Number(caloriesMatch[1]);
+      if (proteinMatch) result.protein = Number(proteinMatch[1]);
+      if (carbsMatch) result.carbs = Number(carbsMatch[1]);
+      if (fatMatch) result.fat = Number(fatMatch[1]);
+
+      return result;
+    }
+
+    const parsedMeals = meal_library_data.map(meal => {
+      const nutrition = parseNutritionInfo(meal.nutrition_info);
+
+      return {
+        recipe_id: meal.recipe_id,
+        title: meal.title,
+        ingredients: meal.ingredients,
+        ...nutrition
+      };
+    });
+
+    console.log("Parsed Meals from Library:", parsedMeals);
+
+    filteredMealsFromMealLibrary = filterMealsByTime(parsedMeals, mealTime);
+    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
+
+
+    const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
+      m.calories,
+      m.protein,
+      m.carbs,
+      m.fat
+    ]);
+
+    console.log(vectorsFromMealLibrary);
 
     function normalizeVector(v) {
       const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
@@ -314,13 +382,15 @@ router.post("/chat", upload.any(), async (req, res) => {
       return sum.map(x => x / n);
     }
 
-    const normalizedVectors = vectors.map(normalizeVector);
-    console.log("Normalized Vectors:", normalizedVectors);
+    const normalizedVectorsForMealLogs = vectorsFromMealLogs.map(normalizeVector);
+    //console.log("Normalized Vectors:", normalizedVectors);
 
-    const referenceVector = averageVector(normalizedVectors);
-    console.log("Reference Vector:", referenceVector);
+    const referenceVector = averageVector(normalizedVectorsForMealLogs);
+    //console.log("Reference Vector:", referenceVector);
 
-    const mealTensor = tf.tensor2d(normalizedVectors);
+    const normalizedVectorsFromMealLibrary = vectorsFromMealLibrary.map(normalizeVector);
+
+    const mealTensor = tf.tensor2d(normalizedVectorsFromMealLibrary);
     const refTensor = tf.tensor1d(referenceVector); 
 
     // Cosine similarity = dot product of normalized vectors
@@ -338,7 +408,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const topScores = values.arraySync();
 
     const recommendations = topIndices.map((idx, i) => ({
-      meal: filteredMeals[idx],       // original meal object from DB
+      meal: filteredMealsFromMealLibrary[idx],       // original meal object from DB
       similarity: topScores[i]
     }));
 
@@ -347,7 +417,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     tf.dispose([
       mealTensor,
       refTensor,
-      normalizedVectors,
       similarityTensor,
       values,
       indices
