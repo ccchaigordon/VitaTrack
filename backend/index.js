@@ -5,13 +5,22 @@ const udmRoutes = require('./src/routes/udm');
 const acmRoutes = require('./src/routes/acm');
 
 const app = express();
+
+// CORS configuration
 app.use(
   cors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173'
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    credentials: true,
   })
 );
 
 app.use(express.json());
+
+// Fix Chrome CORB
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  next();
+});
 
 // AI Conversational and Recommendation APIs (will integrate with auth later)
 app.use('/api', acmRoutes);
