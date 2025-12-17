@@ -159,7 +159,7 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 flex items-center justify-between bg-white px-4 xl:px-10 py-3 shadow-[0px_4px_6px_-2px_rgba(0,0,0,0.1)] rounded-b-xl">
+      <nav className="sticky top-0 z-100 flex items-center justify-between bg-white px-4 xl:px-10 py-3 shadow-[0px_4px_6px_-2px_rgba(0,0,0,0.1)] rounded-b-xl">
         <a href="/dashboard" className="text-3xl font-bold leading-none">
           <img src={NavLogo} alt="VitaTrack" className="h-9" />
         </a>
@@ -302,7 +302,7 @@ export default function Navbar() {
             </button>
 
             <div
-              className={`absolute right-0 z-50 mt-2 w-[280px] origin-top-right rounded-2xl border border-[#1A381D]/15 bg-white p-3 shadow-lg transition-all duration-200 ${
+              className={`absolute right-0 z-100 mt-2 w-[280px] origin-top-right rounded-2xl border border-[#1A381D]/15 bg-white p-3 shadow-lg transition-all duration-200 ${
                 profileOpen
                   ? "pointer-events-auto scale-100 opacity-100"
                   : "pointer-events-none scale-95 opacity-0"
@@ -389,7 +389,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => {
                   setProfileOpen(false);
-                  nav("/dashboard");
+                  nav("/pricings");
                 }}
                 className="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#1A381D] transition-colors hover:bg-[#1A381D]/5"
               >
@@ -404,11 +404,11 @@ export default function Navbar() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="2"
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                 </span>
-                Upgrade Plan
+                Pricings
               </button>
 
               <div className="my-2 h-px bg-[#1A381D]/10" />
@@ -441,7 +441,7 @@ export default function Navbar() {
       </nav>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-100 lg:hidden">
           <button
             type="button"
             onClick={closeMobileMenu}
@@ -674,7 +674,7 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/pricings"
                     onClick={closeMobileMenu}
                     className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
                   >
@@ -691,7 +691,7 @@ export default function Navbar() {
                         d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
                       />
                     </svg>
-                    Upgrade Plan
+                    Pricings
                   </a>
                 </li>
               </ul>

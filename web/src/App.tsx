@@ -10,6 +10,7 @@ import { ProfileEditPage } from "./pages/ProfileEditPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
+import PricingPage from "./pages/PricingPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 
@@ -98,6 +99,17 @@ export function App() {
           <RequireAuth>
             <AuthenticatedLayout>
               <ChatApp />
+            </AuthenticatedLayout>
+          </RequireAuth>
+        }
+      />
+
+      <Route
+        path="/pricings"
+        element={
+          <RequireAuth>
+            <AuthenticatedLayout showFooter>
+              <PricingPage />
             </AuthenticatedLayout>
           </RequireAuth>
         }
