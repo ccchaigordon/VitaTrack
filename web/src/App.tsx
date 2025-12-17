@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
 import { RedirectIfAuth } from "./components/RedirectIfAuth";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -34,88 +35,91 @@ function AuthenticatedLayout({
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/signin" replace />} />
-      <Route
-        path="/signin"
-        element={
-          <RedirectIfAuth>
-            <SignInPage />
-          </RedirectIfAuth>
-        }
-      />
-      <Route
-        path="/signup"
-        element={
-          <RedirectIfAuth>
-            <SignUpPage />
-          </RedirectIfAuth>
-        }
-      />
-      <Route path="/auth/callback" element={<AuthCallbackPage />} />
+    <>
+      <ScrollToTop />
+      <Routes>
+        <Route path="/" element={<Navigate to="/signin" replace />} />
+        <Route
+          path="/signin"
+          element={
+            <RedirectIfAuth>
+              <SignInPage />
+            </RedirectIfAuth>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <RedirectIfAuth>
+              <SignUpPage />
+            </RedirectIfAuth>
+          }
+        />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
-      <Route
-        path="/onboarding"
-        element={
-          <RequireAuth>
-            <OnboardingPage />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <RequireAuth>
-            <AuthenticatedLayout showFooter>
-              <DashboardPage />
-            </AuthenticatedLayout>
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <RequireAuth>
-            <AuthenticatedLayout>
-              <ProfileSettingsPage />
-            </AuthenticatedLayout>
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/profile/edit"
-        element={
-          <RequireAuth>
-            <AuthenticatedLayout>
-              <ProfileEditPage />
-            </AuthenticatedLayout>
-          </RequireAuth>
-        }
-      />
+        <Route
+          path="/onboarding"
+          element={
+            <RequireAuth>
+              <OnboardingPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <DashboardPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <ProfileSettingsPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/profile/edit"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <ProfileEditPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
 
-      <Route
-        path="/chatbot"
-        element={
-          <RequireAuth>
-            <AuthenticatedLayout>
-              <ChatApp />
-            </AuthenticatedLayout>
-          </RequireAuth>
-        }
-      />
+        <Route
+          path="/chatbot"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <ChatApp />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
 
-      <Route
-        path="/pricings"
-        element={
-          <RequireAuth>
-            <AuthenticatedLayout showFooter>
-              <PricingPage />
-            </AuthenticatedLayout>
-          </RequireAuth>
-        }
-      />
+        <Route
+          path="/pricings"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <PricingPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/signin" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/signin" replace />} />
+      </Routes>
+    </>
   );
 }
