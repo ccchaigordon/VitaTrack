@@ -11,6 +11,7 @@ import { ProfileEditPage } from "./pages/ProfileEditPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
+import { ProgressDashboardPage } from "./pages/ProgressDashboardPage";
 import PricingPage from "./pages/PricingPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
@@ -102,6 +103,17 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout>
                 <ChatApp />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/progressdashboard"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <ProgressDashboardPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }
