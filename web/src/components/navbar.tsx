@@ -160,11 +160,11 @@ export default function Navbar() {
           <img src={NavLogo} alt="VitaTrack" className="h-9" />
         </a>
 
-        <div className="flex items-center gap-1 lg:hidden">
+        <div className="flex items-center gap-0 lg:hidden">
           <button
             type="button"
             onClick={openMobileMenu}
-            className="flex cursor-pointer items-center rounded-lg p-2 text-[#1A381D] transition-colors hover:bg-[#1A381D]/5"
+            className="flex cursor-pointer items-center rounded-lg p-2 text-gray-400 transition-colors hover:bg-[#1A381D]/5"
           >
             <svg
               className="h-6 w-6"
