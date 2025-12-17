@@ -3,7 +3,7 @@ const extractMealTime = require('../Extraction/extractMealTime');
 const supabaseServer = require('../../../services/supabaseClient');
 const { queryGemini } = require('../../../services/geminiClient');
 
-async function recommendationHandler(message, user_id, conversationState) {
+async function recommendationHandlerForMeal(message, user_id, conversationState) {
     let mealTime = "";
 
     mealTime = extractMealTime(message);
@@ -190,8 +190,9 @@ async function recommendationHandler(message, user_id, conversationState) {
     // Save to conversation state
     conversationState.set(user_id, {
         state: "SHOWING_RESULTS",
-        recommendedMeals: recommendations,
-        selectedMealIndex: 0,
+        type: "MEAL",
+        recommended: recommendations,
+        selectedIndex: 0,
         referenceVector
     });
 
@@ -230,4 +231,4 @@ async function recommendationHandler(message, user_id, conversationState) {
     return { reply: gResponse };
 }
 
-module.exports = recommendationHandler;
+module.exports = recommendationHandlerForMeal;

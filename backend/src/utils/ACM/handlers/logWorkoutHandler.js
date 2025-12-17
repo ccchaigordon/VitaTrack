@@ -1,12 +1,14 @@
 const supabaseServer = require("../../../services/supabaseClient");
+const { queryGemini } = require("../../../services/geminiClient");
 const cleanLLMJSON  = require("../cleanLLMJSON");
 const extractWorkoutInfoFromFiles = require('../Extraction/extractWorkoutInfoFromFiles');
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
 const processFiles = require("../FileProcessor/fileProcessor");
 
-async function logWorkoutHandler(message, files) {
+async function logWorkoutHandler(message, files, conversationState, user_id) {
     let combinedText = "";
     let imagesForGemini = [];
+    let messageToReturn;
 
     if (files && files.length > 0) {
       const result = await processFiles(files);
@@ -70,7 +72,7 @@ async function logWorkoutHandler(message, files) {
           duration: workout.duration,
           calories_burned: workout.calories_burned,
           source: workoutSource,
-          user_id: 1001, // Placeholder user ID
+          user_id: user_id,
           created_at: new Date()
         });
 
@@ -78,9 +80,37 @@ async function logWorkoutHandler(message, files) {
         console.error("Workout log error:", error);
         return { reply: "Failed to log workout." };
       }
+
+      const messageForRec = `I have just logged a workout: ${workout.exercise_name} with ${workout.calories_burned} kcal burned. Can you recommend a suitable workout for my next workout?`;
+
+      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState);
+
+      const prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is logging workout.
+
+        Workout details:
+        - Name: ${workout.exercise_name}
+        - Sets: ${workout.sets}
+        - Reps: ${workout.reps}
+        - Duration: ${workout.duration} minutes
+        - Calories Burned: ${workout.calories_burned} kcal
+
+        Task:
+        Write a short, friendly response. Can use emojis naturally.
+        - Acknowledge the logged workout
+        - Mention calories burned`
+      
+      const gResponse = await queryGemini(prompt);
+
+      messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+
+      conversationState.set(user_id, { state: "IDLE" });
     }
 
-    return { reply: `🏋️ Workout logged successfully.` };
+    return { reply: messageToReturn };
 }
 
 module.exports = logWorkoutHandler;

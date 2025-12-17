@@ -5,7 +5,7 @@ const extractMealInfoFromFiles = require('../Extraction/extractMealInfoFromFiles
 const extractMealInfoFromMsg = require("../Extraction/extractMealInfoFromMsg");
 const fetchNutritionFromSpoonacular = require("../../../services/spoonacularClient");
 const processFiles = require("../FileProcessor/fileProcessor");
-const recommendationHandler = require("./recommendationHandler");
+const recommendationHandler = require("./recommendationHandlerForMeal");
 
 async function logMealHandler(message, files, conversationState, user_id) {
     let combinedText = "";
@@ -177,6 +177,8 @@ async function logMealHandler(message, files, conversationState, user_id) {
       const gResponse = await queryGemini(prompt);
 
       messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+
+      conversationState.set(user_id, { state: "IDLE" });
     }    
 
     return {
