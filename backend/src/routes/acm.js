@@ -1,14 +1,13 @@
 const express = require('express');
-const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
-const detectIntent = require('../utils/detectIntent');
-const extractMealTime = require('../utils/extractMealTime');
+const detectIntent = require('../utils/ACM/detectIntent');
 const multer = require('multer');
 const upload = multer();
 
 const logMealHandler = require('../utils/ACM/handlers/logMealHandler');
 const logWorkoutHandler = require('../utils/ACM/handlers/logWorkoutHandler');
-const recommendationHandler = require('../utils/ACM/handlers/recommendationHandler');
+const recommendationHandlerForMeal = require('../utils/ACM/handlers/recommendationHandlerForMeal');
+const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommendationHandlerForWorkout');
 
 let conversationState = new Map();
 
@@ -30,36 +29,100 @@ router.post("/chat", upload.any(), async (req, res) => {
   
   // Log meal
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files);
+    const response = await logMealHandler(message, files, conversationState, user_id);
     return res.json(response);
   }
 
   if (intent === "log_workout") {
-    const response = await logWorkoutHandler(message, files);
+    const response = await logWorkoutHandler(message, files, conversationState, user_id);
     return res.json(response);
   }
 
-  if (intent === "recommendation") {
-    const response = await recommendationHandler(message, user_id, conversationState);
+  if (intent === "recommendation_meal") {
+    const response = await recommendationHandlerForMeal(message, user_id, conversationState);
+    return res.json(response);    
+  }
+
+  if (intent === "recommendation_workout") {
+    const response = await recommendationHandlerForWorkout(message, user_id, conversationState);
     return res.json(response);    
   }
 
   if (intent === "more_recommendation") {
     const state = conversationState.get(user_id);
-    const currentIndex = state.selectedMealIndex || 0;
+    const currentIndex = state.selectedIndex || 0;
     const nextIndex = currentIndex + 1;
 
-    if (!state || !state.recommendedMeals[nextIndex]) {
-      return res.json({ reply: "I couldn't find that recommendation." });
+    if (!state || !state.recommended[nextIndex]) {
+      const prompt = `There is no more recommendation available. Please inform the user accordingly.`;
+      const gResponse = await queryGemini(prompt);
+      return res.json({ reply: gResponse });
     }
 
-    state.selectedMealIndex = nextIndex;
+    state.selectedIndex = nextIndex;
     conversationState.set(user_id, state);
 
-    const meal = state.recommendedMeals[nextIndex].meal;
+    const item = state.recommended[nextIndex];
+    let prompt = "";
+
+    if (state.type === "MEAL") {
+      const meal = item.meal;
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is browsing meal recommendations.
+        They selected the next recommended meal.
+
+        Meal details:
+        - Name: ${meal.title}
+        - Calories: ${meal.calories} kcal
+        - Protein: ${meal.protein} g
+        - Carbs: ${meal.carbs} g
+        - Fat: ${meal.fat} g
+
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the choice
+        - Mention calories
+        - Ask if the user wants more recommendation or modify the meal
+        - Use emojis naturally
+        - Keep it under 2 sentences
+        `;
+    }
+
+    if (state.type === "WORKOUT") {
+      const workout = item.workout;
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is browsing workout recommendations.
+
+        Workout details:
+        - Exercise: ${workout.exercise_name}
+        - Sets: ${workout.sets}
+        - Reps: ${workout.reps}
+        - Duration: ${workout.duration} minutes
+        - Estimated calories burned: ${workout.calories_burned} kcal
+
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the workout
+        - Mention calories burned
+        - Ask if the user wants another workout or to modify it
+        - Use emojis naturally
+        - Keep it under 2 sentences
+        `;
+      }
+    
+    const gResponse = await queryGemini(prompt);
+    console.log('Gemini response for more recommendation:', gResponse);
 
     return res.json({
-      reply: `🍽️ Great choice! ${meal.title} has ${meal.calories} kcal. Want to log it or modify it?`
+      reply: gResponse,
     });
   }
 

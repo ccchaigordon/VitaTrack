@@ -1,13 +1,16 @@
 const supabaseServer = require("../../../services/supabaseClient");
-const cleanLLMJSON  = require("../../cleanLLMJSON");
-const extractMealInfoFromFiles = require('../../extractMealInfoFromFiles');
-const extractMealInfoFromMsg = require("../../extractMealInfoFromMsg");
+const { queryGemini } = require("../../../services/geminiClient");
+const cleanLLMJSON  = require("../cleanLLMJSON");
+const extractMealInfoFromFiles = require('../Extraction/extractMealInfoFromFiles');
+const extractMealInfoFromMsg = require("../Extraction/extractMealInfoFromMsg");
 const fetchNutritionFromSpoonacular = require("../../../services/spoonacularClient");
-const processFiles = require("../../fileProcessor");
+const processFiles = require("../FileProcessor/fileProcessor");
+const recommendationHandler = require("./recommendationHandlerForMeal");
 
-async function logMealHandler(message, files) {
+async function logMealHandler(message, files, conversationState, user_id) {
     let combinedText = "";
     let imagesForGemini = [];
+    let messageToReturn;
 
     if (files && files.length > 0) {
       const result = await processFiles(files);
@@ -139,7 +142,7 @@ async function logMealHandler(message, files) {
           calories: meal.calories,
           source: mealSource,
           meal_time: meal.meal_time,
-          user_id: 1001, // Placeholder user ID
+          user_id: user_id,
           created_at: new Date()
         });
 
@@ -147,10 +150,39 @@ async function logMealHandler(message, files) {
         console.error("Meal log error:", error);
         return { reply: "Failed to log meal." };
       }
+
+      const messageForRec = `I have just logged a meal: ${meal.meal_name} with ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, and ${meal.fat}g fat. Can you recommend a suitable meal for my next meal?`;
+
+      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState);
+
+      const prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is logging meal.
+
+        Meal details:
+        - Name: ${meal.title}
+        - Calories: ${meal.calories} kcal
+        - Protein: ${meal.protein} g
+        - Carbs: ${meal.carbs} g
+        - Fat: ${meal.fat} g
+
+        Task:
+        Write a short, friendly response. Can use emojis naturally.
+        - Acknowledge the logged meal
+        - Mention calories and macros
+        `;
+      
+      const gResponse = await queryGemini(prompt);
+
+      messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+
+      conversationState.set(user_id, { state: "IDLE" });
     }    
 
     return {
-      reply: `🍽️ Meal logged (placeholder). `
+      reply: messageToReturn
     };
 }
 
