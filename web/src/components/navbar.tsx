@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getSupabase } from "../services/supabase";
 import { useUser } from "../contexts/UserContext";
 import NavLogo from "../assets/NavLogo.png";
@@ -95,11 +95,15 @@ function Avatar({
 
 export default function Navbar() {
   const nav = useNavigate();
+  const location = useLocation();
   const { me } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileAnimating, setMobileAnimating] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+
+  // Check active path
+  const isActive = (path: string) => location.pathname === path;
 
   const displayName = useMemo(() => {
     const username = me?.user?.username?.trim();
@@ -155,16 +159,16 @@ export default function Navbar() {
 
   return (
     <>
-      <nav className="sticky top-0 z-50 flex items-center justify-between bg-white px-4 xl:px-10 py-3 shadow-[0px_4px_6px_-2px_rgba(0,0,0,0.1)] rounded-b-xl">
+      <nav className="sticky top-0 z-100 flex items-center justify-between bg-white px-4 xl:px-10 py-3 shadow-[0px_4px_6px_-2px_rgba(0,0,0,0.1)] rounded-b-xl">
         <a href="/dashboard" className="text-3xl font-bold leading-none">
           <img src={NavLogo} alt="VitaTrack" className="h-9" />
         </a>
 
-        <div className="flex items-center gap-1 lg:hidden">
+        <div className="flex items-center gap-0 lg:hidden">
           <button
             type="button"
             onClick={openMobileMenu}
-            className="flex cursor-pointer items-center rounded-lg p-2 text-[#1A381D] transition-colors hover:bg-[#1A381D]/5"
+            className="flex cursor-pointer items-center rounded-lg p-2 text-gray-400 transition-colors hover:bg-[#1A381D]/5"
           >
             <svg
               className="h-6 w-6"
@@ -199,7 +203,14 @@ export default function Navbar() {
 
         <ul className="hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform items-center space-x-3 xl:space-x-6 lg:mx-auto lg:flex lg:w-auto">
           <li>
-            <a href="/dashboard" className="text-sm font-bold text-[#1A381D]">
+            <a
+              href="/dashboard"
+              className={`text-sm ${
+                isActive("/dashboard")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
+            >
               Home
             </a>
           </li>
@@ -207,7 +218,11 @@ export default function Navbar() {
           <li>
             <a
               href="/chatbot"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              className={`text-sm ${
+                isActive("/chatbot")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Chatbot
             </a>
@@ -215,8 +230,12 @@ export default function Navbar() {
           <DotSeparator />
           <li>
             <a
-              href="/dashboard"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              href="/progress"
+              className={`text-sm ${
+                isActive("/progress")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Progress
             </a>
@@ -224,8 +243,12 @@ export default function Navbar() {
           <DotSeparator />
           <li>
             <a
-              href="/dashboard"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              href="/resources"
+              className={`text-sm ${
+                isActive("/resources")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Resources
             </a>
@@ -279,7 +302,7 @@ export default function Navbar() {
             </button>
 
             <div
-              className={`absolute right-0 z-50 mt-2 w-[280px] origin-top-right rounded-2xl border border-[#1A381D]/15 bg-white p-3 shadow-lg transition-all duration-200 ${
+              className={`absolute right-0 z-100 mt-2 w-[280px] origin-top-right rounded-2xl border border-[#1A381D]/15 bg-white p-3 shadow-lg transition-all duration-200 ${
                 profileOpen
                   ? "pointer-events-auto scale-100 opacity-100"
                   : "pointer-events-none scale-95 opacity-0"
@@ -366,7 +389,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => {
                   setProfileOpen(false);
-                  nav("/dashboard");
+                  nav("/pricings");
                 }}
                 className="mt-1 flex w-full cursor-pointer items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[#1A381D] transition-colors hover:bg-[#1A381D]/5"
               >
@@ -381,11 +404,11 @@ export default function Navbar() {
                       strokeLinecap="round"
                       strokeLinejoin="round"
                       strokeWidth="2"
-                      d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                      d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
                 </span>
-                Upgrade Plan
+                Pricings
               </button>
 
               <div className="my-2 h-px bg-[#1A381D]/10" />
@@ -418,7 +441,7 @@ export default function Navbar() {
       </nav>
 
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-100 lg:hidden">
           <button
             type="button"
             onClick={closeMobileMenu}
@@ -480,10 +503,16 @@ export default function Navbar() {
                   <a
                     href="/dashboard"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-[#1A381D] transition-colors hover:bg-[#DDF3D8]/50"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/dashboard")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5 text-[#34A853]"
+                      className={`h-5 w-5 ${
+                        isActive("/dashboard") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -502,10 +531,16 @@ export default function Navbar() {
                   <a
                     href="/chatbot"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/chatbot")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/chatbot") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -522,12 +557,18 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/progress"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/progress")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/progress") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -544,12 +585,18 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/resources"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/resources")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/resources") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -573,10 +620,16 @@ export default function Navbar() {
                   <a
                     href="/profile"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/profile")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/profile") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -621,7 +674,7 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/pricings"
                     onClick={closeMobileMenu}
                     className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
                   >
@@ -638,7 +691,7 @@ export default function Navbar() {
                         d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
                       />
                     </svg>
-                    Upgrade Plan
+                    Pricings
                   </a>
                 </li>
               </ul>
@@ -669,7 +722,7 @@ export default function Navbar() {
                 Sign Out
               </button>
               <p className="mt-4 text-center text-xs text-gray-400">
-                © 2026 VitaTrack
+                © 2026 VitaTrack. All Rights Reserved.
               </p>
             </div>
           </nav>
