@@ -28,7 +28,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   
   // Log meal
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files);
+    const response = await logMealHandler(message, files, conversationState, user_id);
     return res.json(response);
   }
 
