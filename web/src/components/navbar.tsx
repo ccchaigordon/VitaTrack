@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getSupabase } from "../services/supabase";
 import { useUser } from "../contexts/UserContext";
 import NavLogo from "../assets/NavLogo.png";
@@ -95,11 +95,15 @@ function Avatar({
 
 export default function Navbar() {
   const nav = useNavigate();
+  const location = useLocation();
   const { me } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mobileAnimating, setMobileAnimating] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+
+  // Check active path
+  const isActive = (path: string) => location.pathname === path;
 
   const displayName = useMemo(() => {
     const username = me?.user?.username?.trim();
@@ -199,7 +203,14 @@ export default function Navbar() {
 
         <ul className="hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform items-center space-x-3 xl:space-x-6 lg:mx-auto lg:flex lg:w-auto">
           <li>
-            <a href="/dashboard" className="text-sm font-bold text-[#1A381D]">
+            <a
+              href="/dashboard"
+              className={`text-sm ${
+                isActive("/dashboard")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
+            >
               Home
             </a>
           </li>
@@ -207,7 +218,11 @@ export default function Navbar() {
           <li>
             <a
               href="/chatbot"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              className={`text-sm ${
+                isActive("/chatbot")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Chatbot
             </a>
@@ -215,8 +230,12 @@ export default function Navbar() {
           <DotSeparator />
           <li>
             <a
-              href="/dashboard"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              href="/progress"
+              className={`text-sm ${
+                isActive("/progress")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Progress
             </a>
@@ -224,8 +243,12 @@ export default function Navbar() {
           <DotSeparator />
           <li>
             <a
-              href="/dashboard"
-              className="text-sm text-gray-400 hover:text-gray-500"
+              href="/resources"
+              className={`text-sm ${
+                isActive("/resources")
+                  ? "font-bold text-[#1A381D]"
+                  : "text-gray-400 hover:text-gray-500"
+              }`}
             >
               Resources
             </a>
@@ -480,10 +503,16 @@ export default function Navbar() {
                   <a
                     href="/dashboard"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-[#1A381D] transition-colors hover:bg-[#DDF3D8]/50"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/dashboard")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5 text-[#34A853]"
+                      className={`h-5 w-5 ${
+                        isActive("/dashboard") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -502,10 +531,16 @@ export default function Navbar() {
                   <a
                     href="/chatbot"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/chatbot")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/chatbot") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -522,12 +557,18 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/progress"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/progress")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/progress") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -544,12 +585,18 @@ export default function Navbar() {
                 </li>
                 <li>
                   <a
-                    href="/dashboard"
+                    href="/resources"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/resources")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/resources") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
@@ -573,10 +620,16 @@ export default function Navbar() {
                   <a
                     href="/profile"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/profile")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/profile") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"
