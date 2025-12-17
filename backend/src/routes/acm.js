@@ -1,8 +1,6 @@
 const express = require('express');
-const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
-const detectIntent = require('../utils/detectIntent');
-const extractMealTime = require('../utils/extractMealTime');
+const detectIntent = require('../utils/ACM/detectIntent');
 const multer = require('multer');
 const upload = multer();
 

@@ -1,5 +1,5 @@
 const tf = require('@tensorflow/tfjs');
-const extractMealTime = require('../../extractMealTime');
+const extractMealTime = require('../Extraction/extractMealTime');
 const supabaseServer = require('../../../services/supabaseClient');
 const { queryGemini } = require('../../../services/geminiClient');
 

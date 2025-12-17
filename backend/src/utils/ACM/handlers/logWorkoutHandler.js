@@ -1,8 +1,8 @@
 const supabaseServer = require("../../../services/supabaseClient");
-const cleanLLMJSON  = require("../../cleanLLMJSON");
-const extractWorkoutInfoFromFiles = require('../../extractWorkoutInfoFromFiles');
-const extractWorkoutInfoFromMsg = require('../../extractWorkoutInfoFromMsg');
-const processFiles = require("../../fileProcessor");
+const cleanLLMJSON  = require("../cleanLLMJSON");
+const extractWorkoutInfoFromFiles = require('../Extraction/extractWorkoutInfoFromFiles');
+const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
+const processFiles = require("../FileProcessor/fileProcessor");
 
 async function logWorkoutHandler(message, files) {
     let combinedText = "";

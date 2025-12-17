@@ -1,9 +1,9 @@
 const supabaseServer = require("../../../services/supabaseClient");
-const cleanLLMJSON  = require("../../cleanLLMJSON");
-const extractMealInfoFromFiles = require('../../extractMealInfoFromFiles');
-const extractMealInfoFromMsg = require("../../extractMealInfoFromMsg");
+const cleanLLMJSON  = require("../cleanLLMJSON");
+const extractMealInfoFromFiles = require('../Extraction/extractMealInfoFromFiles');
+const extractMealInfoFromMsg = require("../Extraction/extractMealInfoFromMsg");
 const fetchNutritionFromSpoonacular = require("../../../services/spoonacularClient");
-const processFiles = require("../../fileProcessor");
+const processFiles = require("../FileProcessor/fileProcessor");
 
 async function logMealHandler(message, files) {
     let combinedText = "";

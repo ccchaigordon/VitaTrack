@@ -1,4 +1,4 @@
-const { queryGemini } = require('../services/geminiClient');
+const { queryGemini } = require('../../../services/geminiClient');
 
 async function extractWorkoutInfoFromMsg(message) {
     const prompt = `
