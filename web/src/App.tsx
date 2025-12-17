@@ -11,12 +11,22 @@ import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
 import Navbar from "./components/navbar";
+import Footer from "./components/footer";
 
-function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
+function AuthenticatedLayout({
+  children,
+  showFooter = false,
+}: {
+  children: React.ReactNode;
+  showFooter?: boolean;
+}) {
   return (
     <UserProvider>
-      <Navbar />
-      {children}
+      <div className="flex min-h-screen flex-col">
+        <Navbar />
+        <main className="flex-1">{children}</main>
+        {showFooter && <Footer />}
+      </div>
     </UserProvider>
   );
 }
@@ -55,7 +65,7 @@ export function App() {
         path="/dashboard"
         element={
           <RequireAuth>
-            <AuthenticatedLayout>
+            <AuthenticatedLayout showFooter>
               <DashboardPage />
             </AuthenticatedLayout>
           </RequireAuth>

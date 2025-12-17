@@ -722,7 +722,7 @@ export default function Navbar() {
                 Sign Out
               </button>
               <p className="mt-4 text-center text-xs text-gray-400">
-                © 2026 VitaTrack
+                © 2026 VitaTrack. All Rights Reserved.
               </p>
             </div>
           </nav>

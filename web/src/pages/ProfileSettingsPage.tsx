@@ -231,7 +231,7 @@ export function ProfileSettingsPage() {
         })}
       </aside>
 
-      <main className="min-h-screen lg:ml-16">
+      <div className="min-h-screen lg:ml-16">
         <div className="mx-auto max-w-7xl px-6 py-8">
           <div className="mb-6 flex items-center justify-between">
             <div>
@@ -390,7 +390,7 @@ export function ProfileSettingsPage() {
             </div>
           </InfoCard>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
