@@ -1,6 +1,7 @@
 const tf = require('@tensorflow/tfjs');
 const extractMealTime = require('../../extractMealTime');
-const supabaseServer = require('../../../services/supabaseClient');''
+const supabaseServer = require('../../../services/supabaseClient');
+const { queryGemini } = require('../../../services/geminiClient');
 
 async function recommendationHandler(message, user_id, conversationState) {
     let mealTime = "";
@@ -100,6 +101,30 @@ async function recommendationHandler(message, user_id, conversationState) {
     filteredMealsFromMealLibrary = filterMealsByTime(parsedMeals, mealTime);
     console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
+    if (!filteredMealsFromMealLogs.length) {
+      const prompt = `You are a friendly fitness assistant chatbot.
+            Context:
+            The user asked for a meal recommendation, but there is not enough past meal data.
+
+            Task:
+            Politely explain that you need more logged meals to give accurate recommendations.
+            Encourage the user to log a meal first.
+            Keep it friendly and under 2 sentences.`;
+
+      const gResponse = await queryGemini(prompt);
+      return { reply: gResponse };
+    }
+
+    if (!filteredMealsFromMealLibrary.length) {
+      const prompt = `You are a friendly fitness assistant chatbot.
+        Context:
+        The user requested a meal recommendation, but no suitable meals match the criteria.
+
+        Meal time: ${mealTime || "any"}`;
+
+      const gResponse = await queryGemini(prompt);
+      return { reply: gResponse };
+    }     
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
@@ -178,14 +203,31 @@ async function recommendationHandler(message, user_id, conversationState) {
 
     const m = top.meal;
 
-    const replyText =
-        `🍽️ Recommended Meal: ${m.title}\n` +
-        `Calories: ${m.calories} kcal\n` +
-        `Protein: ${m.protein}g | Carbs: ${m.carbs}g | Fat: ${m.fat}g\n` +
-        `Ingredients: ${m.ingredients}\n` +
-        `Would you like to log this meal or see another recommendation?`;
+    const prompt = `
+      You are a friendly fitness assistant chatbot.
 
-    return { reply: replyText };
+      Context:
+      The user is browsing meal recommendations.
+
+      Meal details:
+      - Name: ${m.title}
+      - Calories: ${m.calories} kcal
+      - Protein: ${m.protein} g
+      - Carbs: ${m.carbs} g
+      - Fat: ${m.fat} g
+
+      Task:
+      Write a short, friendly response:
+      - Acknowledge the choice
+      - Mention calories
+      - Ask if the user wants more recommendation or modify the meal
+      - Use emojis naturally
+      - Keep it under 2 sentences
+      `;
+    
+    const gResponse = await queryGemini(prompt);
+
+    return { reply: gResponse };
 }
 
 module.exports = recommendationHandler;

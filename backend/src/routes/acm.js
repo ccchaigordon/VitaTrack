@@ -50,7 +50,9 @@ router.post("/chat", upload.any(), async (req, res) => {
     const nextIndex = currentIndex + 1;
 
     if (!state || !state.recommendedMeals[nextIndex]) {
-      return res.json({ reply: "I couldn't find that recommendation." });
+      const prompt = `There is no more meal recommendation available. Please inform the user accordingly.`;
+      const gResponse = await queryGemini(prompt);
+      return res.json({ reply: gResponse });
     }
 
     state.selectedMealIndex = nextIndex;
@@ -58,8 +60,34 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const meal = state.recommendedMeals[nextIndex].meal;
 
+    const prompt = `
+      You are a friendly fitness assistant chatbot.
+
+      Context:
+      The user is browsing meal recommendations.
+      They selected the next recommended meal.
+
+      Meal details:
+      - Name: ${meal.title}
+      - Calories: ${meal.calories} kcal
+      - Protein: ${meal.protein} g
+      - Carbs: ${meal.carbs} g
+      - Fat: ${meal.fat} g
+
+      Task:
+      Write a short, friendly response:
+      - Acknowledge the choice
+      - Mention calories
+      - Ask if the user wants more recommendation or modify the meal
+      - Use emojis naturally
+      - Keep it under 2 sentences
+      `;
+    
+    const gResponse = await queryGemini(prompt);
+    console.log('Gemini response for more recommendation:', gResponse);
+
     return res.json({
-      reply: `🍽️ Great choice! ${meal.title} has ${meal.calories} kcal. Want to log it or modify it?`
+      reply: gResponse,
     });
   }
 
