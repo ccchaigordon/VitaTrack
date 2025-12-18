@@ -1,11 +1,10 @@
-const supabaseServer = require("../../../services/supabaseClient");
 const { queryGemini } = require("../../../services/geminiClient");
 const cleanLLMJSON  = require("../cleanLLMJSON");
 const extractWorkoutInfoFromFiles = require('../Extraction/extractWorkoutInfoFromFiles');
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
 const processFiles = require("../FileProcessor/fileProcessor");
 
-async function logWorkoutHandler(message, files, conversationState, user_id) {
+async function logWorkoutHandler(message, files, conversationState, user_id, supabase) {
     let combinedText = "";
     let imagesForGemini = [];
     let messageToReturn;
@@ -63,7 +62,7 @@ async function logWorkoutHandler(message, files, conversationState, user_id) {
         }        
       };
 
-      const { data, error } = await supabaseServer
+      const { data, error } = await supabase
         .from("workout_logs")
         .insert({
           exercise_name: workout.exercise_name,

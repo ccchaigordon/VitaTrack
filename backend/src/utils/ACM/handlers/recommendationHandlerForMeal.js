@@ -1,15 +1,14 @@
 const tf = require('@tensorflow/tfjs');
 const extractMealTime = require('../Extraction/extractMealTime');
-const supabaseServer = require('../../../services/supabaseClient');
 const { queryGemini } = require('../../../services/geminiClient');
 
-async function recommendationHandlerForMeal(message, user_id, conversationState) {
+async function recommendationHandlerForMeal(message, user_id, conversationState, supabase) {
     let mealTime = "";
 
     mealTime = extractMealTime(message);
     console.log("Inferred meal time for recommendation:", mealTime);
 
-    const { data: meals, error } = await supabaseServer
+    const { data: meals, error } = await supabase
       .from("meal_logs")
       .select("*")
       .eq("user_id", user_id);

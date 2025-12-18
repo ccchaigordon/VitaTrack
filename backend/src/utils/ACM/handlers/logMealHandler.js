@@ -1,4 +1,3 @@
-const supabaseServer = require("../../../services/supabaseClient");
 const { queryGemini } = require("../../../services/geminiClient");
 const cleanLLMJSON  = require("../cleanLLMJSON");
 const extractMealInfoFromFiles = require('../Extraction/extractMealInfoFromFiles');
@@ -7,7 +6,7 @@ const fetchNutritionFromSpoonacular = require("../../../services/spoonacularClie
 const processFiles = require("../FileProcessor/fileProcessor");
 const recommendationHandler = require("./recommendationHandlerForMeal");
 
-async function logMealHandler(message, files, conversationState, user_id) {
+async function logMealHandler(message, files, conversationState, user_id, supabase) {
     let combinedText = "";
     let imagesForGemini = [];
     let messageToReturn;
@@ -132,7 +131,7 @@ async function logMealHandler(message, files, conversationState, user_id) {
 
       console.log("Entry for meal log:", meal);
 
-      const { data, error } = await supabaseServer
+      const { data, error } = await supabase
         .from("meal_logs")
         .insert({
           meal_name: meal.meal_name,
