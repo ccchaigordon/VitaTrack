@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
 import { RedirectIfAuth } from "./components/RedirectIfAuth";
+import { RequireProfileComplete } from "./components/RequireProfileComplete";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
@@ -25,11 +26,13 @@ function AuthenticatedLayout({
 }) {
   return (
     <UserProvider>
-      <div className="flex min-h-screen flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        {showFooter && <Footer />}
-      </div>
+      <RequireProfileComplete>
+        <div className="flex min-h-screen flex-col">
+          <Navbar />
+          <main className="flex-1">{children}</main>
+          {showFooter && <Footer />}
+        </div>
+      </RequireProfileComplete>
     </UserProvider>
   );
 }
