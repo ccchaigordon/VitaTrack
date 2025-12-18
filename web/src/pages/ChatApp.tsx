@@ -1,4 +1,6 @@
 import { useRef, useState } from "react";
+import { apiFetch } from "../services/api";
+
 type Message = {
   role: "user" | "assistant";
   text: string;
@@ -125,14 +127,12 @@ export function ChatApp() {
     setUploads([]);
 
     try {
-      const res = await fetch("http://localhost:4000/api/chat", {
-        method: "POST",
-        body: formData,
+      const data = await apiFetch<{ reply: string }>('/chat', {
+        method: 'POST',
+        json: formData,
       });
 
       console.log("Form Data sent:", formData);
-
-      const data = await res.json();
 
       setMessages((prev) => [
         ...prev,

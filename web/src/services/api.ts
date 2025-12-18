@@ -21,7 +21,7 @@ async function getAccessToken(): Promise<string> {
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit & { json?: unknown } = {}
+  options: RequestInit & { json?: unknown | FormData } = {}
 ): Promise<T> {
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
@@ -30,8 +30,12 @@ export async function apiFetch<T>(
 
   let body = options.body;
   if (options.json !== undefined || options.body) {
-    headers.set('Content-Type', 'application/json');
-    body = options.json !== undefined ? JSON.stringify(options.json) : options.body;
+    if (options.json instanceof FormData) {
+       body = options.json;
+    } else {
+      headers.set('Content-Type', 'application/json');
+      body = options.json !== undefined ? JSON.stringify(options.json) : options.body;
+    }  
   }
 
   const res = await fetch(`${apiBase}${path}`, {

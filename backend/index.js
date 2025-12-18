@@ -24,10 +24,10 @@ app.use((req, res, next) => {
 });
 
 // AI Conversational and Recommendation APIs (will integrate with auth later)
-app.use('/api', acmRoutes);
+app.use('/api', supabaseAuth, acmRoutes);
 
 // Progress Tracking & Feedback APIs
-app.use('/api', ptfRoutes);
+app.use('/api', supabaseAuth, ptfRoutes);
 
 // User & Data Management APIs (auth-required)
 app.use('/api', supabaseAuth, udmRoutes);

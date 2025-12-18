@@ -1,4 +1,5 @@
 const express = require('express');
+const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
 const detectIntent = require('../utils/ACM/detectIntent');
 const multer = require('multer');
@@ -11,10 +12,17 @@ const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommend
 
 let conversationState = new Map();
 
+function getRlsClient(req) {
+  console.log('Creating RLS client with access token:', req.user.accessToken);
+  return supabaseServer.createUserSupabaseClient(req.user.accessToken);
+}
+
 const router = express.Router();
 
 router.post("/chat", upload.any(), async (req, res) => {
   const user_id = 1001; // dummy user ID
+  const supabase = getRlsClient(req);
+
   const { message } = req.body;
   const files = req.files;
   if (!message) return res.status(400).json({ error: "Message is required" });
@@ -29,22 +37,22 @@ router.post("/chat", upload.any(), async (req, res) => {
   
   // Log meal
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files, conversationState, user_id);
+    const response = await logMealHandler(message, files, conversationState, user_id, supabase);
     return res.json(response);
   }
 
   if (intent === "log_workout") {
-    const response = await logWorkoutHandler(message, files, conversationState, user_id);
+    const response = await logWorkoutHandler(message, files, conversationState, user_id, supabase);
     return res.json(response);
   }
 
   if (intent === "recommendation_meal") {
-    const response = await recommendationHandlerForMeal(message, user_id, conversationState);
+    const response = await recommendationHandlerForMeal(message, user_id, conversationState, supabase);
     return res.json(response);    
   }
 
   if (intent === "recommendation_workout") {
-    const response = await recommendationHandlerForWorkout(message, user_id, conversationState);
+    const response = await recommendationHandlerForWorkout(message, user_id, conversationState, supabase);
     return res.json(response);    
   }
 
