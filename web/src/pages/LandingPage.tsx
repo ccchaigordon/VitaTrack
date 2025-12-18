@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import NavLogo from "../assets/NavLogo.png";
+import Particles from "../misc/Particles";
 
 export function LandingPage() {
   const navigate = useNavigate();
@@ -36,21 +37,22 @@ export function LandingPage() {
 
       {/* Hero */}
       <main>
-        <section className="border-b border-gray-200 bg-white">
-          <div className="mx-auto flex max-w-6xl flex-col gap-10 px-4 py-10 sm:py-14 sm:px-6 lg:flex-row lg:items-center lg:py-16 lg:px-8">
-            <div className="flex-1 space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full bg-[#E5F3E2] px-3 py-1 text-xs font-semibold text-[#166534]">
+        <section className="relative overflow-hidden border-b border-black/10 bg-white">
+          <Particles />
+          <div className="relative z-10 mx-auto flex max-w-6xl flex-col gap-10 px-4 py-12 sm:py-16 sm:px-6 lg:flex-row lg:items-center lg:py-20 lg:px-8">
+            <div className="flex-1 space-y-6 text-slate-900">
+              <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/90 px-3 py-1 text-xs font-semibold text-white">
                 <span className="h-1.5 w-1.5 rounded-full bg-[#22C55E]" />
                 Smart health companion for busy people
               </div>
 
               <div className="space-y-4">
-                <h1 className="text-3xl font-extrabold tracking-tight text-[#0F172A] sm:text-4xl md:text-5xl">
+                <h1 className="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-4xl md:text-5xl">
                   Stay on top of your{" "}
-                  <span className="text-[#1A381D]">nutrition, workouts</span>{" "}
+                  <span className="text-emerald-700">nutrition, workouts</span>{" "}
                   and progress.
                 </h1>
-                <p className="max-w-xl text-sm text-gray-600 sm:text-base">
+                <p className="max-w-xl text-sm text-slate-600 sm:text-base">
                   VitaTrack combines AI-powered guidance, simple logging, and
                   clear progress insights so you can build healthy habits that
                   actually stick.
@@ -68,96 +70,10 @@ export function LandingPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/signin")}
-                  className="inline-flex items-center justify-center rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:border-[#1A381D] hover:text-[#1A381D] cursor-pointer"
+                  className="inline-flex items-center justify-center rounded-full border border-emerald-700 bg-transparent px-5 py-2.5 text-sm font-medium text-emerald-800 hover:border-emerald-900 hover:text-emerald-900 cursor-pointer"
                 >
                   I already have an account
                 </button>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-gray-500 sm:text-sm">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#DDF3D8] text-[11px] font-semibold text-[#166534]">
-                    ✓
-                  </span>
-                  No credit card required
-                </div>
-                <div className="h-1 w-1 rounded-full bg-gray-300" />
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#DDF3D8] text-[11px] font-semibold text-[#166534]">
-                    ✓
-                  </span>
-                  Designed for students & working adults
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1">
-              <div className="mx-auto max-w-md rounded-2xl border border-gray-200 bg-[#F9FAFB] p-4 sm:p-6 shadow-sm">
-                <div className="mb-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                      Today&apos;s overview
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-[#111827]">
-                      You&apos;re on track for your goals 🎯
-                    </p>
-                  </div>
-                  <span className="rounded-full bg-[#DDF3D8] px-3 py-1 text-xs font-semibold text-[#166534]">
-                    VitaTrack
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm">
-                  <div className="rounded-xl border border-green-100 bg-white p-3">
-                    <p className="text-[11px] font-medium text-gray-500">
-                      Calories
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-[#166534]">
-                      1,280
-                    </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      65% of daily target
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-blue-100 bg-white p-3">
-                    <p className="text-[11px] font-medium text-gray-500">
-                      Steps
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-[#1D4ED8]">
-                      7,420
-                    </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      Keep going!
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-amber-100 bg-white p-3">
-                    <p className="text-[11px] font-medium text-gray-500">
-                      Workouts
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-[#92400E]">
-                      3 / 4
-                    </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      sessions this week
-                    </p>
-                  </div>
-                  <div className="rounded-xl border border-purple-100 bg-white p-3">
-                    <p className="text-[11px] font-medium text-gray-500">
-                      Streak
-                    </p>
-                    <p className="mt-1 text-lg font-bold text-[#6D28D9]">
-                      12 days
-                    </p>
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      Don't break it!
-                    </p>
-                  </div>
-                </div>
-
-                <p className="mt-4 text-[11px] text-gray-500">
-                  Sync your meals, workouts, and progress in one place.
-                  VitaTrack keeps you accountable, without feeling overwhelming.
-                </p>
               </div>
             </div>
           </div>
