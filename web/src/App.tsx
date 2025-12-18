@@ -109,7 +109,7 @@ export function App() {
         />
 
         <Route
-          path="/progressdashboard"
+          path="/progress"
           element={
             <RequireAuth>
               <AuthenticatedLayout>
