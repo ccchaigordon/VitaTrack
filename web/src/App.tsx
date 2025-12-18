@@ -16,6 +16,7 @@ import { ProgressDashboardPage } from "./pages/ProgressDashboardPage";
 import PricingPage from "./pages/PricingPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
+import { LandingPage } from "./pages/LandingPage";
 
 function AuthenticatedLayout({
   children,
@@ -42,7 +43,7 @@ export function App() {
     <>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<Navigate to="/signin" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route
           path="/signin"
           element={
@@ -133,7 +134,7 @@ export function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

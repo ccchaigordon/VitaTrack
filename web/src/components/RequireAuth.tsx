@@ -34,6 +34,6 @@ export function RequireAuth({ children }: PropsWithChildren) {
 
   if (loading) return null;
   if (!hasSession)
-    return <Navigate to="/signin" replace state={{ from: location }} />;
+    return <Navigate to="/" replace state={{ from: location }} />;
   return <>{children}</>;
 }
