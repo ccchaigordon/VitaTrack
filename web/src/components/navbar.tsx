@@ -140,7 +140,7 @@ export default function Navbar() {
       localStorage.clear();
       sessionStorage.clear();
     }
-    nav("/signin", { replace: true });
+    nav("/", { replace: true });
   }
 
   function openMobileMenu() {
