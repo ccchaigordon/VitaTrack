@@ -230,9 +230,9 @@ export default function Navbar() {
           <DotSeparator />
           <li>
             <a
-              href="/progressdashboard"
+              href="/progress"
               className={`text-sm ${
-                isActive("/progressdashboard")
+                isActive("/progress")
                   ? "font-bold text-[#1A381D]"
                   : "text-gray-400 hover:text-gray-500"
               }`}
