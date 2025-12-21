@@ -8,6 +8,8 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     mealTime = extractMealTime(message);
     console.log("Inferred meal time for recommendation:", mealTime);
 
+    console.log("User id: ", user_id);
+
     const { data: meals, error } = await supabase
       .from("meal_logs")
       .select("*")

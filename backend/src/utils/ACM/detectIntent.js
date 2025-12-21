@@ -19,12 +19,30 @@ function detectIntent(text, state) {
     }    
   }
 
+  if (state?.state === "WAITING_WORKOUT_GOAL") {
+    return 'recommendation_workout';
+  }
+
   // state: "IDLE" | "SHOWING_RESULTS" | "LOGGING_MEAL" | "RECOMMENDING",
 
+  const mealKeywords = /(meal|food|eat|lunch|dinner|breakfast|diet|calories)/;
+  const workoutKeywords = /(workout|exercise|training|gym|cardio|strength|bulk|cut)/;
+
+  if (/\b(give me|recommend|suggest|what can i have|ideas|recommendation)\b/.test(t)) {
+
+    if (workoutKeywords.test(t)) {
+      return 'recommendation_workout';
+    }
+
+    if (mealKeywords.test(t)) {
+      return 'recommendation_meal';
+    }
+
+    return 'recommendation';
+  }
 
   if (/\b(i ate|i had|ate|had|i drank|log meal)\b/.test(t)) return 'log_meal';
-  if (/\b(i did|completed|ran|jogged|workout|lifted|training|log workout)\b/.test(t)) return 'log_workout';
-  if (/\b(give me|recommend|suggest|what can i have|ideas|recommendation)\b/.test(t)) return 'recommendation';
+  if (/\b(i did|completed|ran|jogged|workout|lifted|training|log workout)\b/.test(t)) return 'log_workout'; 
 
   return 'chat';
 }
