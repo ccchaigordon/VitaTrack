@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { CaloriesCard } from '../components/ptf/CaloriesCard';
 import { MacroCard } from '../components/ptf/MacroCard';
+import { InsightsCard } from '../components/ptf/InsightsCard';
+import { apiFetch } from "../services/api";
 
 interface CaloriesActivity {
   date: string;
@@ -52,6 +54,12 @@ interface MetricsResponse {
   };
 }
 
+interface InsightResponse {
+  summary: string[];
+  nextFocus: string;
+  isFallback: boolean; // True if Gemini failed or no data
+}
+
 const ErrorCardPlaceholder = ({ title, message }: { title: string, message: string }) => (
   <div className="bg-white rounded-2xl p-6 shadow-sm border border-red-100 h-full flex flex-col items-center justify-center text-center min-h-[300px]">
     <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-3">
@@ -74,6 +82,7 @@ export function ProgressDashboardPage() {
   // Error States
   const [macroError, setMacroError] = useState(false);
   const [caloriesError, setCaloriesError] = useState(false);
+  const [insight, setInsight] = useState<InsightResponse | null>(null);
   const [activeTab, setActiveTab] = useState('progress');
   
 
@@ -82,11 +91,9 @@ export function ProgressDashboardPage() {
     const fetchMacros = async () => {
       setMacroError(false);
       try {
-        const userId = 1;
-        const res = await fetch(`http://localhost:4000/api/ptf/macros?user_id=${userId}&days=${macroRange}`);
-        if(!res.ok) throw new Error("Macro fetch failed");
-        
-        const macroData = await res.json();
+        const macroData = await apiFetch<MacroData>(`/ptf/macros?days=${macroRange}`);
+
+        console.log('Fetched Macro Data:', macroData);
         
         setMetrics(prev => ({
             ...prev,
@@ -102,11 +109,7 @@ export function ProgressDashboardPage() {
   useEffect(() => {
     const fetchCalories = async () => {
       try {
-        const userId = 1;
-        const res = await fetch(`http://localhost:4000/api/ptf/calories?user_id=${userId}&days=${caloriesRange}`);
-        if(!res.ok) throw new Error("Calories Activity fetch failed");
-        
-        const activityData = await res.json();
+        const activityData = await apiFetch<CaloriesActivity[]>(`/ptf/calories?days=${caloriesRange}`);
 
         setMetrics(prev => ({
           ...prev,
@@ -120,13 +123,28 @@ export function ProgressDashboardPage() {
     fetchCalories();
   }, [caloriesRange]);
 
+  // FETCH 3: WEEKLY INSIGHTS
+  useEffect(() => {
+    const fetchInsights = async () => {
+      try {
+        const response = await apiFetch<InsightResponse>(`/ptf/insights`);
+        setInsight(response);
+      } catch (err) {
+        console.error(err);
+        setInsight(MOCK_INSIGHTS);
+      }
+    };
+
+    fetchInsights();
+  }, []);
+
   return (
-    <div className="min-h-screen w-full bg-cover bg-[#E8EFE5] p-4 md:p-8 flex justify-center font-sans" style={{ backgroundImage: "url('/src/assets/Chatbot/5522.jpg')" }}>
+    <div className="min-h-screen w-full p-10 bg-cover bg-[#F5F7FA] md:p-2 flex justify-center font-sans">
       {/* Container */}
-      <div className="w-full max-w-[1400px] bg-[#F4F9E8] rounded-[40px] p-6 md:p-8 shadow-xl flex flex-col md:flex-row gap-8">
+      <div className="w-full max-w-[1800px] m-4 md:p-2 flex flex-col md:flex-row gap-8">
         
         {/* LEFT SIDEBAR */}
-        <aside className="w-full md:w-64 bg-white rounded-2xl shadow p-4 flex-shrink-0">
+        <aside className="w-full md:w-64 bg-white rounded-2xl shadow-sm p-4 flex-shrink-0">
           
           <nav className="space-y-4">
             <button 
@@ -172,6 +190,10 @@ export function ProgressDashboardPage() {
 
         {/* MAIN CONTAINER */}
         <main className="flex-1">
+
+          <section className="mb-6">
+            <InsightsCard insight={insight} /*loading={loading}*/ />
+          </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
             <div className="min-w-0">
@@ -250,3 +272,12 @@ const MOCK_METRICS: MetricsResponse = {
   }
 };
 
+const MOCK_INSIGHTS: InsightResponse = {
+  summary: [
+    "Your protein intake is slightly lower than last week (-2.84%).",
+    "Great job maintaining a 2-day workout streak!",
+    "Calorie consumption is stable and within 10% of your goal."
+  ],
+  nextFocus: "Try adding a protein shake after your Thursday workout.",
+  isFallback: false
+};

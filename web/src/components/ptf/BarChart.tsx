@@ -12,8 +12,15 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   const contentWidth = (barWidth * 2 + groupGap) * data.length;
   const width = contentWidth + xPadding  * 2; 
 
-  const values = data.flatMap(d => [d.val1, d.val2]);
-  const maxVal = values.length ? Math.max(...values)*1.2 : 100;
+  const normalised = data.map(d => {
+  const v1 = Number(d.val1) || 0;
+  const v2 = Number(d.val2) || 0;
+  return { ...d, val1: v1, val2: v2 };
+  });
+  const values = normalised.flatMap(d => [d.val1, d.val2]);
+  const rawMax = values.length ? Math.max(...values) : 0;
+  const maxVal = Number.isFinite(rawMax) && rawMax > 0 ? rawMax * 1.2 : 100;
+  // const maxVal = values.length ? Math.max(...values)*1.2 : 100;
   const yAxisOffset = 30;
   
   return (
@@ -52,11 +59,14 @@ export function BarChart ({ data }: { data: ChartData[] }) {
         );
       })}
 
-        {data.map((d, i) => {
+        {normalised.map((d, i) => {
           const xPos = xPadding + i * (barWidth * 2 + groupGap);
           
-          const h1 = (d.val1 / maxVal) * height;
-          const h2 = (d.val2 / maxVal) * height;
+          const h1Raw = (d.val1 / maxVal) * height;
+          const h2Raw = (d.val2 / maxVal) * height;
+
+          const h1 = Number.isFinite(h1Raw) ? h1Raw : 0;
+          const h2 = Number.isFinite(h2Raw) ? h2Raw : 0;
 
           return (
             <g key={i} className="group cursor-pointer">
