@@ -153,17 +153,16 @@ export function ChatApp() {
 
   return (
     <div
-      className="min-h-screen w-full bg-cover bg-center bg-no-repeat bg-fixed"
-      style={{ backgroundImage: "url('/src/assets/Chatbot/5522.jpg')" }}
+      className="h-100vh bg-cover bg-center bg-no-repeat bg-fixed"
     >
-      <div className="flex justify-center px-4 sm:px-6 lg:px-8">
+      <div className="flex justify-center mt-8 sm:px-6 lg:px-8">
         {/* MAIN CHAT UI */}
         <div
-          className="flex gap-6 w-full 
-         rounded-3xl bg-[#F5F7DE] p-8 h-[86vh] shadow-xl"
+          className="flex gap-6 w-full max-w-[1390px]
+         rounded-3xl p-8 h-[80vh] shadow-xl"
         >
           {/* LEFT SIDEBAR */}
-          <div className="bg-white p-6 rounded-3xl w-75">
+          <div className="bg-[#F5F7DE]/50 p-6 rounded-3xl w-75">
             <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">
               CHAT VITATRACK
             </h1>
@@ -197,7 +196,7 @@ export function ChatApp() {
           </div>
 
           {/* MAIN CHAT AREA */}
-          <div className="bg-white/50 flex-1 rounded-3xl p-10 flex flex-col items-center justify-start">
+          <div className="bg-[#F5F7DE]/50 flex-1 rounded-3xl p-10 flex flex-col items-center justify-start">
             {messages.length > 0 && (
               <div className="flex flex-col w-full gap-6 mb-6 overflow-y-auto pr-2 h-[60vh]">
                 {messages.map((msg, index) => (

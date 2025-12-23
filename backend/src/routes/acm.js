@@ -20,8 +20,11 @@ function getRlsClient(req) {
 const router = express.Router();
 
 router.post("/chat", upload.any(), async (req, res) => {
-  const user_id = 1001; // dummy user ID
   const supabase = getRlsClient(req);
+
+  // Access the user ID
+  const user_id = req.user?.id || req.user?.user_id || 1001;
+  console.log("user_id:", user_id, typeof user_id);
 
   const { message } = req.body;
   const files = req.files;
@@ -32,10 +35,9 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   const state = conversationState.get(user_id);
 
-  //const user = req.user;
   const intent = detectIntent(message, state);
+  console.log("Intent:", intent);
   
-  // Log meal
   if (intent === "log_meal") {
     const response = await logMealHandler(message, files, conversationState, user_id, supabase);
     return res.json(response);
@@ -101,7 +103,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
 
     if (state.type === "WORKOUT") {
-      const workout = item.workout;
 
       prompt = `
         You are a friendly fitness assistant chatbot.
@@ -109,24 +110,28 @@ router.post("/chat", upload.any(), async (req, res) => {
         Context:
         The user is browsing workout recommendations.
 
-        Workout details:
-        - Exercise: ${workout.exercise_name}
-        - Sets: ${workout.sets}
-        - Reps: ${workout.reps}
-        - Duration: ${workout.duration} minutes
-        - Estimated calories burned: ${workout.calories_burned} kcal
+       Wokrout details:
+        - Name: ${item.title}
+        - Description: ${item.description}
+        - Source: ${item.source_url}
+        - Category: ${item.category_tags}
 
         Task:
         Write a short, friendly response:
-        - Acknowledge the workout
-        - Mention calories burned
-        - Ask if the user wants another workout or to modify it
+        - Acknowledge the choice
+        - Ask if the user wants more recommendation
         - Use emojis naturally
         - Keep it under 2 sentences
         `;
-      }
+    }
     
-    const gResponse = await queryGemini(prompt);
+    // const gResponse = await queryGemini(prompt);
+    gResponse = gResponse = `Workout details:
+     - Name: ${item.title}
+    - Description: ${item.description}
+    - Source: ${item.source_url}
+    - Category: ${item.category_tags.join(', ')}`
+
     console.log('Gemini response for more recommendation:', gResponse);
 
     return res.json({
