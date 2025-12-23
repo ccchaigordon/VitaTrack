@@ -153,16 +153,16 @@ export function ChatApp() {
 
   return (
     <div
-      className="h-100vh bg-cover bg-center bg-no-repeat bg-fixed"
+      className="bg-[#F5F7FA] bg-cover bg-center bg-no-repeat"
     >
-      <div className="flex justify-center mt-8 sm:px-6 lg:px-8">
+      <div className="flex justify-center p-8 sm:px-6 lg:px-8 gap-6">
         {/* MAIN CHAT UI */}
-        <div
+        {/* <div
           className="flex gap-6 w-full max-w-[1390px]
          rounded-3xl p-8 h-[80vh] shadow-xl"
-        >
+        > */}
           {/* LEFT SIDEBAR */}
-          <div className="bg-[#F5F7DE]/50 p-6 rounded-3xl w-75">
+          <div className="bg-white p-6 rounded-3xl w-75 shadow-sm h-[82vh]">
             <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">
               CHAT VITATRACK
             </h1>
@@ -196,7 +196,7 @@ export function ChatApp() {
           </div>
 
           {/* MAIN CHAT AREA */}
-          <div className="bg-[#F5F7DE]/50 flex-1 rounded-3xl p-10 flex flex-col items-center justify-start">
+          <div className="bg-white flex-1 rounded-3xl p-10 flex flex-col items-center justify-start shadow-sm">
             {messages.length > 0 && (
               <div className="flex flex-col w-full gap-6 mb-6 overflow-y-auto pr-2 h-[60vh]">
                 {messages.map((msg, index) => (
@@ -291,7 +291,7 @@ export function ChatApp() {
               </div>
             </div>
           </div>
-        </div>
+        
       </div>
     </div>
   );
