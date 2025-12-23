@@ -1,0 +1,3 @@
+function logMessageHandler (message, files) {
+
+}

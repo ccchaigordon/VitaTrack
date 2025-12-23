@@ -20,16 +20,11 @@ function getRlsClient(req) {
 const router = express.Router();
 
 router.post("/chat", upload.any(), async (req, res) => {
-  // const user_id = 1001; // dummy user ID
   const supabase = getRlsClient(req);
 
   // Access the user ID
-  const user_id = req.user?.id || req.user?.user_id || 1001; // fallback to dummy
+  const user_id = req.user?.id || req.user?.user_id || 1001;
   console.log("user_id:", user_id, typeof user_id);
-
-  const { data } = await supabase
-  .rpc('get_current_user'); // optional: you can create a simple function that returns auth.uid()
-console.log(data);
 
   const { message } = req.body;
   const files = req.files;
@@ -40,11 +35,9 @@ console.log(data);
 
   const state = conversationState.get(user_id);
 
-  //const user = req.user;
   const intent = detectIntent(message, state);
   console.log("Intent:", intent);
   
-  // Log meal
   if (intent === "log_meal") {
     const response = await logMealHandler(message, files, conversationState, user_id, supabase);
     return res.json(response);
