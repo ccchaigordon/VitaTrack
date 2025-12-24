@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { CaloriesCard } from '../components/ptf/CaloriesCard';
 import { MacroCard } from '../components/ptf/MacroCard';
 import { InsightsCard } from '../components/ptf/InsightsCard';
+import { LineChart } from '../components/ptf/LineChart';  
 import { apiFetch } from "../services/api";
 
 interface CaloriesActivity {
@@ -32,17 +33,24 @@ interface MacroData {
   };
 }
 
+interface WorkoutData {
+  date: string; 
+  label: string; 
+  count: number; 
+}
+
 type GoalStatus = 'on_track' | 'slightly_behind' | 'off_track' | null;
 
 interface MetricsResponse {
   rangeDays: number;
   caloriesActivity: CaloriesActivity[];
   macros: MacroData;
-  workouts: {
-    totalCount: number;
-    streakDays: number;
-    history: number[];
-  };
+  workouts: WorkoutData[];
+  // workouts: {
+  //   totalCount: number;
+  //   streakDays: number;
+  //   history: number[];
+  // };
   goals: {
     hasGoals: boolean;
     calorieGoal: number;
@@ -84,7 +92,28 @@ export function ProgressDashboardPage() {
   const [caloriesError, setCaloriesError] = useState(false);
   const [insight, setInsight] = useState<InsightResponse | null>(null);
   const [activeTab, setActiveTab] = useState('progress');
-  
+  const [recOpen, setRecOpen] = useState(false);
+
+  // Sidebar states
+  const activeBtn = "bg-[#CDEE6E] text-black shadow-sm";
+  const inactiveBtn = "text-gray-400 hover:bg-lime-50";
+  const recSectionActive = activeTab === "recommendation" || activeTab === "recipe" || activeTab === "workout";
+  const recParentSelected = activeTab === "recommendation";
+
+  const handleProgress = () => {
+    setActiveTab("progress");
+    setRecOpen(false);
+  };
+
+  const handleRecommendation = () => {
+    setRecOpen((prev) => !prev);
+    setActiveTab("recommendation");
+  };
+
+  const handleChild = (tab: "recipe" | "workout") => {
+    setActiveTab(tab);
+    setRecOpen(true);
+  };
 
   // FETCH 1: MACROS
   useEffect(() => {
@@ -138,53 +167,74 @@ export function ProgressDashboardPage() {
     fetchInsights();
   }, []);
 
+  // FETCH 4: WORKOUT HISTORY
+  useEffect(() => {
+    const fetchWorkout = async () => {
+      try {
+        const workoutData = await apiFetch<WorkoutData[]>(`/ptf/workout`);
+        setMetrics(prev => ({
+          ...prev,
+            workouts: workoutData
+          }));
+      } catch (err) { console.error(err); }
+    };
+
+    fetchWorkout();
+  }, []);
+
   return (
-    <div className="min-h-screen w-full p-10 bg-cover bg-[#F5F7FA] md:p-2 flex justify-center font-sans">
+    <div className="min-h-screen w-full p-10 bg-cover bg-[#F5F7FA] md:p-2 flex justify-center">
       {/* Container */}
       <div className="w-full max-w-[1800px] m-4 md:p-2 flex flex-col md:flex-row gap-8">
-        
-        {/* LEFT SIDEBAR */}
-        <aside className="w-full md:w-64 bg-white rounded-2xl shadow-sm p-4 flex-shrink-0">
-          
+        {/* Left Sidebar */}
+        <aside className="w-full rounded-2xl border border-gray-200 p-5 md:w-64 bg-white rounded-2xl p-4 flex-shrink-0">
           <nav className="space-y-4">
             <button 
-              onClick={() => setActiveTab('progress')}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition-all ${
+              onClick={handleProgress}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
                 activeTab === 'progress' 
-                  ? 'bg-[#CDEE6E] text-black shadow-sm' 
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              <img src="src/assets/Progress/Progress.svg" className="w-5 h-5" />
+                  ? activeBtn 
+                  : inactiveBtn
+              }`}>
+            <img src={activeTab === "progress" ? "src/assets/Progress/Progress.svg" : 
+              "src/assets/Progress/Progress_inactive.svg"} className="w-5 h-5" />
               Progress
             </button>
 
-            <button 
-              onClick={() => setActiveTab('notifications')}
-              className={`w-full flex items-center justify-between px-4 py-3 rounded-full font-medium text-gray-400 hover:text-gray-600 hover:bg-white/50`}
+            <button
+              onClick={handleRecommendation}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium cursor-pointer 
+                ${recParentSelected ? activeBtn : recSectionActive ? "text-black" : inactiveBtn}`}
             >
-              <div className="flex items-center gap-3">
-                <img src="src/assets/Progress/Bell.svg" className="w-5 h-5" />
-                Notification
-              </div>
+            <div className="flex items-center gap-3">
+              <img
+                src={recSectionActive ? "src/assets/Progress/Recommendation.svg" : 
+                  "src/assets/Progress/Recommendation_inactive.svg"}
+                className="w-5 h-5"/>
+              Recommendation
+            </div>
+            <span className={`text-xl transition-transform ${recOpen ? "rotate-90" : ""}`}>
+              ›
+            </span>
             </button>
 
-            <div className="px-4 py-2">
-              <div className="flex items-center justify-between text-gray-400 mb-2 cursor-pointer hover:text-gray-600">
-                <div className="flex items-center gap-3 font-medium">
-                  <img src="src/assets/Progress/Recommendation.svg" className="w-5 h-5" />
-                  Recommendation
-                </div>
+            {recOpen && (
+              <div className="pl-12 space-y-2">
+                <button
+                  onClick={() => handleChild("recipe")}
+                  className={`w-full flex items-center gap-2 font-medium rounded-lg px-3 py-2 cursor-pointer
+                    ${activeTab === "recipe" ? activeBtn : inactiveBtn }`}
+                >Recipe
+                </button>
+
+                <button
+                  onClick={() => handleChild("workout")}
+                  className={`w-full flex items-center gap-2 font-medium rounded-lg px-3 py-2 cursor-pointer 
+                    ${activeTab === "workout" ? activeBtn : inactiveBtn }`}
+                >Workout
+                </button>
               </div>
-              <div className="pl-12 space-y-3 text-sm text-gray-400">
-                <div className="flex items-center gap-2 hover:text-gray-600 cursor-pointer">
-                  <span className="w-4 border-b border-gray-300"></span>Recipe
-                </div>
-                <div className="flex items-center gap-2 hover:text-gray-600 cursor-pointer">
-                  <span className="w-4 border-b border-gray-300"></span>Workout
-                </div>
-              </div>
-            </div>
+            )}
           </nav>
         </aside>
 
@@ -216,6 +266,12 @@ export function ProgressDashboardPage() {
             </div>
           </section>
 
+          <section className="bg-white rounded-2xl p-6 border border-gray-200">
+            <h2 className="text-xl font-semibold mb-4">Workout Progress</h2>
+            <LineChart
+              data={metrics.workouts}
+            />
+          </section>
         </main>
       </div>
     </div>
@@ -256,11 +312,17 @@ const MOCK_METRICS: MetricsResponse = {
       fat: 4.16,
     },
   },
-  workouts: {
-    totalCount: 3,
-    streakDays: 2,
-    history: [1, 0, 1, 1, 0, 1, 1]
-  },
+  // workouts: {
+  //   totalCount: 3,
+  //   streakDays: 2,
+  //   history: [1, 0, 1, 1, 0, 1, 1]
+  // },
+  workouts: Array.from({ length: 14 }).map((_, i) => ({
+    date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
+    label: new Date(Date.now() - (13 - i) * 86400000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    count: Math.random() > 0.5 ? 1 : 0
+  })),
+
   goals: {
     hasGoals: true,
     calorieGoal: 2000,
