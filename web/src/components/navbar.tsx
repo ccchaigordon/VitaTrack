@@ -676,10 +676,16 @@ export default function Navbar() {
                   <a
                     href="/pricings"
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-[#DDF3D8]/50 hover:text-[#1A381D]"
+                    className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium transition-colors hover:bg-[#DDF3D8]/50 ${
+                      isActive("/pricings")
+                        ? "bg-[#DDF3D8]/50 text-[#1A381D]"
+                        : "text-gray-600 hover:text-[#1A381D]"
+                    }`}
                   >
                     <svg
-                      className="h-5 w-5"
+                      className={`h-5 w-5 ${
+                        isActive("/pricings") ? "text-[#34A853]" : ""
+                      }`}
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="currentColor"

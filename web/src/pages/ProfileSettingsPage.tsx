@@ -131,7 +131,7 @@ export function ProfileSettingsPage() {
 
           {/* Profile Card with Banner */}
           <div className="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-            <div className="h-16 bg-linear-to-r from-[#DDF3D8] to-[#E8F5A3]" />
+            <div className="h-14 bg-linear-to-r from-[#DDF3D8] to-[#E8F5A3]" />
 
             <div className="relative px-6 pb-6">
               <div className="-mt-10 flex items-end justify-between">
@@ -144,7 +144,7 @@ export function ProfileSettingsPage() {
                   onClick={() => nav("/profile/edit")}
                   className="rounded-lg bg-white border border-[#34A853]/50 px-6 py-1.5 text-sm font-medium text-[#34A853] transition cursor-pointer"
                 >
-                  Edit
+                  Edit Profile
                 </button>
               </div>
               <div className="mt-4">
@@ -161,7 +161,10 @@ export function ProfileSettingsPage() {
               <label className="mb-2 block text-sm font-medium text-gray-700">
                 Full Name
               </label>
-              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700">
+              <div
+                className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-700 cursor-not-allowed"
+                title="Username is unique and cannot be changed"
+              >
                 {me?.user?.username || "Username"}
               </div>
             </div>
