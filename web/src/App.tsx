@@ -15,6 +15,8 @@ import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
 import { ProgressDashboardPage } from "./pages/ProgressDashboardPage";
 import PricingPage from "./pages/PricingPage";
+import { HelpCenterPage } from "./pages/HelpCenterPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import { LandingPage } from "./pages/LandingPage";
@@ -138,6 +140,26 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout showFooter>
                 <PricingPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/help"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <HelpCenterPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <PrivacyPolicyPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }

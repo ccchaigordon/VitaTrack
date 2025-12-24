@@ -13,6 +13,8 @@ const routeTitles: Record<string, string> = {
   "/chatbot": "Chatbot - VitaTrack",
   "/progress": "Progress - VitaTrack",
   "/pricings": "Pricings - VitaTrack",
+  "/help": "Help Center - VitaTrack",
+  "/privacy": "Privacy Policy - VitaTrack",
 };
 
 export function DocumentTitle() {
