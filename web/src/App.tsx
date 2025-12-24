@@ -43,7 +43,14 @@ export function App() {
     <>
       <ScrollToTop />
       <Routes>
-        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/"
+          element={
+            <RedirectIfAuth>
+              <LandingPage />
+            </RedirectIfAuth>
+          }
+        />
         <Route
           path="/signin"
           element={
