@@ -23,43 +23,153 @@ router.post("/chat", upload.any(), async (req, res) => {
   const supabase = getRlsClient(req);
 
   // Access the user ID
-  const user_id = req.user?.id || req.user?.user_id || 1001;
-  console.log("user_id:", user_id, typeof user_id);
+  const user = req.user; // from auth middleware
 
-  const { message } = req.body;
+  const { message, chat_id, msg_id } = req.body;
+
+  let finalChatId = chat_id;
+  let finalMsgId = " ";
+
+  // Create chat if new
+  if (!finalChatId) {
+    const { data: chat, error } = await supabase
+      .from("chats")
+      .insert({
+        user_id: user.id,
+        title: message.slice(0, 30) || "New chat",
+        created_at: new Date(),
+        updated_at: new Date()
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    finalChatId = chat.chat_id;
+  }
+
+  const { data: chat, error } = await supabase
+    .from("chat_history")
+    .insert({
+      chat_id: finalChatId,
+      role: "user",
+      message
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  finalMsgId = chat.msg_id;
+
+  console.log("Final msg id:", finalMsgId);
+
   const files = req.files;
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   console.log("Received message:", message);
   console.log("Received files:", files);
 
-  const state = conversationState.get(user_id);
+ if (files.length > 0) {
+    for (const file of files) {
+      const path = `${user.id}/${finalChatId}/${Date.now()}-${file.originalname}`;
+
+      const { data: uploadData, error: uploadError } =
+        await supabase.storage
+          .from("chat-files")
+          .upload(path, file.buffer, {
+            contentType: file.mimetype
+          });
+
+      console.log("UPLOAD RESULT:", uploadData);
+      console.log("UPLOAD ERROR:", uploadError);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: signedUrlData, error: signedUrlError } =
+        await supabase.storage
+          .from("chat-files")
+          .createSignedUrl(path, 60 * 60);
+
+      console.log("SIGNED FILE URL:", signedUrlData?.signedUrl);
+
+      if (signedUrlError) throw signedUrlError;
+
+      const { error: insertError } =
+        await supabase.from("chat_files").insert({
+          msg_id: finalMsgId,
+          file_url: path,
+          file_name: file.originalname,
+          file_type: file.mimetype,
+          uploaded_at: new Date()
+        });
+
+      if (insertError) {
+        console.error("Error inserting chat file record:", insertError);
+        throw insertError;
+      }
+    }
+  }
+
+  const state = conversationState.get(user.id);
 
   const intent = detectIntent(message, state);
   console.log("Intent:", intent);
   
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files, conversationState, user_id, supabase);
+    const response = await logMealHandler(message, files, conversationState, user.id, supabase);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: response,
+      created_at: new Date(),  
+    });
+
     return res.json(response);
   }
 
   if (intent === "log_workout") {
-    const response = await logWorkoutHandler(message, files, conversationState, user_id, supabase);
+    const response = await logWorkoutHandler(message, files, conversationState, user.id, supabase);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: response,
+      created_at: new Date(),  
+    });
+
     return res.json(response);
   }
 
   if (intent === "recommendation_meal") {
-    const response = await recommendationHandlerForMeal(message, user_id, conversationState, supabase);
+    const response = await recommendationHandlerForMeal(message, user.id, conversationState, supabase);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: response,
+      created_at: new Date(),  
+    });
+
     return res.json(response);    
   }
 
   if (intent === "recommendation_workout") {
-    const response = await recommendationHandlerForWorkout(message, user_id, conversationState, supabase);
+    const response = await recommendationHandlerForWorkout(message, user.id, conversationState, supabase);
+    
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: response,
+      created_at: new Date(),  
+    });
+    
     return res.json(response);    
   }
 
   if (intent === "more_recommendation") {
-    const state = conversationState.get(user_id);
+    const state = conversationState.get(user.id);
     const currentIndex = state.selectedIndex || 0;
     const nextIndex = currentIndex + 1;
 
@@ -70,7 +180,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
 
     state.selectedIndex = nextIndex;
-    conversationState.set(user_id, state);
+    conversationState.set(user.id, state);
 
     const item = state.recommended[nextIndex];
     let prompt = "";
@@ -132,9 +242,17 @@ router.post("/chat", upload.any(), async (req, res) => {
     - Source: ${item.source_url}
     - Category: ${item.category_tags.join(', ')}`
 
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: gResponse,
+      created_at: new Date(),  
+    });
+
     console.log('Gemini response for more recommendation:', gResponse);
 
     return res.json({
+      chat_id: finalChatId,
       reply: gResponse,
     });
   }
@@ -144,6 +262,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     const prompt = `You are a friendly wellness assistant. Respond to: "${message}"`;
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: gResponse,
+      created_at: new Date(),  
+    });
+
     return res.json({ reply: gResponse });
   }
 
@@ -152,5 +278,103 @@ router.post("/chat", upload.any(), async (req, res) => {
     reply: `👋 Hello! How can I support your wellness today? (placeholder)`
   });
 });
+
+router.get("/fetchChatList", async (req, res) =>{
+  const supabase = getRlsClient(req);
+
+  try {
+    const user = req.user; // from auth middleware
+    console.log("Fetching chat list for user:", user.id);
+
+    // Fetch messages
+    const { data: chatList } = await supabase
+      .from("chats")
+      .select("chat_id, title")
+      .eq("user_id", user.id);
+    
+    console.log("Fetched chat list:", chatList);
+
+    // Respond
+    res.json(chatList || []);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch chat list" });
+  }
+});
+
+router.get("/loadchat", async (req, res) => {
+  try {
+    const supabase = getRlsClient(req);
+    const user = req.user; // from auth middleware
+    let { chat_id } = req.query;
+
+    console.log("Loading chat for user:", user.id);
+    console.log("Requested chat_id:", chat_id);
+
+    // 1. Fetch messages for this chat
+    const { data: messages } = await supabase
+      .from("chat_history")
+      .select("msg_id, role, message, created_at")
+      .eq("chat_id", chat_id);
+
+    const msgIds = (messages || []).map(m => m.msg_id);
+
+    console.log("Msg IDs to fetch files for:", msgIds);
+
+    const { data: allFiles } = await supabase.from("chat_files").select("*").limit(10);
+    console.log("All files in DB:", allFiles);
+
+    // 2. Fetch files for these messages
+    const { data: files } = await supabase
+      .from("chat_files")
+      .select("file_url, file_name, file_type, uploaded_at, msg_id")
+      .in("msg_id", msgIds);
+
+    console.log("Fetched files from DB:", files);
+
+    // 3. Generate signed URLs for files
+    const filesWithUrls = await Promise.all(
+      (files || []).map(async (f) => {
+        const { data } = await supabase.storage
+          .from("chat-files")
+          .createSignedUrl(f.file_url, 60 * 60 * 24 * 30); // 30 days
+
+        return {
+          role: "user",
+          message: null,
+          file_name: f.file_name,
+          file_url: data?.signedUrl,
+          created_at: f.uploaded_at,
+          msg_id: f.msg_id
+        };
+      })
+    );
+
+    console.log("Fetched files with URLs:", filesWithUrls);
+
+    // 4. Merge messages and files in timeline
+    const timeline = [
+      ...messages.map(m => ({
+        role: m.role,
+        message: m.message,
+        created_at: m.created_at,
+        msg_id: m.msg_id,
+        file_url: null,
+        file_name: null
+      })),
+      ...filesWithUrls
+    ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+    console.log("Loaded chat timeline:", timeline);
+
+    res.json({ chat_id, messages: timeline });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to load chat" });
+  }
+});
+
 
 module.exports = router;
