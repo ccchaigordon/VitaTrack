@@ -3,6 +3,7 @@ import { RequireAuth } from "./components/RequireAuth";
 import { RedirectIfAuth } from "./components/RedirectIfAuth";
 import { RequireProfileComplete } from "./components/RequireProfileComplete";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { DocumentTitle } from "./components/DocumentTitle";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -42,6 +43,7 @@ export function App() {
   return (
     <>
       <ScrollToTop />
+      <DocumentTitle />
       <Routes>
         <Route
           path="/"
