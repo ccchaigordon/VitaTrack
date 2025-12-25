@@ -151,28 +151,30 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
       }
     }
     
-    const messageForRec = `I have just logged a meal. Can you recommend a suitable meal for my next meal?`;
+    // const messageForRec = `I have just logged a meal. Can you recommend a suitable meal for my next meal?`;
 
-    const recResponse = await recommendationHandler(messageForRec, user_id, conversationState, supabase);
+    // const recResponse = await recommendationHandler(messageForRec, user_id, conversationState, supabase);
 
-    const prompt = `
-      You are a friendly fitness assistant chatbot.
+    // const prompt = `
+    //   You are a friendly fitness assistant chatbot.
 
-      Context:
-      The user is logging meal.
+    //   Context:
+    //   The user is logging meal.
 
-      Meal details:
-      - ${mealData}
+    //   Meal details:
+    //   - ${mealData}
 
-      Task:
-      Write a short, friendly response. Can use emojis naturally.
-      - Acknowledge the logged meal
-      - Mention calories and macros
-      `;
+    //   Task:
+    //   Write a short, friendly response. Can use emojis naturally.
+    //   - Acknowledge the logged meal
+    //   - Mention calories and macros
+    //   `;
     
-    const gResponse = await queryGemini(prompt);
+    // const gResponse = await queryGemini(prompt);
 
-    messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+    // messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+
+    messageToReturn = "Got it! Your meal has been logged successfully. 🍽️ If you need any meal recommendations or have questions about your nutrition, feel free to ask! 😊";
 
     conversationState.set(user_id, { state: "IDLE" });
 
