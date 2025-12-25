@@ -25,10 +25,12 @@ router.post("/chat", upload.any(), async (req, res) => {
   // Access the user ID
   const user = req.user; // from auth middleware
 
-  const { message, chat_id, msg_id } = req.body;
+  const { message, chat_id } = req.body;
 
   let finalChatId = chat_id;
   let finalMsgId = " ";
+
+  console.log("final chat id at start:", finalChatId);
 
   // Create chat if new
   if (!finalChatId) {
@@ -45,6 +47,35 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     if (error) throw error;
     finalChatId = chat.chat_id;
+  }
+
+  // Update chat title
+  // Get the chat
+  const { data: chatData, error: chatError } = await supabase
+    .from("chats")
+    .select("*")
+    .eq("chat_id", finalChatId)
+    .single();
+  
+  console.log("Chat data fetched:", chatData);
+  console.log("Chat title:", chatData ? chatData.title : "No chat data");
+
+  if (chatError) return res.status(500).json({ error: chatError });
+
+  // If title is still "New chat", update it to the first message
+  if (chatData.title === "New chat") {
+    const { error: updateError } = await supabase
+      .from("chats")
+      .update({ title: message, updated_at: new Date() })
+      .eq("chat_id", finalChatId)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.log("Failed to update chat title:", updateError);
+    
+      return res.status(500).json({ error: updateError });
+    }
   }
 
   const { data: chat, error } = await supabase
@@ -278,6 +309,27 @@ router.post("/chat", upload.any(), async (req, res) => {
     reply: `👋 Hello! How can I support your wellness today? (placeholder)`
   });
 });
+
+router.post("/newchat", async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user = req.user;
+
+  const { data, error } = await supabase
+    .from("chats")
+    .insert({
+      user_id: user.id,
+      title: "New chat",
+      created_at: new Date(),
+      updated_at: new Date()
+    })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error });
+
+  res.json({ chat_id: data.chat_id });
+});
+
 
 router.get("/fetchChatList", async (req, res) =>{
   const supabase = getRlsClient(req);

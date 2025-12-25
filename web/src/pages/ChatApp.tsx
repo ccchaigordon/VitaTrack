@@ -24,6 +24,34 @@ type FileItem = {
   file_name: string;
 };
 
+const normalizeMessageText = (message: unknown): string => {
+  if (typeof message === "string") {
+    // 🔥 try to parse JSON string
+    try {
+      const parsed = JSON.parse(message);
+      if (parsed && typeof parsed.reply === "string") {
+        return parsed.reply;
+      }
+    } catch {
+      // not JSON → normal text
+      return message;
+    }
+
+    return message;
+  }
+
+  if (
+    typeof message === "object" &&
+    message !== null &&
+    "reply" in message &&
+    typeof (message as any).reply === "string"
+  ) {
+    return (message as any).reply;
+  }
+
+  return "";
+};
+
 function ChatBubble({
   role,
   text,
@@ -118,57 +146,62 @@ export function ChatApp() {
     setUploads((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const sendMessage = async () => {
-    if (!input.trim()) return;
+ const sendMessage = async () => {
+    const messageText = input.trim();
+    if (!messageText) return;
 
     const newUserMessage: Message = {
       role: "user",
-      text: input.trim(),
+      text: messageText,
       file: uploads,
     };
-    setMessages((prev) => [...prev, newUserMessage]);
+    setMessages(prev => [...prev, newUserMessage]);
 
-    // prepare request
     const formData = new FormData();
-    formData.append("message", input.trim());
+    formData.append("message", messageText);
     formData.append("chat_id", activeChatId ?? "");
     formData.append("is_new_chat", activeChatId ? "false" : "true");
 
-    uploads.forEach((file) => {
-      formData.append("files", file);
-    });
+    uploads.forEach(file => formData.append("files", file));
 
     setInput("");
     setUploads([]);
 
     try {
-      const data = await apiFetch<{ chat_id: string; reply: string }>('/chat', {
-        method: 'POST',
+      const data = await apiFetch<{ chat_id: string; reply: string }>("/chat", {
+        method: "POST",
         json: formData,
       });
 
-      if (!activeChatId) {
-        setActiveChatId(data.chat_id);
-      }
+      const chatId = activeChatId || data.chat_id;
 
-      console.log("Form Data sent:", formData);
+      if (!activeChatId) setActiveChatId(chatId);
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: data.reply, file: [] },
-      ]);
+      setChatList(prev => {
+        const chatExists = prev.find(c => c.chat_id === chatId);
+
+        if (chatExists) {
+          return prev.map(c =>
+            c.chat_id === chatId && c.title === "New chat"
+              ? { ...c, title: messageText } // update title only if it's "New chat"
+              : c
+          );
+        } else {
+          // if somehow chat is not in the list, add it
+          return [{ chat_id: chatId, title: messageText }, ...prev];
+        }
+      });
+
+      setMessages(prev => [...prev, { role: "assistant", text: data.reply, file: [] }]);
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
-        {
-          role: "assistant",
-          text: "Error: failed to contact server.",
-          file: [],
-        },
+        { role: "assistant", text: "Error: failed to contact server.", file: [] },
       ]);
     }
   };
+
 
   const loadChat = async (chatId: string) => {
     const data = await apiFetch<{ chat_id: string; messages: any[] }>(
@@ -192,14 +225,17 @@ export function ChatApp() {
         }
 
         // ✅ IMPORTANT: only set text if it exists and current text is empty
-        if (item.message && !existingMsg.text) {
-          existingMsg.text = item.message;
+        if (!existingMsg.text) {
+          const normalized = normalizeMessageText(item.message);
+          if (normalized) {
+            existingMsg.text = normalized;
+          }
         }
       } else {
         acc.push({
           msg_id: item.msg_id,
           role: item.role === "ai" ? "assistant" : "user",
-          text: item.message ?? "",   // keep null-safe init
+          text: normalizeMessageText(item.message),
           files: item.file_url && item.file_name
             ? [{
                 file_url: item.file_url,
@@ -217,33 +253,30 @@ export function ChatApp() {
 
     setActiveChatId(data.chat_id);
 
-    // setMessages(
-    //   data.messages.map(m => ({
-    //     role: m.role,
-    //     text: m.message ?? "",
-    //     file_name: m.file_name ?? undefined,
-    //     file_url: m.file_url ?? undefined,
-    //     file: []
-    //   }))
-    // );
-
     setMessages(messages);
   };
 
 
   const newChat = async () => {
-    const data = await apiFetch<{ chat_id: string; messages: any[] }>(
-      "/loadchat",
-      {
-        method: "POST",
-        json: { chat_id: "" }
-      }
-    );
+    try {
+      // Clear UI immediately
+      setMessages([]);
+      setActiveChatId(null);
 
-    setActiveChatId(data.chat_id);
-    setMessages([]);
+      // Create empty chat
+      const data = await apiFetch<{ chat_id: string }>("/newchat", {
+        method: "POST"
+      });
+
+      const newChatItem = { chat_id: data.chat_id, title: "New chat" };
+      setChatList(prev => [newChatItem, ...prev]);
+
+      setActiveChatId(data.chat_id);
+
+    } catch (err) {
+      console.error("Failed to create new chat", err);
+    }
   };
-
 
   return (
     <div
@@ -261,7 +294,9 @@ export function ChatApp() {
               CHAT VITATRACK
             </h1>
 
-            <button className="bg-[#1A381D] hover:bg-green-800 text-white text-[14px] px-4 py-2 w-full rounded-full cursor-pointer">
+            <button 
+              onClick={newChat}
+              className="bg-[#1A381D] hover:bg-green-800 text-white text-[14px] px-4 py-2 w-full rounded-full cursor-pointer">              
               + New Chat
             </button>
 

@@ -3,6 +3,7 @@ const cleanLLMJSON  = require("../cleanLLMJSON");
 const extractWorkoutInfoFromFiles = require('../Extraction/extractWorkoutInfoFromFiles');
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
 const processFiles = require("../FileProcessor/fileProcessor");
+const recommendationHandler = require("./recommendationHandlerForWorkout");
 
 async function logWorkoutHandler(message, files, conversationState, user_id, supabase) {
     let combinedText = "";
@@ -45,6 +46,10 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
       return { reply: "Invalid workout data format." };
     }
 
+    if (!Array.isArray(workoutDataParsed) || workoutDataParsed.length === 0) {
+      return { reply: "No workout data found to log." };
+    }
+
     for(const workout of workoutDataParsed) {
       const workoutSource = workout.source || "unknown";
 
@@ -82,7 +87,7 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
 
       const messageForRec = `I have just logged a workout: ${workout.exercise_name} with ${workout.calories_burned} kcal burned. Can you recommend a suitable workout for my next workout?`;
 
-      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState);
+      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState, supabase);
 
       const prompt = `
         You are a friendly fitness assistant chatbot.
