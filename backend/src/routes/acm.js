@@ -341,10 +341,13 @@ router.get("/fetchChatList", async (req, res) =>{
     // Fetch messages
     const { data: chatList } = await supabase
       .from("chats")
-      .select("chat_id, title")
+      .select("chat_id, title, updated_at")
       .eq("user_id", user.id);
     
     console.log("Fetched chat list:", chatList);
+
+    // Reorder by most recent updated_at
+    chatList.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
     // Respond
     res.json(chatList || []);

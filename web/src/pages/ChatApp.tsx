@@ -110,6 +110,12 @@ export function ChatApp() {
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   const [msg_id, setMsgId] = useState<string | null>(null);
   const [chatList, setChatList] = useState<{ chat_id: string; title: string }[]>([]);
+  const [activeTab, setActiveTab] = useState('progress');
+  const [chatOpen, setChatOpen] = useState(false);
+
+  const activeBtn = "bg-[#CDEE6E] text-black shadow-sm";
+  const inactiveBtn = "text-gray-400 hover:bg-lime-50";
+  const chatSectionActive = activeTab === "chat" 
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -204,6 +210,9 @@ export function ChatApp() {
 
 
   const loadChat = async (chatId: string) => {
+    setActiveTab("chat");
+    setChatOpen(false);
+
     const data = await apiFetch<{ chat_id: string; messages: any[] }>(
       `/loadchat?chat_id=${chatId}`
     );
@@ -308,16 +317,18 @@ export function ChatApp() {
             </div>
 
             {/* Chat list */}
-            <div className="flex flex-col">
+            <div className="flex flex-col overflow-y-auto mt-2 pr-1 h-[52vh]">
               {chatList.map((chat) => (
                 <div
                   key={chat.chat_id}
-                  className="flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
-                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]"
+                  className={`flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
+                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]
+                        ${activeChatId === chat.chat_id ? activeBtn : inactiveBtn}`}
+                      
                   onClick={() => loadChat(chat.chat_id)} // load messages for selected chat
                 >
                   <img src="/src/assets/Chatbot/Messages.svg" className="w-6" />
-                  <p className="text-[12px] text-gray-800">{chat.title || "Untitled Chat"}</p>
+                  <p className="text-[12px] text-gray-800 truncate">{chat.title || "Untitled Chat"}</p>
                 </div>
               ))}
             </div>
