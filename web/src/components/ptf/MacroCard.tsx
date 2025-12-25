@@ -61,7 +61,7 @@ const MacroItem: React.FC<{ icon: string; color?: string; label: string; value: 
 export function MacroCard ({ data, rangeDays, onRangeChange }: Props) {
   const comparison = rangeDays === 7 ? 'vs last week' : 'vs last month';
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-50"> 
+    <div className="bg-white rounded-2xl p-6 border border-gray-200"> 
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-xl font-bold text-gray-800">Macronutrients</h3>
         <RangeSelect value={rangeDays} options={macroOptions} onChange={onRangeChange}  />

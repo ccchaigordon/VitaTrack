@@ -37,7 +37,7 @@ export function CaloriesCard ({ data, goal, status, rangeValue, onRangeChange }:
   }));
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-50 h-full">
+    <div className="bg-white rounded-2xl p-6 border border-gray-200 h-full">
       <div className="flex justify-between items-end mb-4">
         <div>
           <h3 className="text-left text-xl font-bold text-gray-800">Calories Activities</h3>
