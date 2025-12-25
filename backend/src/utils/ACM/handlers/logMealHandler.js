@@ -149,36 +149,32 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
         console.error("Meal log error:", error);
         return { reply: "Failed to log meal." };
       }
+    }
+    
+    const messageForRec = `I have just logged a meal. Can you recommend a suitable meal for my next meal?`;
 
-      const messageForRec = `I have just logged a meal: ${meal.meal_name} with ${meal.calories} kcal, ${meal.protein}g protein, ${meal.carbs}g carbs, and ${meal.fat}g fat. Can you recommend a suitable meal for my next meal?`;
+    const recResponse = await recommendationHandler(messageForRec, user_id, conversationState, supabase);
 
-      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState);
+    const prompt = `
+      You are a friendly fitness assistant chatbot.
 
-      const prompt = `
-        You are a friendly fitness assistant chatbot.
+      Context:
+      The user is logging meal.
 
-        Context:
-        The user is logging meal.
+      Meal details:
+      - ${mealData}
 
-        Meal details:
-        - Name: ${meal.title}
-        - Calories: ${meal.calories} kcal
-        - Protein: ${meal.protein} g
-        - Carbs: ${meal.carbs} g
-        - Fat: ${meal.fat} g
+      Task:
+      Write a short, friendly response. Can use emojis naturally.
+      - Acknowledge the logged meal
+      - Mention calories and macros
+      `;
+    
+    const gResponse = await queryGemini(prompt);
 
-        Task:
-        Write a short, friendly response. Can use emojis naturally.
-        - Acknowledge the logged meal
-        - Mention calories and macros
-        `;
-      
-      const gResponse = await queryGemini(prompt);
+    messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
 
-      messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
-
-      conversationState.set(user_id, { state: "IDLE" });
-    }    
+    conversationState.set(user_id, { state: "IDLE" });
 
     return {
       reply: messageToReturn

@@ -1,10 +1,27 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { apiFetch } from "../services/api";
 
 type Message = {
   role: "user" | "assistant";
   text: string;
-  file: File[];
+  file?: File[];         // For newly uploaded files
+  files?: FileItem[];    // For loaded messages from backend
+  file_name?: string;
+  file_url?: string;
+};
+
+type TimelineItem = {
+  created_at: string;
+  file_name: string | null;
+  file_url: string | null;
+  message: string | null;
+  msg_id: string;
+  role: "user" | "ai";
+};
+
+type FileItem = {
+  file_url: string;
+  file_name: string;
 };
 
 function ChatBubble({
@@ -14,41 +31,28 @@ function ChatBubble({
 }: {
   role: "user" | "assistant";
   text: string;
-  files: File[];
+  files: FileItem[];
 }) {
   const isUser = role === "user";
 
   return (
     <div className={`w-full flex ${isUser ? "justify-start" : "justify-end"}`}>
       <div className="flex items-start gap-3 max-w-[70%]">
-        {/* USER AVATAR */}
-        {isUser && (
-          <img
-            src="/src/assets/Chatbot/user.png"
-            className="w-10 h-10 rounded-4 object-cover"
-          />
-        )}
-
-        {/* COLUMN FOR FILES + BUBBLE */}
+        {isUser && <img src="/src/assets/Chatbot/user.png" className="w-10 h-10 rounded-4 object-cover" />}
         <div className="flex flex-col">
-          {/* FILE PREVIEWS ABOVE THE BUBBLE */}
           {files.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-3">
               {files.map((file, index) => (
                 <div key={index} className="max-w-[150px]">
-                  {file.type.startsWith("image/") ? (
+                  {file.file_url.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
                     <img
-                      src={URL.createObjectURL(file)}
-                      alt={file.name}
+                      src={file.file_url}
+                      alt={file.file_name}
                       className="rounded-xl shadow max-w-full"
                     />
                   ) : (
-                    <a
-                      href={URL.createObjectURL(file)}
-                      target="_blank"
-                      className="text-sm"
-                    >
-                      📄 {file.name}
+                    <a href={file.file_url} target="_blank" className="text-sm">
+                      📄 {file.file_name}
                     </a>
                   )}
                 </div>
@@ -56,32 +60,41 @@ function ChatBubble({
             </div>
           )}
 
-          {/* TEXT BUBBLE */}
           <div
             className={`px-5 py-3 text-sm whitespace-pre-line shadow-sm
-              ${
-                isUser
-                  ? "bg-[#DDF3D8] text-gray-800 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
-                  : "bg-white text-gray-700 rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
+              ${isUser
+                ? "bg-[#DDF3D8] text-gray-800 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
+                : "bg-white text-gray-700 rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
               }`}
           >
             {text}
           </div>
         </div>
-
-        {/* AI ICON */}
-        {!isUser && (
-          <img src="/src/assets/Chatbot/AI.svg" className="w-6 h-6 mt-1" />
-        )}
+        {!isUser && <img src="/src/assets/Chatbot/AI.svg" className="w-6 h-6 mt-1" />}
       </div>
     </div>
   );
 }
-
 export function ChatApp() {
   const [uploads, setUploads] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [msg_id, setMsgId] = useState<string | null>(null);
+  const [chatList, setChatList] = useState<{ chat_id: string; title: string }[]>([]);
+
+  useEffect(() => {
+    const fetchChats = async () => {
+      const data = await apiFetch<{ chat_id: string; title: string }[]>('/fetchChatList', {
+        method: 'GET'
+      });
+      setChatList(data);
+    };
+    fetchChats();
+  }, []);
+
+  console.log("Chatlist:", chatList);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -118,6 +131,8 @@ export function ChatApp() {
     // prepare request
     const formData = new FormData();
     formData.append("message", input.trim());
+    formData.append("chat_id", activeChatId ?? "");
+    formData.append("is_new_chat", activeChatId ? "false" : "true");
 
     uploads.forEach((file) => {
       formData.append("files", file);
@@ -127,10 +142,14 @@ export function ChatApp() {
     setUploads([]);
 
     try {
-      const data = await apiFetch<{ reply: string }>('/chat', {
+      const data = await apiFetch<{ chat_id: string; reply: string }>('/chat', {
         method: 'POST',
         json: formData,
       });
+
+      if (!activeChatId) {
+        setActiveChatId(data.chat_id);
+      }
 
       console.log("Form Data sent:", formData);
 
@@ -151,18 +170,93 @@ export function ChatApp() {
     }
   };
 
+  const loadChat = async (chatId: string) => {
+    const data = await apiFetch<{ chat_id: string; messages: any[] }>(
+      `/loadchat?chat_id=${chatId}`
+    );
+
+    console.log("Loaded chat data:", data);
+
+    // group data based on msg_id
+    // group data based on msg_id
+    const messages = data.messages.reduce((acc: any[], item: TimelineItem) => {
+      const existingMsg = acc.find(m => m.msg_id === item.msg_id);
+
+      if (existingMsg) {
+        // Append file info if exists
+        if (item.file_url && item.file_name) {
+          existingMsg.files.push({
+            file_url: item.file_url,
+            file_name: item.file_name
+          });
+        }
+
+        // ✅ IMPORTANT: only set text if it exists and current text is empty
+        if (item.message && !existingMsg.text) {
+          existingMsg.text = item.message;
+        }
+      } else {
+        acc.push({
+          msg_id: item.msg_id,
+          role: item.role === "ai" ? "assistant" : "user",
+          text: item.message ?? "",   // keep null-safe init
+          files: item.file_url && item.file_name
+            ? [{
+                file_url: item.file_url,
+                file_name: item.file_name
+              }]
+            : []
+        });
+      }
+
+      return acc;
+    }, []);
+
+
+    console.log("Grouped messages:", messages);
+
+    setActiveChatId(data.chat_id);
+
+    // setMessages(
+    //   data.messages.map(m => ({
+    //     role: m.role,
+    //     text: m.message ?? "",
+    //     file_name: m.file_name ?? undefined,
+    //     file_url: m.file_url ?? undefined,
+    //     file: []
+    //   }))
+    // );
+
+    setMessages(messages);
+  };
+
+
+  const newChat = async () => {
+    const data = await apiFetch<{ chat_id: string; messages: any[] }>(
+      "/loadchat",
+      {
+        method: "POST",
+        json: { chat_id: "" }
+      }
+    );
+
+    setActiveChatId(data.chat_id);
+    setMessages([]);
+  };
+
+
   return (
     <div
-      className="h-100vh bg-cover bg-center bg-no-repeat bg-fixed"
+      className="bg-[#F5F7FA] bg-cover bg-center bg-no-repeat"
     >
-      <div className="flex justify-center mt-8 sm:px-6 lg:px-8">
+      <div className="flex justify-center p-8 sm:px-6 lg:px-8 gap-6">
         {/* MAIN CHAT UI */}
-        <div
+        {/* <div
           className="flex gap-6 w-full max-w-[1390px]
          rounded-3xl p-8 h-[80vh] shadow-xl"
-        >
+        > */}
           {/* LEFT SIDEBAR */}
-          <div className="bg-[#F5F7DE]/50 p-6 rounded-3xl w-75">
+          <div className="bg-white p-6 rounded-3xl w-75 shadow-sm h-[82vh]">
             <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">
               CHAT VITATRACK
             </h1>
@@ -178,25 +272,24 @@ export function ChatApp() {
               </span>
             </div>
 
-            {/* Dummy chat list */}
+            {/* Chat list */}
             <div className="flex flex-col">
-              {[1, 2, 3, 4].map((i) => (
+              {chatList.map((chat) => (
                 <div
-                  key={i}
+                  key={chat.chat_id}
                   className="flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
-                                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]"
+                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]"
+                  onClick={() => loadChat(chat.chat_id)} // load messages for selected chat
                 >
                   <img src="/src/assets/Chatbot/Messages.svg" className="w-6" />
-                  <p className="text-[12px] text-gray-800">
-                    Chat is chatting the chat…
-                  </p>
+                  <p className="text-[12px] text-gray-800">{chat.title || "Untitled Chat"}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* MAIN CHAT AREA */}
-          <div className="bg-[#F5F7DE]/50 flex-1 rounded-3xl p-10 flex flex-col items-center justify-start">
+          <div className="bg-white flex-1 rounded-3xl p-10 flex flex-col items-center justify-start shadow-sm">
             {messages.length > 0 && (
               <div className="flex flex-col w-full gap-6 mb-6 overflow-y-auto pr-2 h-[60vh]">
                 {messages.map((msg, index) => (
@@ -204,7 +297,10 @@ export function ChatApp() {
                     key={index}
                     role={msg.role}
                     text={msg.text}
-                    files={msg.file}
+                    files={[
+                      ...(msg.files || []), // loaded files
+                      ...(msg.file?.map(f => ({ file_name: f.name, file_url: URL.createObjectURL(f) })) || []), // newly uploaded
+                    ]}
                   />
                 ))}
               </div>
@@ -291,7 +387,7 @@ export function ChatApp() {
               </div>
             </div>
           </div>
-        </div>
+        
       </div>
     </div>
   );
