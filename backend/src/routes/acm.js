@@ -431,5 +431,71 @@ router.get("/loadchat", async (req, res) => {
   }
 });
 
+router.delete("/deletechat", async (req, res) => {
+  try {
+    const supabase = getRlsClient(req);
+    const user = req.user; // from auth middleware
+    let { chat_id } = req.query;
+
+    console.log("Deleting chat for user:", user.id);
+    console.log("Chat ID to delete:", chat_id);
+
+    // Delete chat history
+    const { error: deleteHistoryError } = await supabase
+      .from("chat_history")
+      .delete()
+      .eq("chat_id", chat_id);
+    
+    if (deleteHistoryError) {
+      console.error("Error deleting chat history:", deleteHistoryError);
+      return res.status(500).json({ error: "Failed to delete chat history" });
+    }
+
+    // Delete chat
+    const { error: deleteChatError } = await supabase
+      .from("chats")
+      .delete()
+      .eq("chat_id", chat_id)
+      .eq("user_id", user.id);
+
+    if (deleteChatError) {
+      console.error("Error deleting chat:", deleteChatError);
+      return res.status(500).json({ error: "Failed to delete chat" });
+    }
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to delete chat" });
+  }
+});
+
+router.delete("/clearAllChats", async (req, res) => {
+  try {
+    const supabase = getRlsClient(req);
+    const user = req.user; // from auth middleware
+
+    console.log("Clearing all chats for user:", user.id);
+
+    // Delete chat history
+    const { error: deleteChat } = await supabase
+      .from("chats")
+      .delete()
+      .eq("user_id", user.id);
+
+    if (deleteChat) {
+      console.error("Error deleting all chats:", deleteChat);
+      return res.status(500).json({ error: "Failed to delete all chats" });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to clear all chats" });
+  } 
+});
+
+
 
 module.exports = router;

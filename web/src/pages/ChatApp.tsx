@@ -1,5 +1,6 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, useMemo } from "react";
 import { apiFetch } from "../services/api";
+import { useUser } from "../contexts/UserContext";
 
 type Message = {
   role: "user" | "assistant";
@@ -61,12 +62,32 @@ function ChatBubble({
   text: string;
   files: FileItem[];
 }) {
+
+  
   const isUser = role === "user";
+  const { me } = useUser();
+  const avatarUrl = me?.user?.avatar_url || null;
+  console.log("Avatar URL:", avatarUrl);
+
+  const displayName = useMemo(() => {
+    const username = me?.user?.username?.trim();
+    if (username) return username;
+    const email = me?.user?.email?.trim();
+    if (email) return email.split("@")[0];
+    return "User";
+  }, [me?.user?.email, me?.user?.username]);
+
+  function firstChar(v: string) {
+    const s = v.trim();
+    return s ? s[0].toUpperCase() : "U";
+  }
+
+  const avatarLetter = firstChar(displayName);
 
   return (
     <div className={`w-full flex ${isUser ? "justify-start" : "justify-end"}`}>
       <div className="flex items-start gap-3 max-w-[70%]">
-        {isUser && <img src="/src/assets/Chatbot/user.png" className="w-10 h-10 rounded-4 object-cover" />}
+        {isUser && <Avatar src={avatarUrl} letter={avatarLetter} size="sm" />}
         <div className="flex flex-col">
           {files.length > 0 && (
             <div className="flex flex-wrap gap-3 mb-3">
@@ -103,6 +124,46 @@ function ChatBubble({
     </div>
   );
 }
+
+function Avatar({
+  src,
+  letter,
+  size = "md",
+}: {
+  src: string | null;
+  letter: string;
+  size?: "sm" | "md" | "lg";
+}) {
+  const [imgError, setImgError] = useState(false);
+
+  const sizeClass =
+    size === "sm"
+      ? "h-9 w-9 text-sm"
+      : size === "lg"
+      ? "h-12 w-12 text-base"
+      : "h-10 w-10 text-sm";
+
+  if (src && !imgError) {
+    return (
+      <img
+        src={src}
+        alt="Avatar"
+        className={`${sizeClass} rounded-full object-cover`}
+        onError={() => setImgError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`flex ${sizeClass} items-center justify-center rounded-full bg-[#DDF3D8] font-semibold text-[#1A381D]`}
+    >
+      {letter}
+    </div>
+  );
+}
+
+
 export function ChatApp() {
   const [uploads, setUploads] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -208,7 +269,6 @@ export function ChatApp() {
     }
   };
 
-
   const loadChat = async (chatId: string) => {
     setActiveTab("chat");
     setChatOpen(false);
@@ -265,7 +325,6 @@ export function ChatApp() {
     setMessages(messages);
   };
 
-
   const newChat = async () => {
     try {
       // Clear UI immediately
@@ -287,9 +346,44 @@ export function ChatApp() {
     }
   };
 
+  const deleteChat = async (chatId: string) => {
+    try {
+
+      await apiFetch<{}>(`/deleteChat?chat_id=${chatId}`, {
+        method: "DELETE",
+      });
+
+      // Remove from chat list
+      setChatList(prev => prev.filter(c => c.chat_id !== chatId));
+
+      // Reset current chat if it was active
+      if (activeChatId === chatId) {
+        setActiveChatId(null);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Failed to delete chat", err);
+    }
+  };
+
+  const clearAllChats = async () => {
+    try {
+      await apiFetch<{}>(`/clearAllChats`, {
+        method: "DELETE",
+      });
+
+      setChatList([]);
+      setActiveChatId(null);
+      setMessages([]);
+
+    } catch (err) {
+      console.error("Failed to clear all chats", err);
+    }
+  };
+
   return (
     <div
-      className="bg-[#F5F7FA] bg-cover bg-center bg-no-repeat"
+      className="bg-[#F5F7FA] overflow-hidden"
     >
       <div className="flex justify-center p-8 sm:px-6 lg:px-8 gap-6">
         {/* MAIN CHAT UI */}
@@ -311,9 +405,9 @@ export function ChatApp() {
 
             <div className="flex justify-between text-gray-500 text-[12px] mb-8 mt-8">
               <span>Your chats</span>
-              <span className="cursor-pointer hover:text-gray-700">
+              <button className="cursor-pointer hover:text-gray-700" onClick={clearAllChats}>
                 Clear All
-              </span>
+              </button>
             </div>
 
             {/* Chat list */}
@@ -321,23 +415,40 @@ export function ChatApp() {
               {chatList.map((chat) => (
                 <div
                   key={chat.chat_id}
-                  className={`flex items-center gap-4 cursor-pointer p-2 rounded-xl transition-all duration-200
-                        hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]
-                        ${activeChatId === chat.chat_id ? activeBtn : inactiveBtn}`}
-                      
-                  onClick={() => loadChat(chat.chat_id)} // load messages for selected chat
+                  className={`flex items-center p-2 rounded-xl transition-all duration-200
+                              hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]
+                              ${activeChatId === chat.chat_id ? activeBtn : inactiveBtn}`}
                 >
-                  <img src="/src/assets/Chatbot/Messages.svg" className="w-6" />
-                  <p className="text-[12px] text-gray-800 truncate">{chat.title || "Untitled Chat"}</p>
-                </div>
+                  {/* Left: chat icon */}
+                  <img src="/src/assets/Chatbot/Messages.svg" className="w-6 mr-2 flex-shrink-0" />
+
+                  {/* Title: truncate, shrink when delete button shows */}
+                  <p className="text-[12px] text-gray-800 truncate flex-1 min-w-0 cursor-pointer" onClick={() => loadChat(chat.chat_id)}>
+                    {chat.title || "Untitled Chat"}
+                  </p>
+
+                  {/* Delete button only for active chat */}
+                  {activeChatId === chat.chat_id && (
+                    <button
+                      className="ml-10 mr-2 text-red-500 hover:text-red-700 flex-shrink-0 w-4 h-4 flex justify-center items-center cursor-pointer"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteChat(chat.chat_id);
+                      }}
+                    >
+                      <img src="/src/assets/Chatbot/Delete.svg" />
+                    </button>
+                  )}
+                </div>               
               ))}
             </div>
           </div>
 
           {/* MAIN CHAT AREA */}
-          <div className="bg-white flex-1 rounded-3xl p-10 flex flex-col items-center justify-start shadow-sm">
+          <div className="bg-white flex-1 rounded-3xl p-10 flex flex-col shadow-sm min-h-0 h-[82vh]">
+            
             {messages.length > 0 && (
-              <div className="flex flex-col w-full gap-6 mb-6 overflow-y-auto pr-2 h-[60vh]">
+              <div className="flex flex-col w-full gap-6 pr-2 flex-1 min-h-0 overflow-y-auto">
                 {messages.map((msg, index) => (
                   <ChatBubble
                     key={index}
@@ -354,7 +465,7 @@ export function ChatApp() {
 
             {/* Bubble */}
             {messages.length === 0 && (
-              <div>
+              <div className="flex flex-col items-center justify-start">
                 <img
                   src="/src/assets/Chatbot/Logo.svg"
                   className="w-[200px] mb-2 mt-4"
@@ -365,7 +476,9 @@ export function ChatApp() {
                 </h2>
               </div>
             )}
+            
 
+            <div className="w-full flex justify-center">
             {/* Input Box */}
             <div className="flex flex-col bg-white shadow-lg rounded-[20px] px-4 py-3 w-full max-w-2xl">
               {/* Uploaded Files */}
@@ -431,6 +544,7 @@ export function ChatApp() {
                   />
                 </button>
               </div>
+            </div>
             </div>
           </div>
         
