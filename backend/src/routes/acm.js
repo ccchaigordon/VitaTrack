@@ -27,6 +27,8 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   const { message, chat_id } = req.body;
 
+  console.log("Active chat id received:", chat_id);
+
   let finalChatId = chat_id;
   let finalMsgId = " ";
 
@@ -48,6 +50,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     if (error) throw error;
     finalChatId = chat.chat_id;
   }
+
+  console.log("Final chat id after check:", finalChatId);
 
   // Update chat title
   // Get the chat
@@ -144,7 +148,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   const state = conversationState.get(user.id);
 
-  const intent = detectIntent(message, state);
+  const intent = await detectIntent(message, state);
   console.log("Intent:", intent);
   
   if (intent === "log_meal") {
@@ -156,6 +160,9 @@ router.post("/chat", upload.any(), async (req, res) => {
       message: response,
       created_at: new Date(),  
     });
+
+    // append response with chat id
+    response = { ...response, chat_id: finalChatId };
 
     return res.json(response);
   }
@@ -170,11 +177,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    // append response with chat id
+    response = { ...response, chat_id: finalChatId };
+
     return res.json(response);
   }
 
   if (intent === "recommendation_meal") {
-    const response = await recommendationHandlerForMeal(message, user.id, conversationState, supabase);
+    let response = await recommendationHandlerForMeal(message, user.id, conversationState, supabase);
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
@@ -182,6 +192,9 @@ router.post("/chat", upload.any(), async (req, res) => {
       message: response,
       created_at: new Date(),  
     });
+
+    // append response with chat id
+    response = { ...response, chat_id: finalChatId };
 
     return res.json(response);    
   }
@@ -195,6 +208,9 @@ router.post("/chat", upload.any(), async (req, res) => {
       message: response,
       created_at: new Date(),  
     });
+
+    // append response with chat id
+    response = { ...response, chat_id: finalChatId };
     
     return res.json(response);    
   }
@@ -205,7 +221,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const nextIndex = currentIndex + 1;
 
     if (!state || !state.recommended[nextIndex]) {
-      const prompt = `There is no more recommendation available. Please inform the user accordingly.`;
+      const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
       const gResponse = await queryGemini(prompt);
       return res.json({ reply: gResponse });
     }
@@ -266,12 +282,101 @@ router.post("/chat", upload.any(), async (req, res) => {
         `;
     }
     
-    // const gResponse = await queryGemini(prompt);
-    gResponse = gResponse = `Workout details:
-     - Name: ${item.title}
-    - Description: ${item.description}
-    - Source: ${item.source_url}
-    - Category: ${item.category_tags.join(', ')}`
+    const gResponse = await queryGemini(prompt);
+    // gResponse = gResponse = `Workout details:
+    //  - Name: ${item.title}
+    // - Description: ${item.description}
+    // - Source: ${item.source_url}
+    // - Category: ${item.category_tags.join(', ')}`
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: gResponse,
+      created_at: new Date(),  
+    });
+
+    console.log('Gemini response for more recommendation:', gResponse);
+
+    return res.json({
+      chat_id: finalChatId,
+      reply: gResponse,
+    });
+  }
+
+  if (intent === "previous_recommendation") {
+    const state = conversationState.get(user.id);
+    const currentIndex = state.selectedIndex || 0;
+    const prevIndex = currentIndex - 1;
+
+    if (!state || !state.recommended[prevIndex]) {
+      const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
+      const gResponse = await queryGemini(prompt);
+      return res.json({ reply: gResponse });
+    }
+
+    state.selectedIndex = prevIndex;
+    conversationState.set(user.id, state);
+
+    const item = state.recommended[prevIndex];
+    let prompt = "";
+
+    if (state.type === "MEAL") {
+      const meal = item.meal;
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is browsing meal recommendations.
+        They selected the next recommended meal.
+
+        Meal details:
+        - Name: ${meal.title}
+        - Calories: ${meal.calories} kcal
+        - Protein: ${meal.protein} g
+        - Carbs: ${meal.carbs} g
+        - Fat: ${meal.fat} g
+
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the choice
+        - Mention calories
+        - Ask if the user wants more recommendation or modify the meal
+        - Use emojis naturally
+        - Keep it under 2 sentences
+        `;
+    }
+
+    if (state.type === "WORKOUT") {
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+
+        Context:
+        The user is browsing workout recommendations.
+
+       Wokrout details:
+        - Name: ${item.title}
+        - Description: ${item.description}
+        - Source: ${item.source_url}
+        - Category: ${item.category_tags}
+
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the choice
+        - Ask if the user wants more recommendation
+        - Use emojis naturally
+        - Keep it under 2 sentences
+        `;
+    }
+    
+    const gResponse = await queryGemini(prompt);
+    // gResponse = gResponse = `Workout details:
+    //  - Name: ${item.title}
+    // - Description: ${item.description}
+    // - Source: ${item.source_url}
+    // - Category: ${item.category_tags.join(', ')}`
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
@@ -290,7 +395,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   if (intent === 'chat') {
     console.log('Querying Gemini for message:', message);
-    const prompt = `You are a friendly wellness assistant. Respond to: "${message}"`;
+    const prompt = `You are a friendly wellness assistant. Respond to: "${message}" in a helpful and engaging manner. Use emojis naturally. Reply to messages with fitness/wellness context in mind. If you don't know the answer, say something like "I'm not sure about that, but I'm here to help with your wellness journey!".`;
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
 
@@ -301,7 +406,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
-    return res.json({ reply: gResponse });
+    return res.json({ chat_id: finalChatId, reply: gResponse });
   }
 
   // Default normal chat placeholder

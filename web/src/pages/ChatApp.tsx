@@ -224,6 +224,8 @@ export function ChatApp() {
     };
     setMessages(prev => [...prev, newUserMessage]);
 
+    console.log("Active Chat ID:", activeChatId);
+
     const formData = new FormData();
     formData.append("message", messageText);
     formData.append("chat_id", activeChatId ?? "");
@@ -240,6 +242,7 @@ export function ChatApp() {
         json: formData,
       });
 
+      console.log("Chat response data:", data);
       const chatId = activeChatId || data.chat_id;
 
       if (!activeChatId) setActiveChatId(chatId);
@@ -405,7 +408,7 @@ export function ChatApp() {
 
             <div className="flex justify-between text-gray-500 text-[12px] mb-8 mt-8">
               <span>Your chats</span>
-              <button className="cursor-pointer hover:text-gray-700" onClick={clearAllChats}>
+              <button className="cursor-pointer hover:text-gray-700">
                 Clear All
               </button>
             </div>

@@ -15,11 +15,27 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       .select("*")
       .eq("user_id", user_id);
 
-    if (error || !meals.length) {
-      throw new Error("No meal data found");
-    }
+    //console.log("Fetched Meals:", meals);
 
-    console.log("Fetched Meals:", meals);
+    if (error || !meals.length) {
+
+      conversationState.set(user_id, {
+          state: "IDLE",
+          type: "MEAL",
+      });
+
+      const prompt = `You are a friendly fitness assistant chatbot.
+            Context:
+            The user asked for a meal recommendation, but there is not enough past meal data.
+
+            Task:
+            Politely explain that you need more logged meals to give accurate recommendations.
+            Encourage the user to log a meal first.
+            Keep it friendly and under 2 sentences.`;
+
+      const gResponse = await queryGemini(prompt);
+      return { reply: gResponse };
+    }
 
     // Filter by rules based on meal time
     function filterMealsByTime(meals, mealTime) {
@@ -35,74 +51,39 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return meals;
     }
 
-    const filteredMealsFromMealLogs = filterMealsByTime(meals, mealTime);
+    function filterMealsByTime_Calories(meals, mealTime) {
+      if (!mealTime) return meals;
 
-    console.log("Filtered Meals:", filteredMealsFromMealLogs);
+      let min = 0;
+      let max = Infinity;
 
-    const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
-      m.calories,
-      m.protein,
-      m.carbs,
-      m.fat
-    ]);
+      if (mealTime === "breakfast") {
+        min = 300;
+        max = 550;
+      } else if (mealTime === "lunch") {
+        min = 500;
+        max = 750;
+      } else if (mealTime === "dinner") {
+        min = 500;
+        max = 800;
+      }
 
-    meal_library_data = [
-      { recipe_id: 1,
-        title: "Grilled Chicken Salad",
-        nutrition_info: "Calories: 350, Protein: 30g, Carbs: 15g, Fat: 12g",
-        ingredients: "Chicken breast, mixed greens, cherry tomatoes, cucumber, olive oil, lemon juice" },
-      { recipe_id: 2,
-        title: "Quinoa and Black Bean Bowl",
-        nutrition_info: "Calories: 400, Protein: 20g, Carbs: 50g, Fat: 10g",
-        ingredients: "Quinoa, black beans, corn, avocado, salsa, cilantro" },
-      { recipe_id: 3,
-        title: "Baked Salmon with Asparagus",
-        nutrition_info: "Calories: 450, Protein: 35g, Carbs: 10g, Fat: 20g",
-        ingredients: "Salmon fillet, asparagus, garlic, olive oil, lemon wedges" },
-      { recipe_id: 4,
-        title: "Vegetable Stir-Fry with Tofu",
-        nutrition_info: "Calories: 300, Protein: 25g, Carbs: 30g, Fat: 8g",
-        ingredients: "Tofu, broccoli, bell peppers, snap peas, soy sauce, ginger, garlic" },
-    ]
-
-    function parseNutritionInfo(nutritionInfo) {
-      const result = {
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0
-      };
-
-      const caloriesMatch = nutritionInfo.match(/Calories:\s*(\d+)/i);
-      const proteinMatch = nutritionInfo.match(/Protein:\s*(\d+)/i);
-      const carbsMatch = nutritionInfo.match(/Carbs:\s*(\d+)/i);
-      const fatMatch = nutritionInfo.match(/Fat:\s*(\d+)/i);
-
-      if (caloriesMatch) result.calories = Number(caloriesMatch[1]);
-      if (proteinMatch) result.protein = Number(proteinMatch[1]);
-      if (carbsMatch) result.carbs = Number(carbsMatch[1]);
-      if (fatMatch) result.fat = Number(fatMatch[1]);
-
-      return result;
+      return meals.filter(m =>
+        m.meal_time === mealTime &&
+        m.calories >= min &&
+        m.calories <= max
+      );
     }
 
-    const parsedMeals = meal_library_data.map(meal => {
-      const nutrition = parseNutritionInfo(meal.nutrition_info);
-
-      return {
-        recipe_id: meal.recipe_id,
-        title: meal.title,
-        ingredients: meal.ingredients,
-        ...nutrition
-      };
-    });
-
-    console.log("Parsed Meals from Library:", parsedMeals);
-
-    filteredMealsFromMealLibrary = filterMealsByTime(parsedMeals, mealTime);
-    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
+    const filteredMealsFromMealLogs = filterMealsByTime_Calories(meals, mealTime);
 
     if (!filteredMealsFromMealLogs.length) {
+
+      conversationState.set(user_id, {
+          state: "IDLE",
+          type: "MEAL",
+      });
+
       const prompt = `You are a friendly fitness assistant chatbot.
             Context:
             The user asked for a meal recommendation, but there is not enough past meal data.
@@ -116,7 +97,73 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return { reply: gResponse };
     }
 
+    //console.log("Filtered Meals:", filteredMealsFromMealLogs);
+
+    const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
+      m.calories,
+      m.protein,
+      m.carbs,
+      m.fat
+    ]);
+
+    const { data: mealLibrary, error: libError } = await supabase
+      .from("recipes")
+      .select("*");
+
+    if (libError || !mealLibrary.length) {
+      
+      conversationState.set(user_id, {
+          state: "IDLE",
+          type: "MEAL",
+      });
+
+      const prompt = `You are a friendly fitness assistant chatbot.
+            Context:
+            The user asked for a meal recommendation, but there is not enough library meal data.
+
+            Task:
+            Politely explain that you do not have enough library meal data to give accurate recommendations.
+            Keep it friendly and under 2 sentences.`;
+
+      const gResponse = await queryGemini(prompt);
+      return { reply: gResponse };
+    }
+
+    console.log("Fetched Meal Library:", mealLibrary);
+
+    function parseNutritionJSON(nutrition) {
+      return {
+        calories: Number(nutrition.calories) || 0,
+        protein: Number(String(nutrition.protein).replace("g", "")) || 0,
+        carbs: Number(String(nutrition.carbs).replace("g", "")) || 0,
+        fat: Number(String(nutrition.fat).replace("g", "")) || 0
+      };
+    }
+
+    const parsedMeals = mealLibrary.map(meal => {
+      const nutrition = parseNutritionJSON(meal.nutrition_info);
+
+      return {
+        recipe_id: meal.recipe_id,
+        title: meal.title,
+        ingredients: meal.ingredients,
+        procedure: meal.procedure,
+        cooking_time: meal.cooking_time,
+        ...nutrition
+      };
+    });
+
+    console.log("Parsed Meals from Library:", parsedMeals);
+
+    filteredMealsFromMealLibrary = filterMealsByTime(parsedMeals, mealTime);
+
     if (!filteredMealsFromMealLibrary.length) {
+
+      conversationState.set(user_id, {
+          state: "IDLE",
+          type: "MEAL",
+      });
+
       const prompt = `You are a friendly fitness assistant chatbot.
         Context:
         The user requested a meal recommendation, but no suitable meals match the criteria.
@@ -126,6 +173,8 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
     }     
+
+    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
@@ -166,7 +215,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
 
     const similarityTensor = similarity;
 
-    const K = 3;
+    const K = Math.min(3, similarityTensor.shape[0]);
 
     const { values, indices } = tf.topk(similarityTensor, K);
 
@@ -200,6 +249,11 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     const top = recommendations[0];
 
     if (!top) {
+        conversationState.set(user_id, {
+            state: "IDLE",
+            type: "MEAL",
+        });
+
         return { reply: "Sorry, I couldn't find a suitable meal recommendation." };
     }
 
