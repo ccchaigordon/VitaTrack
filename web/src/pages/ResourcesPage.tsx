@@ -1,4 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getRecipes, getResources } from "../services/healthApi";
 
 type Category = "Articles" | "Recipes" | "Tutorials";
 
@@ -7,102 +9,212 @@ type ResourceItem = {
   title: string;
   summary: string;
   badge: string;
-  link: string;
+  link?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  category?: string;
+  content?: string;
+  cooking_time?: number;
+  ingredients?: string[];
+  isRecipe?: boolean;
 };
 
-const SAMPLE_RESOURCES: Record<Category, ResourceItem[]> = {
-  Articles: [
-    {
-      id: "art-1",
-      title: "Building a sustainable routine",
-      summary: "Three small habits that keep your energy steady across the day.",
-      badge: "5 min read",
-      link: "https://example.com/articles/routine",
-    },
-    {
-      id: "art-2",
-      title: "Why recovery days matter",
-      summary: "How to avoid burnout with simple recovery checkpoints.",
-      badge: "4 min read",
-      link: "https://example.com/articles/recovery",
-    },
-  ],
-  Recipes: [
-    {
-      id: "rec-1",
-      title: "High-protein breakfast wrap",
-      summary: "Eggs, spinach, and yogurt sauce in a 10-minute wrap.",
-      badge: "400 kcal",
-      link: "https://example.com/recipes/breakfast-wrap",
-    },
-    {
-      id: "rec-2",
-      title: "Sheet-pan veggie dinner",
-      summary: "One-pan roast with chickpeas and seasonal veggies.",
-      badge: "30 min",
-      link: "https://example.com/recipes/sheet-pan",
-    },
-  ],
-  Tutorials: [
-    {
-      id: "vid-1",
-      title: "10-minute mobility reset",
-      summary: "Follow-along routine to loosen up after sitting.",
-      badge: "Video",
-      link: "https://example.com/tutorials/mobility",
-    },
-    {
-      id: "vid-2",
-      title: "Meal prep basics",
-      summary: "Batch-cooking walkthrough for beginners.",
-      badge: "Video",
-      link: "https://example.com/tutorials/meal-prep",
-    },
-  ],
-};
+export default function ResourcesPage() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<Category>("Articles");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [recipes, setRecipes] = useState<ResourceItem[]>([]);
+  const [articles, setArticles] = useState<ResourceItem[]>([]);
+  const [tutorials, setTutorials] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-function ResourceCard({ item }: { item: ResourceItem }) {
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        // Fetch recipes
+        const recipesRes = await getRecipes();
+        const recipesData = recipesRes.recipes?.map((recipe: any) => ({
+          id: recipe.recipe_id,
+          title: recipe.title,
+          summary: recipe.procedure?.substring(0, 100) + "..." || "Delicious recipe",
+          badge: recipe.calories ? `${recipe.calories} kcal` : "Recipe",
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat,
+          category: recipe.dietary_tags?.join(", ") || "Recipe",
+          content: recipe.procedure,
+          cooking_time: recipe.cooking_time,
+          ingredients: recipe.ingredients,
+          isRecipe: true
+        })) || [];
+        setRecipes(recipesData);
+
+        // Fetch articles
+        const articlesRes = await getResources(null, null, "Article");
+        const articlesData = articlesRes.resources?.map((resource: any) => ({
+          id: resource.resource_id,
+          title: resource.title,
+          summary: resource.description || "Read this article to learn more",
+          badge: "Article",
+          link: resource.source_url,
+          content: resource.description,
+          isRecipe: false
+        })) || [];
+        setArticles(articlesData);
+
+        // Fetch tutorials
+        const tutorialsRes = await getResources(null, null, "Video");
+        const tutorialsData = tutorialsRes.resources?.map((resource: any) => ({
+          id: resource.resource_id,
+          title: resource.title,
+          summary: resource.description || "Watch this tutorial to learn more",
+          badge: "Tutorial",
+          link: resource.source_url,
+          content: resource.description,
+          isRecipe: false
+        })) || [];
+        setTutorials(tutorialsData);
+
+      } catch (err) {
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const RESOURCES: Record<Category, ResourceItem[]> = {
+    Articles: articles,
+    Recipes: recipes,
+    Tutorials: tutorials,
+  };
+
+function ResourceCard({ item, navigate }: { item: ResourceItem; navigate: (path: string) => void }) {
+  const handleCardClick = () => {
+    if (item.isRecipe) {
+      navigate(`/recipe/${item.id}`);
+    } else if (item.link) {
+      window.open(item.link, "_blank");
+    }
+  };
+
   return (
-    <a
-      href={item.link}
-      target="_blank"
-      rel="noreferrer"
-      className="block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    <div
+      onClick={handleCardClick}
+      className={`block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        item.isRecipe ? "cursor-pointer" : item.link ? "cursor-pointer" : ""
+      }`}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center justify-between gap-3 mb-3">
         <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
-        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 whitespace-nowrap">
           {item.badge}
         </span>
       </div>
-      <p className="mt-2 text-sm text-gray-600">{item.summary}</p>
-    </a>
+
+      {/* Recipe Card: Show Macros */}
+      {item.isRecipe && (
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          <div className="bg-lime-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-lime-700">{item.calories || 0}</div>
+            <div className="text-xs text-gray-600">Calories</div>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-blue-600">{item.carbs || 0}g</div>
+            <div className="text-xs text-gray-600">Carbs</div>
+          </div>
+          <div className="bg-orange-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-orange-600">{item.protein || 0}g</div>
+            <div className="text-xs text-gray-600">Protein</div>
+          </div>
+          <div className="bg-red-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-red-600">{item.fat || 0}g</div>
+            <div className="text-xs text-gray-600">Fat</div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipe Card: Show Ingredients and Cooking Time */}
+      {item.isRecipe && (
+        <div className="mb-4 space-y-2">
+          {item.cooking_time && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="text-lg">⏱️</span>
+              <span>{item.cooking_time} minutes</span>
+            </div>
+          )}
+          {item.ingredients && item.ingredients.length > 0 && (
+            <div className="flex items-start gap-2 text-sm text-gray-600">
+              <span className="text-lg">🥘</span>
+              <span>{item.ingredients.length} ingredients</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-sm text-gray-600 mb-3">{item.summary}</p>
+
+      {/* External Link for Articles/Tutorials */}
+      {!item.isRecipe && item.link && (
+        <a
+          href={item.link}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          View More →
+        </a>
+      )}
+
+      {/* Recipe Card: Click to View Full Recipe */}
+      {item.isRecipe && (
+        <div className="text-sm font-medium text-blue-600 hover:text-blue-700">
+          View Full Recipe →
+        </div>
+      )}
+    </div>
   );
 }
 
-export default function ResourcesPage() {
-  const [activeCategory, setActiveCategory] = useState<Category>("Articles");
-
-  const items = useMemo(() => SAMPLE_RESOURCES[activeCategory], [activeCategory]);
+  const filteredItems = useMemo(() => {
+    const items = RESOURCES[activeTab];
+    if (!searchQuery.trim()) return items;
+    
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.summary.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [activeTab, searchQuery, RESOURCES]);
 
   return (
     <div className="flex min-h-screen bg-[#fdfcf0] p-6 sm:p-8">
       <div className="w-64 shrink-0 border-r border-gray-200 pr-6 sm:pr-8">
         <h2 className="mb-6 text-xl font-bold text-gray-800">Category</h2>
         <nav className="space-y-3">
-          {["Articles", "Recipes", "Tutorials"].map((cat) => (
+          {(["Articles", "Recipes", "Tutorials"] as Category[]).map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat as Category)}
+              onClick={() => setActiveTab(cat)}
               className={`w-full rounded-xl p-4 text-left transition-all duration-150 ${
-                activeCategory === cat
-                  ? "bg-[#E5E7EB] border-l-4 border-gray-600"
-                  : "hover:bg-gray-100"
+                activeTab === cat
+                  ? "bg-lime-800 text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <div className="font-semibold text-gray-900">{cat}</div>
-              <div className="text-xs text-gray-500">
-                {cat === "Recipes" ? "Food ideas" : `${cat.toLowerCase()} for you`}
+              <div className="font-semibold">{cat}</div>
+              <div className="mt-0.5 text-xs opacity-80">
+                {RESOURCES[cat].length} items
               </div>
             </button>
           ))}
@@ -110,21 +222,47 @@ export default function ResourcesPage() {
       </div>
 
       <div className="flex-1 pl-6 sm:pl-10">
-        <div className="flex items-center justify-between">
+        <div className="mb-8 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-wide text-gray-500">Resources</p>
-            <h2 className="text-2xl font-bold text-gray-900">Curated picks for you</h2>
+            <h1 className="text-3xl font-bold text-gray-900">{activeTab}</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              {loading ? "Loading..." : `${filteredItems.length} resources available`}
+            </p>
           </div>
-          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600 shadow-sm">
-            {items.length} items
-          </span>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64 rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none"
+          />
         </div>
 
-        <div className="mt-6 grid gap-4 sm:gap-6">
-          {items.map((item) => (
-            <ResourceCard key={item.id} item={item} />
-          ))}
-        </div>
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="text-gray-500">Loading resources...</div>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-5xl mb-4">📚</div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No resources found</h3>
+            <p className="text-gray-500">
+              {searchQuery ? "Try a different search term" : "No resources available yet"}
+            </p>
+          </div>
+        ) : (
+          <div className="grid gap-6 sm:grid-cols-2">
+            {filteredItems.map((item) => (
+              <ResourceCard key={item.id} item={item} navigate={navigate} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

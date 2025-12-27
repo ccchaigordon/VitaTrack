@@ -13,6 +13,7 @@ import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
 import PricingPage from "./pages/PricingPage";
 import ResourcesPage from "./pages/ResourcesPage";
+import RecipeDetailPage from "./pages/RecipeDetailPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 
@@ -114,6 +115,17 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout showFooter>
                 <ResourcesPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/recipe/:recipeId"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <RecipeDetailPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }
