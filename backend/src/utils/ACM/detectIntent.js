@@ -69,6 +69,7 @@ async function detectIntent(text, state, conversationContext = '') {
     Conversation state: ${JSON.stringify(state || {})}
     
     Possible intents:
+      - log_workout_goal: User wants to log/set their workout goal
       - log_meal: User wants to log/eat/had a meal
       - log_workout: User wants to log/completed/did a workout
       - recommendation_meal: User asks for meal suggestions/recommendations

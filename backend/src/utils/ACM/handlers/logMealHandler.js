@@ -221,8 +221,6 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
 
       messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
 
-      //messageToReturn = "Got it! Your meal has been logged successfully. 🍽️ If you need any meal recommendations or have questions about your nutrition, feel free to ask! 😊";
-
       conversationState.set(user_id, { state: "IDLE" });
 
       return {
