@@ -75,11 +75,30 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
     // ];
 
     function splitMealItems(mealName) {
-      // Split by comma, semicolon, or 'and'
-      return mealName
+      // Handle if mealName is already an array
+      if (Array.isArray(mealName)) {
+        return mealName.map(item => String(item).trim()).filter(Boolean);
+      }
+      // If it's a string, split by comma, semicolon, or 'and'
+      if (typeof mealName === 'string') {
+        return mealName
+          .split(/\s*(?:,|;|\band\b)\s*/i)
+          .map(item => item.trim())
+          .filter(Boolean);
+      }
+      // Fallback: convert to string and split
+      return String(mealName)
         .split(/\s*(?:,|;|\band\b)\s*/i)
         .map(item => item.trim())
         .filter(Boolean);
+    }
+    
+    function normalizeMealName(mealName) {
+      // Convert array to string if needed, or return string as-is
+      if (Array.isArray(mealName)) {
+        return mealName.join(', ');
+      }
+      return String(mealName);
     }
 
     const mealCache = {};
@@ -129,12 +148,15 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
         meal.calories = totalNutrition.calories;
       }
 
+      // Normalize meal_name to string (handle both array and string formats)
+      const normalizedMealName = normalizeMealName(meal.meal_name);
+
       console.log("Entry for meal log:", meal);
 
       const { data, error } = await supabase
         .from("meal_logs")
         .insert({
-          meal_name: meal.meal_name,
+          meal_name: normalizedMealName,
           protein: meal.protein,
           carbs: meal.carbs,
           fat: meal.fat,

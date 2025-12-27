@@ -11,7 +11,7 @@ function safeParseIntent(response) {
   }
 } 
 
-async function detectIntent(text, state) {
+async function detectIntent(text, state, conversationContext = '') {
 
   // if (state?.state === "SHOWING_RESULTS") {
   //   if (/\b(first|second|third|1|2|3)\b/.test(t)) {
@@ -62,28 +62,23 @@ async function detectIntent(text, state) {
   // return 'chat';
 
   const prompt = `
-    User message: "${text}"
-    Conversation state: ${JSON.stringify(state)}
-    Possible intents:
-      select_recommendation,
-      modify_recommendation,
-      confirm_recommendation,
-      cancel_recommendation,
-      more_recommendation,
-      previous_recommendation,
-      log_meal,
-      edit_log_meal,
-      delete_log_meal,
-      recommendation_meal,
-      log_workout,
-      edit_log_workout,
-      delete_log_workout,      
-      recommendation_workout,
-      ask_help,
-      ask_summary,
-      chat
+    You are an intent classifier for a fitness and wellness chatbot.
     
-    Determine the user's intent based on the message and conversation state.
+    ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}
+    Current user message: "${text}"
+    Conversation state: ${JSON.stringify(state || {})}
+    
+    Possible intents:
+      - log_meal: User wants to log/eat/had a meal
+      - log_workout: User wants to log/completed/did a workout
+      - recommendation_meal: User asks for meal suggestions/recommendations
+      - recommendation_workout: User asks for workout suggestions/recommendations
+      - more_recommendation: User wants to see next/another recommendation
+      - previous_recommendation: User wants to see previous/earlier recommendation
+      - chat: General conversation, questions, or unclear intent
+    
+    Determine the user's intent based on the message, conversation context, and state.
+    Consider the conversation flow - if user just asked for recommendations, "next" likely means more_recommendation.
 
     Return ONLY valid JSON. Do not include any explanation, markdown, or extra text. 
     Format:

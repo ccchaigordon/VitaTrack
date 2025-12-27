@@ -146,50 +146,71 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
   }
 
+  // Load conversation history for context (last 20 messages)
+  const { data: chatHistory } = await supabase
+    .from("chat_history")
+    .select("role, message, created_at")
+    .eq("chat_id", finalChatId)
+    .order("created_at", { ascending: true })
+    .limit(20);
+
+  // Formatting
+  const conversationContext = (chatHistory || [])
+    .filter(msg => msg.message) // Only include messages with text
+    .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.message}`)
+    .join('\n');
+
   const state = conversationState.get(user.id);
 
-  const intent = await detectIntent(message, state);
+  // Pass conversation context to intent detection for better accuracy
+  const intent = await detectIntent(message, state, conversationContext);
   console.log("Intent:", intent);
   
   if (intent === "log_meal") {
     const response = await logMealHandler(message, files, conversationState, user.id, supabase);
 
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
-      message: response,
+      message: responseMessage,
       created_at: new Date(),  
     });
 
     // append response with chat id
-    response = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId };
 
-    return res.json(response);
+    return res.json(responseWithChatId);
   }
 
   if (intent === "log_workout") {
     const response = await logWorkoutHandler(message, files, conversationState, user.id, supabase);
 
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
-      message: response,
+      message: responseMessage,
       created_at: new Date(),  
     });
 
     // append response with chat id
-    response = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId };
 
-    return res.json(response);
+    return res.json(responseWithChatId);
   }
 
   if (intent === "recommendation_meal") {
     let response = await recommendationHandlerForMeal(message, user.id, conversationState, supabase);
 
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
-      message: response,
+      message: responseMessage,
       created_at: new Date(),  
     });
 
@@ -202,17 +223,19 @@ router.post("/chat", upload.any(), async (req, res) => {
   if (intent === "recommendation_workout") {
     const response = await recommendationHandlerForWorkout(message, user.id, conversationState, supabase);
     
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
-      message: response,
+      message: responseMessage,
       created_at: new Date(),  
     });
 
     // append response with chat id
-    response = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId };
     
-    return res.json(response);    
+    return res.json(responseWithChatId);    
   }
 
   if (intent === "more_recommendation") {
@@ -395,7 +418,21 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   if (intent === 'chat') {
     console.log('Querying Gemini for message:', message);
-    const prompt = `You are a friendly wellness assistant. Respond to: "${message}" in a helpful and engaging manner. Use emojis naturally. Reply to messages with fitness/wellness context in mind. If you don't know the answer, say something like "I'm not sure about that, but I'm here to help with your wellness journey!".`;
+    
+    // Build prompt with conversation context
+    let prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
+
+    Your role:
+    - Help users with fitness, nutrition, and wellness questions
+    - Provide helpful, accurate information
+    - Use emojis naturally
+    - Be conversational and engaging
+    - If you don't know something, admit it politely
+
+    ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+
+    Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
+
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
 
