@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { useUser } from "../contexts/UserContext";
 import ReactMarkdown from "react-markdown";
@@ -302,6 +303,8 @@ function Avatar({
 }
 
 export function ChatApp() {
+  const { chatId } = useParams<{ chatId?: string }>();
+  const navigate = useNavigate();
   const [uploads, setUploads] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -324,6 +327,83 @@ export function ChatApp() {
     };
     fetchChats();
   }, []);
+
+  // Load chat from URL parameter
+  useEffect(() => {
+    if (chatId && chatId !== activeChatId) {
+      loadChatFromUrl(chatId);
+    } else if (!chatId && activeChatId) {
+      // If no chatId in URL but we have an active chat, clear it
+      setActiveChatId(null);
+      setMessages([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatId]);
+
+  // Internal function to load chat
+  const loadChatFromUrl = async (chatId: string) => {
+    const data = await apiFetch<{ chat_id: string; messages: TimelineItem[] }>(
+      `/loadchat?chat_id=${chatId}`
+    );
+
+    console.log("Loaded chat data:", data);
+
+    // group data based on msg_id
+    const messages = data.messages.reduce(
+      (
+        acc: Array<{
+          msg_id: string;
+          role: "user" | "assistant";
+          text: string;
+          files: FileItem[];
+        }>,
+        item: TimelineItem
+      ) => {
+        const existingMsg = acc.find((m) => m.msg_id === item.msg_id);
+
+        if (existingMsg) {
+          // Append file info if exists
+          if (item.file_url && item.file_name) {
+            existingMsg.files.push({
+              file_url: item.file_url,
+              file_name: item.file_name,
+            });
+          }
+
+          // IMPORTANT: only set text if it exists and current text is empty
+          if (!existingMsg.text) {
+            const normalized = normalizeMessageText(item.message);
+            if (normalized) {
+              existingMsg.text = normalized;
+            }
+          }
+        } else {
+          acc.push({
+            msg_id: item.msg_id,
+            role: item.role === "ai" ? "assistant" : "user",
+            text: normalizeMessageText(item.message),
+            files:
+              item.file_url && item.file_name
+                ? [
+                    {
+                      file_url: item.file_url,
+                      file_name: item.file_name,
+                    },
+                  ]
+                : [],
+          });
+        }
+
+        return acc;
+      },
+      []
+    );
+
+    console.log("Grouped messages:", messages);
+
+    setActiveChatId(data.chat_id);
+    setMessages(messages);
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -386,22 +466,26 @@ export function ChatApp() {
       });
 
       console.log("Chat response data:", data);
-      const chatId = activeChatId || data.chat_id;
+      const newChatId = activeChatId || data.chat_id;
 
-      if (!activeChatId) setActiveChatId(chatId);
+      if (!activeChatId) {
+        setActiveChatId(newChatId);
+        // Navigate to the new chat URL
+        navigate(`/chatbot/${newChatId}`, { replace: true });
+      }
 
       setChatList((prev) => {
-        const chatExists = prev.find((c) => c.chat_id === chatId);
+        const chatExists = prev.find((c) => c.chat_id === newChatId);
 
         if (chatExists) {
           return prev.map((c) =>
-            c.chat_id === chatId && c.title === "New chat"
+            c.chat_id === newChatId && c.title === "New chat"
               ? { ...c, title: messageText } // update title only if it's "New chat"
               : c
           );
         } else {
           // if somehow chat is not in the list, add it
-          return [{ chat_id: chatId, title: messageText }, ...prev];
+          return [{ chat_id: newChatId, title: messageText }, ...prev];
         }
       });
 
@@ -484,6 +568,7 @@ export function ChatApp() {
     console.log("Grouped messages:", messages);
 
     setActiveChatId(data.chat_id);
+    navigate(`/chatbot/${data.chat_id}`, { replace: true });
 
     setMessages(messages);
   };
@@ -503,6 +588,7 @@ export function ChatApp() {
       setChatList((prev) => [newChatItem, ...prev]);
 
       setActiveChatId(data.chat_id);
+      navigate(`/chatbot/${data.chat_id}`, { replace: true });
     } catch (err) {
       console.error("Failed to create new chat", err);
     }
@@ -521,6 +607,7 @@ export function ChatApp() {
       if (activeChatId === chatId) {
         setActiveChatId(null);
         setMessages([]);
+        navigate("/chatbot", { replace: true });
       }
     } catch (err) {
       console.error("Failed to delete chat", err);
@@ -536,6 +623,7 @@ export function ChatApp() {
       setChatList([]);
       setActiveChatId(null);
       setMessages([]);
+      navigate("/chatbot", { replace: true });
     } catch (err) {
       console.error("Failed to clear all chats", err);
     }
