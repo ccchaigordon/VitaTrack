@@ -146,17 +146,18 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
   }
 
-  // Load conversation history for context (last 20 messages)
+  // Load conversation history for context (last 20 messages, excluding current message)
   const { data: chatHistory } = await supabase
     .from("chat_history")
-    .select("role, message, created_at")
+    .select("role, message, created_at, msg_id")
     .eq("chat_id", finalChatId)
+    .neq("msg_id", finalMsgId) // Exclude the current message we just inserted
     .order("created_at", { ascending: true })
     .limit(20);
 
-  // Formatting
+  // Formatting - only include messages with text content
   const conversationContext = (chatHistory || [])
-    .filter(msg => msg.message) // Only include messages with text
+    .filter(msg => msg.message && msg.message.trim()) // Only include messages with text
     .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.message}`)
     .join('\n');
 
@@ -441,10 +442,33 @@ router.post("/chat", upload.any(), async (req, res) => {
     return res.json({ chat_id: finalChatId, reply: gResponse });
   }
 
-  // Default normal chat placeholder
-  return res.json({
-    reply: `👋 Hello! How can I support your wellness today? (placeholder)`
+  // Default fallback - if intent doesn't match, treat as general chat
+  console.log('Intent did not match any handler, defaulting to chat. Intent was:', intent);
+  
+  const prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
+
+    Your role:
+    - Help users with fitness, nutrition, and wellness questions
+    - Provide helpful, accurate information
+    - Use emojis naturally
+    - Be conversational and engaging
+    - If you don't know something, admit it politely
+
+    ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+
+    Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
+
+  const gResponse = await queryGemini(prompt);
+  console.log('Gemini response (fallback):', gResponse);
+
+  await supabase.from("chat_history").insert({
+    chat_id: finalChatId,
+    role: "ai",
+    message: gResponse,
+    created_at: new Date(),  
   });
+
+  return res.json({ chat_id: finalChatId, reply: gResponse });
 });
 
 router.post("/newchat", async (req, res) => {
