@@ -67,9 +67,9 @@ export function MacroCard ({ data, rangeDays, onRangeChange }: Props) {
         <RangeSelect value={rangeDays} options={macroOptions} onChange={onRangeChange}  />
       </div>
       
-      <div className="grid grid-cols-2 gap-y-8 gap-x-4">
+      <div className="grid grid-cols-2 gap-y-5 gap-x-4">
         <MacroItem icon={Calorie} color='bg-lime-300' label="Total Calories" value={data.current.totalCalories} unit="kcal" delta={data.deltaPercent.calories} comparison={comparison}/>
-        <MacroItem icon={Carbs} color="bg-amber-300" label="Total Carb" value={data.current.carbs} unit="g" delta={data.deltaPercent.carbs} comparison={comparison}/>
+        <MacroItem icon={Carbs} color="bg-amber-300" label="Total Carbohydrates" value={data.current.carbs} unit="g" delta={data.deltaPercent.carbs} comparison={comparison}/>
         <MacroItem icon={Protein} color="bg-orange-300" label="Total Proteins" value={data.current.protein} unit="g" delta={data.deltaPercent.protein} comparison={comparison}/>
         <MacroItem icon={Fats} color="bg-gray-100" label="Total Fats" value={data.current.fat} unit="g" delta={data.deltaPercent.fat} comparison={comparison}/>
       </div>

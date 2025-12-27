@@ -21,8 +21,6 @@ async function fetchMetricsData(userId, startDate, endDate, supabase) {
   return data;
 }
 
-
-
 // ENDPOINT 1: MACROS
 router.get('/ptf/macros', async (req, res) => {
   const supabase = getRlsClient(req);
@@ -142,13 +140,115 @@ router.get('/ptf/calories', async (req, res) => {
   }
 });
 
-// ENDPOINT 3: WEEKLY INSIGHTS
+// ENDPOINT 3: WORKOUT
+router.get('/ptf/workout', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id || 1;
+  const days = 14;
+  const today = new Date();
+  const pastDate = new Date(today);
+  pastDate.setDate(pastDate.getDate() - (days - 1));
+
+  try {
+    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
+
+    const dataMap = {};
+      workoutData.forEach(item => {
+        const dateKey = new Date(item.created_at).toISOString().slice(0, 10);
+        dataMap[dateKey] = item.workout_completed ?? 0;
+      });
+
+    // Build the 14-Day Series
+    const history = [];
+    
+    for (let i = 0; i < days; i++) {
+      const d = new Date(pastDate);
+      d.setDate(d.getDate() + i);
+      
+      const dateKey = d.toISOString().slice(0, 10);
+      
+      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+      history.push({
+        date: dateKey,       
+        label: label,        
+        count: dataMap[dateKey] || 0 
+      });
+    }
+
+  return res.json(history);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+}});
+
+  // ENDPOINT 4: STREAK DAYS
+router.get('/ptf/streak', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id || 1;
+  const today = new Date();
+  const pastDate = new Date(today);
+
+  // max streak 30 days
+  pastDate.setDate(pastDate.getDate() - 30); 
+
+  try {
+    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
+
+    // Using Local Time to match user's day boundary
+    const activeDates = new Set();
+    workoutData.forEach(item => {
+      if (item.workout_completed > 0) {
+        const d = new Date(item.created_at);
+        const key = d.toLocaleDateString('en-CA');
+        activeDates.add(key);
+      }
+    });
+
+    let streak = 0;
+    let checkDate = new Date(); // Start checking from today
+
+    const todayKey = checkDate.toLocaleDateString('en-CA');
+    const yesterdayDate = new Date(checkDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
+
+    // If Today has data, streak includes today.
+    // If Today NO data, but Yesterday HAS data, streak count starts from yesterday).
+    // If neither, streak is 0.
+    if (activeDates.has(todayKey)) {
+      // Streak continues from Today
+    } else if (activeDates.has(yesterdayKey)) {
+      // Streak continues from Yesterday
+      checkDate.setDate(checkDate.getDate() - 1);
+    } else {
+      // Streak 0
+      return res.json({ streakDays: 0 });
+    }
+
+    while (true) {
+      const key = checkDate.toLocaleDateString('en-CA');
+      
+      if (activeDates.has(key)) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1); // Go to previous day
+      } else {
+        break;
+      }
+    }
+
+    return res.json({ streakDays: streak });
+
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+// ENDPOINT 5: WEEKLY INSIGHTS
 router.get('/ptf/insights', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id || 1;
 
   const today = new Date();
-
   const currentDay = today.getDay();   // 0=Sun, 1=Mon, ..., 6=Sat
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
@@ -175,12 +275,15 @@ router.get('/ptf/insights', async (req, res) => {
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1); // Sunday before currentMonday
   lastWeekEnd.setHours(23, 59, 59, 999);
 
-  try {
-    const thisWeekData = await fetchMetricsData(user_id, thisWeekStart, thisWeekEnd, supabase);
-    const lastWeekData = await fetchMetricsData(user_id, lastWeekStart, lastWeekEnd, supabase);
+  const streakStart = new Date(today);
+  streakStart.setDate(streakStart.getDate() - 60);
 
-    console.log("This Week Data:", thisWeekData);
-    console.log("Last Week Data:", lastWeekData);
+  try {
+    const [thisWeekData, lastWeekData, streakData] = await Promise.all([
+      fetchMetricsData(user_id, thisWeekStart, thisWeekEnd, supabase),
+      fetchMetricsData(user_id, lastWeekStart, lastWeekEnd, supabase),
+      fetchMetricsData(user_id, streakStart, thisWeekEnd, supabase) 
+    ]);
 
     // CALC TOTAL HELPER
     const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
@@ -231,35 +334,72 @@ router.get('/ptf/insights', async (req, res) => {
       },
     ];
 
-    const negativeDeltas = macroDeltas.filter(m => m.delta < 0);
+    // const negativeDeltas = macroDeltas.filter(m => m.delta < 0);
 
-    if (negativeDeltas.length > 0) {
-      // Rule 1: If negative deltas exist -> pick the most negative (smallest delta)
-      selectedMacro = negativeDeltas.reduce((min, m) =>
-        m.delta < min.delta ? m : min
-      );
-    } else {
-      // Rule 2: If no negative delta -> pick the most positive (largest delta)
-      selectedMacro = macroDeltas.reduce((max, m) =>
-        m.delta > max.delta ? m : max
-      );
+    // if (negativeDeltas.length > 0) {
+    //   // Rule 1: If negative deltas exist -> pick the most negative (smallest delta)
+    //   selectedMacro = negativeDeltas.reduce((min, m) =>
+    //     m.delta < min.delta ? m : min
+    //   );
+    // } else {
+    //   // Rule 2: If no negative delta -> pick the most positive (largest delta)
+    //   selectedMacro = macroDeltas.reduce((max, m) =>
+    //     m.delta > max.delta ? m : max
+    //   );
+    // }
+
+    let selectedMacro = macroDeltas.find(m => m.delta < -10) || 
+                        macroDeltas.reduce((max, m) => Math.abs(m.delta) > Math.abs(max.delta) ? m : max);
+
+    const activeDates = new Set();
+    streakData.forEach(item => {
+      if (item.workout_completed > 0) {
+        activeDates.add(new Date(item.created_at).toLocaleDateString('en-CA'));
+      }
+    });
+
+    let streak = 0;
+    let checkDate = new Date();
+    const todayKey = checkDate.toLocaleDateString('en-CA');
+    const yesterdayDate = new Date(checkDate);
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
+
+    if (activeDates.has(todayKey)) { 
+    } else if (activeDates.has(yesterdayKey)) {
+      checkDate.setDate(checkDate.getDate() - 1); 
+    } 
+    
+    if (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
+        while (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
+            streak++;
+            checkDate.setDate(checkDate.getDate() - 1);
+        }
     }
 
     const prompt = 
-    `Provide a concise weekly summary based on the following data:
-    - Average Daily Calories Burned This Week: ${avgBurnedThisWeek.toFixed(0)}
-    - Average Daily Calories Burned Last Week: ${avgBurnedLastWeek.toFixed(0)}
-    - Percentage Change in Average Daily Calories Burned: ${deltaBurned}%
-    - Most decreased/increased Macronutrient This Week: ${selectedMacro.name} (${selectedMacro.delta}% change compared to last week)
+    `You are a Fitness Trainer. Analyze this user's fitness data for the current week vs last week and generate a summary.
+    Data profile:
+    - Average Calories Burned: ${avgBurnedThisWeek.toFixed(0)} (Change: ${deltaBurned}%)
+    - Key Macronutrient Change: ${selectedMacro.name} (${selectedMacro.delta}% change)
+    - Current Workout Streak: ${streak} days
+    - Workout: ${thisWeekData.filter(d => d.workout_completed > 0).length} sessions
+    Tasks:
+    Generate exactly 4 short, punchy bullet points. Each item must be plain text + emojis if necessary (no *, quotes, markdown) Return ONLY a JSON object with 2 keys: 
+    1. "summary": Exactly 4 short bullet points (Activity, Nutrition, Streak, Tip).
+    2. "nextFocus": ONE single, motivating sentence telling the user exactly what to focus on next week.
+    
+    JSON FORMAT:
+    { 
+      "summary": ["Point 1", "Point 2", "Point 3", "Point 4"],
+      "nextFocus": "Your focus sentence here."
+    }
 
-    Using the data provided, generate 2 bullet point summarizing the user's performance this week compared to last week. Return EXACTLY this JSON format and nothing else:
-    {  "summary": ["...", "..."]  }
-    Rules:
-    - summary must have exactly 2 items
-    - each item must be plain text (no *, quotes, markdown)
-    - if insufficient data, return: {"summary":[
-        "No sufficient data to generate insights.",
-        "No sufficient data to generate insights."]}`;
+    Guidelines:
+    1. Calorie Trend: Comment on the burn rate change.
+    2. Nutrition Highlight: Comment on the macro change (e.g., "Protein intake dropped...").
+    3. Consistency/Streak: Celebration of streak OR encouragement if 0.
+    4. Actionable Tip: A specific behavioral tip based on the data (e.g., "Try to hit 20g protein post-workout").`;
 
     function extractJson(text) {
       const match = String(text).match(/\{[\s\S]*\}/);
@@ -274,8 +414,8 @@ router.get('/ptf/insights', async (req, res) => {
       
       const summary = Array.isArray(obj.summary) ? obj.summary : [];
 
-      const cleaned = summary.map(b => String(b).trim()).filter(Boolean).slice(0, 2);
-      while (cleaned.length < 2) cleaned.push("No sufficient data to generate insights.");
+      const cleaned = summary.map(b => String(b).trim()).filter(Boolean).slice(0, 4);
+      while (cleaned.length < 4) cleaned.push("No sufficient data to generate insights.");
       return cleaned;
     }
 
@@ -287,8 +427,11 @@ router.get('/ptf/insights', async (req, res) => {
     //   summary = parseSummaryFromGemini(gResponse);
     // } catch {
     //   summary = [
-    //     "No sufficient data to generate insights.", 
-    //     "No sufficient data to generate insights." ];
+    //     "Calories activity data is being processed.",
+    //     "Nutrition data will appear here soon.",
+    //     "Keep logging your workouts to see streaks.",
+    //     "Check back tomorrow for more insights." ],
+    //     nextFocus = "Keep logging your meals and workouts.";
     // }
 
     // dummy response without calling Gemini
@@ -299,7 +442,7 @@ router.get('/ptf/insights', async (req, res) => {
     
     const insight = {
       summary: summary,
-      nextFocus: 'Try to maintain this momentum over the next week.',
+      nextFocus: next_focus,
       isFallback: false,
     };
 
@@ -308,65 +451,5 @@ router.get('/ptf/insights', async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 });
-
-// ENDPOINT 4: WORKOUT
-router.get('/ptf/workout', async (req, res) => {
-  const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
-  const days = 14;
-  const today = new Date();
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - (days - 1));
-
-  try {
-    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
-
-  const dataMap = {};
-    workoutData.forEach(item => {
-      const dateKey = new Date(item.created_at).toISOString().slice(0, 10);
-      dataMap[dateKey] = item.workout_completed ?? 0;
-    });
-
-    // Build the 14-Day Series
-    const history = [];
-    
-    for (let i = 0; i < days; i++) {
-      const d = new Date(pastDate);
-      d.setDate(d.getDate() + i);
-      
-      const dateKey = d.toISOString().slice(0, 10);
-      
-      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
-
-      history.push({
-        date: dateKey,       
-        label: label,        
-        count: dataMap[dateKey] || 0 
-      });
-    }
-
-  // Calculate streakDays (consecutive days with workout_completed)
-  // let streakDays = 0;
-  // for (let i = workoutData.length - 1; i >= 0; i--) {
-  //   if (workoutData[i].workout_completed) {
-  //     streakDays++;
-  //   } else {
-  //     break;
-  //   }
-  // }
-
-  // // Create history array (1 for completed, 0 for not)
-  // const history = workoutData.map(d => d.workout_completed ? 1 : 0);
-
-  // const workoutSummary = {
-  //   totalCount,
-  //   streakDays,
-  //   history
-  // };
-
-  return res.json(history);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }});
 
 module.exports = router;
