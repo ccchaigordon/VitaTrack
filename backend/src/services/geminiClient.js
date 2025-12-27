@@ -12,7 +12,7 @@ async function queryGemini(prompt) {
     return response.text;
   } catch (err) {
     console.error("Gemini error:", err);
-    return "Gemini API Error";
+    return "Oops 😅 I’m having a little trouble thinking right now. Please try again in a moment!";
   }
 }
 

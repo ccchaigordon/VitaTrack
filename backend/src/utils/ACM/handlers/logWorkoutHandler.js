@@ -3,9 +3,22 @@ const cleanLLMJSON  = require("../cleanLLMJSON");
 const extractWorkoutInfoFromFiles = require('../Extraction/extractWorkoutInfoFromFiles');
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
 const processFiles = require("../FileProcessor/fileProcessor");
-const recommendationHandler = require("./recommendationHandlerForWorkout");
+const recommendationHandlerForWorkout = require("./recommendationHandlerForWorkout");
+const explainErrorWithGemini = require("../explainErrorWithGemini");
+
+function isGeminiFallback(text) {
+  return (
+    typeof text === "string" &&
+    (
+      text.startsWith("Oops") ||
+      text.includes("trouble thinking") ||
+      text.length < 30 // optional safety
+    )
+  );
+}
 
 async function logWorkoutHandler(message, files, conversationState, user_id, supabase) {
+  try {
     let combinedText = "";
     let imagesForGemini = [];
     let messageToReturn;
@@ -24,6 +37,12 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
     const extraction = hasFiles
       ? await extractWorkoutInfoFromFiles(message, combinedText, imagesForGemini)
       : await extractWorkoutInfoFromMsg(message);
+
+    if (isGeminiFallback(extraction)) {
+      return {           
+        reply: extraction
+      };
+    }
     
     console.log("Extraction result:", extraction);
 
@@ -34,7 +53,13 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
       console.log("Cleaned workout data:", workoutData);
     } catch (err) {
       console.error("JSON parse error:", err);
-      return { reply: "I couldn't understand the workout details." };
+      return {
+        reply: await explainErrorWithGemini({
+          errorType: "WORKOUT_EXTRACTION_FAILED",
+          userMessage: message,
+          technicalMessage: err.message
+        })
+      };
     }
 
     let workoutDataParsed;
@@ -43,27 +68,40 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
       workoutDataParsed = typeof workoutData === "string" ? JSON.parse(workoutData) : workoutData;
     } catch (err) {
       console.error("Failed to parse workoutData:", err);
-      return { reply: "Invalid workout data format." };
-    }
-
-    if (!Array.isArray(workoutDataParsed) || workoutDataParsed.length === 0) {
-      return { reply: "No workout data found to log." };
+        return { 
+          reply: await explainErrorWithGemini({
+            errorType: "WORKOUT_DATA_FORMAT_ERROR",
+            userMessage: message,
+            technicalMessage: err.message
+          })
+        };
     }
 
     for(const workout of workoutDataParsed) {
       const workoutSource = workout.source || "unknown";
 
-      // Check for missing nutrition info
+      // Check for missing workout info
       const requiredFields = ["exercise_name", "sets", "reps", "duration", "calories_burned"];
       const missingFields = requiredFields.filter(field => workout[field] === null);
 
       if (missingFields.length > 0) {
         if (missingFields.includes("calories_burned")) {
           return { 
-          reply: `Please provide the following missing information: ${missingFields.join(", ")}. To calculate calories burned, please use this link: https://www.calculator.net/calories-burned-calculator.html`
-        };
+            reply: await explainErrorWithGemini({
+              errorType: "MISSING_FIELDS_WORKOUT",
+              userMessage: message,
+              technicalMessage: `Please provide the following missing information: ${missingFields.join(", ")}. To calculate calories burned, please use this link: https://www.calculator.net/calories-burned-calculator.html`
+            })
+          };
+
         } else {
-          return { reply: `Please provide the following missing information: ${missingFields.join(", ")}.` };
+          return { 
+            reply: await explainErrorWithGemini({
+              errorType: "MISSING_FIELDS_WORKOUT",
+              userMessage: message,
+              technicalMessage: `Please provide the following missing information: ${missingFields.join(", ")}.`
+            }) 
+          };
         }        
       };
 
@@ -82,39 +120,65 @@ async function logWorkoutHandler(message, files, conversationState, user_id, sup
 
       if (error) {
         console.error("Workout log error:", error);
-        return { reply: "Failed to log workout." };
-      }
-
-      const messageForRec = `I have just logged a workout: ${workout.exercise_name} with ${workout.calories_burned} kcal burned. Can you recommend a suitable workout for my next workout?`;
-
-      const recResponse = await recommendationHandler(messageForRec, user_id, conversationState, supabase);
-
-      const prompt = `
-        You are a friendly fitness assistant chatbot.
-
-        Context:
-        The user is logging workout.
-
-        Workout details:
-        - Name: ${workout.exercise_name}
-        - Sets: ${workout.sets}
-        - Reps: ${workout.reps}
-        - Duration: ${workout.duration} minutes
-        - Calories Burned: ${workout.calories_burned} kcal
-
-        Task:
-        Write a short, friendly response. Can use emojis naturally.
-        - Acknowledge the logged workout
-        - Mention calories burned`
-      
-      const gResponse = await queryGemini(prompt);
-
-      messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
-
-      conversationState.set(user_id, { state: "IDLE" });
+        return {
+          reply: await explainErrorWithGemini({
+            errorType: "DATABASE_WRITE_FAILED",
+            userMessage: message,
+            technicalMessage: error.message
+          })
+        };
+      } 
     }
 
-    return { reply: messageToReturn };
+    // Fetch user goal from user profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .select("goals")
+      .eq("user_id", user_id)
+      .single();
+    
+    workoutGoal = userProfile?.goals || null;
+
+    const messageForRec = `Workout goal: ${workoutGoal}`;
+
+    const recResponse = await recommendationHandlerForWorkout(messageForRec, user_id, conversationState, supabase);
+
+    const prompt = `
+      You are a friendly fitness assistant chatbot.
+
+      Context:
+      The user is logging workout.
+
+      Workout details:
+      - ${workoutData}
+      
+      Task:
+      Write a short, friendly response. Can use emojis naturally.
+      - Acknowledge the logged workout
+      - Mention calories burned`
+    
+    const gResponse = await queryGemini(prompt);
+
+    if (isGeminiFallback(gResponse)) {
+      messageToReturn = gResponse;
+    } else {
+      messageToReturn = `${gResponse} \n\n${recResponse.reply}`;
+    }
+
+    return {
+      reply: messageToReturn
+    };
+
+  } catch (err) {
+    console.error("Unexpected error in logWorkoutHandler:", err);
+    return {
+      reply: await explainErrorWithGemini({
+        errorType: "UNEXPECTED_ERROR",
+        userMessage: message,
+        technicalMessage: err.message
+      })
+    };
+  }
 }
 
 module.exports = logWorkoutHandler;
