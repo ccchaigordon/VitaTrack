@@ -553,7 +553,7 @@ export function ChatApp() {
 
           <div className="w-full flex justify-center mt-4">
             {/* Input Box */}
-            <div className="flex flex-col bg-white rounded-2xl px-5 py-4 w-full max-w-3xl border border-gray-200">
+            <div className="flex flex-col bg-white rounded-2xl px-4 py-1.5 w-full max-w-3xl border border-gray-200">
               {/* Uploaded Files */}
               {uploads.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
