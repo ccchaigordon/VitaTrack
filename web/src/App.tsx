@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
 import { RedirectIfAuth } from "./components/RedirectIfAuth";
 import { RequireProfileComplete } from "./components/RequireProfileComplete";
@@ -28,12 +28,23 @@ function AuthenticatedLayout({
   children: React.ReactNode;
   showFooter?: boolean;
 }) {
+  const location = useLocation();
+  const isChatbot = location.pathname === "/chatbot";
+
   return (
     <UserProvider>
       <RequireProfileComplete>
-        <div className="flex min-h-screen flex-col">
+        <div
+          className={`flex ${isChatbot ? "h-screen" : "min-h-screen"} flex-col`}
+        >
           <Navbar />
-          <main className="flex-1">{children}</main>
+          <main
+            className={`flex-1 min-h-0 flex flex-col ${
+              isChatbot ? "overflow-hidden" : "overflow-auto"
+            }`}
+          >
+            {children}
+          </main>
           {showFooter && <Footer />}
         </div>
       </RequireProfileComplete>

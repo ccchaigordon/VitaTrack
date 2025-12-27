@@ -5,8 +5,8 @@ import { useUser } from "../contexts/UserContext";
 type Message = {
   role: "user" | "assistant";
   text: string;
-  file?: File[];         // For newly uploaded files
-  files?: FileItem[];    // For loaded messages from backend
+  file?: File[]; // For newly uploaded files
+  files?: FileItem[]; // For loaded messages from backend
   file_name?: string;
   file_url?: string;
 };
@@ -45,9 +45,9 @@ const normalizeMessageText = (message: unknown): string => {
     typeof message === "object" &&
     message !== null &&
     "reply" in message &&
-    typeof (message as any).reply === "string"
+    typeof (message as { reply?: string }).reply === "string"
   ) {
-    return (message as any).reply;
+    return (message as { reply: string }).reply;
   }
 
   return "";
@@ -62,8 +62,6 @@ function ChatBubble({
   text: string;
   files: FileItem[];
 }) {
-
-  
   const isUser = role === "user";
   const { me } = useUser();
   const avatarUrl = me?.user?.avatar_url || null;
@@ -85,22 +83,44 @@ function ChatBubble({
   const avatarLetter = firstChar(displayName);
 
   return (
-    <div className={`w-full flex ${isUser ? "justify-start" : "justify-end"}`}>
-      <div className="flex items-start gap-3 max-w-[70%]">
+    <div className={`w-full flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`flex items-start gap-3 max-w-[75%] ${
+          isUser ? "flex-row-reverse" : ""
+        }`}
+      >
+        {!isUser && (
+          <div className="shrink-0">
+            <img
+              src="/src/assets/Chatbot/AI.svg"
+              className="w-8 h-8"
+              alt="AI Assistant"
+            />
+          </div>
+        )}
         {isUser && <Avatar src={avatarUrl} letter={avatarLetter} size="sm" />}
-        <div className="flex flex-col">
+        <div className="flex flex-col gap-2">
           {files.length > 0 && (
-            <div className="flex flex-wrap gap-3 mb-3">
+            <div
+              className={`flex flex-wrap gap-2 mb-1 ${
+                isUser ? "justify-end" : "justify-start"
+              }`}
+            >
               {files.map((file, index) => (
-                <div key={index} className="max-w-[150px]">
+                <div key={index} className="max-w-[180px]">
                   {file.file_url.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
                     <img
                       src={file.file_url}
                       alt={file.file_name}
-                      className="rounded-xl shadow max-w-full"
+                      className="rounded-lg max-w-full border border-gray-200"
                     />
                   ) : (
-                    <a href={file.file_url} target="_blank" className="text-sm">
+                    <a
+                      href={file.file_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-[#2A4A2D] hover:text-[#1A381D] hover:underline flex items-center gap-1"
+                    >
                       📄 {file.file_name}
                     </a>
                   )}
@@ -110,16 +130,16 @@ function ChatBubble({
           )}
 
           <div
-            className={`px-5 py-3 text-sm whitespace-pre-line shadow-sm
-              ${isUser
-                ? "bg-[#DDF3D8] text-gray-800 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
-                : "bg-white text-gray-700 rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
+            className={`px-4 py-2.5 text-sm whitespace-pre-line
+              ${
+                isUser
+                  ? "bg-[#2A4A2D] text-white rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl"
+                  : "bg-gray-50 text-gray-800 border border-gray-100 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
               }`}
           >
             {text}
           </div>
         </div>
-        {!isUser && <img src="/src/assets/Chatbot/AI.svg" className="w-6 h-6 mt-1" />}
       </div>
     </div>
   );
@@ -163,33 +183,38 @@ function Avatar({
   );
 }
 
-
 export function ChatApp() {
   const [uploads, setUploads] = useState<File[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [msg_id, setMsgId] = useState<string | null>(null);
-  const [chatList, setChatList] = useState<{ chat_id: string; title: string }[]>([]);
-  const [activeTab, setActiveTab] = useState('progress');
-  const [chatOpen, setChatOpen] = useState(false);
-
-  const activeBtn = "bg-[#CDEE6E] text-black shadow-sm";
-  const inactiveBtn = "text-gray-400 hover:bg-lime-50";
-  const chatSectionActive = activeTab === "chat" 
+  const [chatList, setChatList] = useState<
+    { chat_id: string; title: string }[]
+  >([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const fetchChats = async () => {
-      const data = await apiFetch<{ chat_id: string; title: string }[]>('/fetchChatList', {
-        method: 'GET'
-      });
+      const data = await apiFetch<{ chat_id: string; title: string }[]>(
+        "/fetchChatList",
+        {
+          method: "GET",
+        }
+      );
       setChatList(data);
     };
     fetchChats();
   }, []);
 
-  console.log("Chatlist:", chatList);
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messages]);
 
+  console.log("Chatlist:", chatList);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,7 +238,7 @@ export function ChatApp() {
     setUploads((prev) => prev.filter((_, i) => i !== index));
   };
 
- const sendMessage = async () => {
+  const sendMessage = async () => {
     const messageText = input.trim();
     if (!messageText) return;
 
@@ -222,7 +247,7 @@ export function ChatApp() {
       text: messageText,
       file: uploads,
     };
-    setMessages(prev => [...prev, newUserMessage]);
+    setMessages((prev) => [...prev, newUserMessage]);
 
     console.log("Active Chat ID:", activeChatId);
 
@@ -231,7 +256,7 @@ export function ChatApp() {
     formData.append("chat_id", activeChatId ?? "");
     formData.append("is_new_chat", activeChatId ? "false" : "true");
 
-    uploads.forEach(file => formData.append("files", file));
+    uploads.forEach((file) => formData.append("files", file));
 
     setInput("");
     setUploads([]);
@@ -247,11 +272,11 @@ export function ChatApp() {
 
       if (!activeChatId) setActiveChatId(chatId);
 
-      setChatList(prev => {
-        const chatExists = prev.find(c => c.chat_id === chatId);
+      setChatList((prev) => {
+        const chatExists = prev.find((c) => c.chat_id === chatId);
 
         if (chatExists) {
-          return prev.map(c =>
+          return prev.map((c) =>
             c.chat_id === chatId && c.title === "New chat"
               ? { ...c, title: messageText } // update title only if it's "New chat"
               : c
@@ -262,21 +287,25 @@ export function ChatApp() {
         }
       });
 
-      setMessages(prev => [...prev, { role: "assistant", text: data.reply, file: [] }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: data.reply, file: [] },
+      ]);
     } catch (err) {
       console.error(err);
-      setMessages(prev => [
+      setMessages((prev) => [
         ...prev,
-        { role: "assistant", text: "Error: failed to contact server.", file: [] },
+        {
+          role: "assistant",
+          text: "Error: failed to contact server.",
+          file: [],
+        },
       ]);
     }
   };
 
   const loadChat = async (chatId: string) => {
-    setActiveTab("chat");
-    setChatOpen(false);
-
-    const data = await apiFetch<{ chat_id: string; messages: any[] }>(
+    const data = await apiFetch<{ chat_id: string; messages: TimelineItem[] }>(
       `/loadchat?chat_id=${chatId}`
     );
 
@@ -284,42 +313,55 @@ export function ChatApp() {
 
     // group data based on msg_id
     // group data based on msg_id
-    const messages = data.messages.reduce((acc: any[], item: TimelineItem) => {
-      const existingMsg = acc.find(m => m.msg_id === item.msg_id);
+    const messages = data.messages.reduce(
+      (
+        acc: Array<{
+          msg_id: string;
+          role: "user" | "assistant";
+          text: string;
+          files: FileItem[];
+        }>,
+        item: TimelineItem
+      ) => {
+        const existingMsg = acc.find((m) => m.msg_id === item.msg_id);
 
-      if (existingMsg) {
-        // Append file info if exists
-        if (item.file_url && item.file_name) {
-          existingMsg.files.push({
-            file_url: item.file_url,
-            file_name: item.file_name
+        if (existingMsg) {
+          // Append file info if exists
+          if (item.file_url && item.file_name) {
+            existingMsg.files.push({
+              file_url: item.file_url,
+              file_name: item.file_name,
+            });
+          }
+
+          // IMPORTANT: only set text if it exists and current text is empty
+          if (!existingMsg.text) {
+            const normalized = normalizeMessageText(item.message);
+            if (normalized) {
+              existingMsg.text = normalized;
+            }
+          }
+        } else {
+          acc.push({
+            msg_id: item.msg_id,
+            role: item.role === "ai" ? "assistant" : "user",
+            text: normalizeMessageText(item.message),
+            files:
+              item.file_url && item.file_name
+                ? [
+                    {
+                      file_url: item.file_url,
+                      file_name: item.file_name,
+                    },
+                  ]
+                : [],
           });
         }
 
-        // ✅ IMPORTANT: only set text if it exists and current text is empty
-        if (!existingMsg.text) {
-          const normalized = normalizeMessageText(item.message);
-          if (normalized) {
-            existingMsg.text = normalized;
-          }
-        }
-      } else {
-        acc.push({
-          msg_id: item.msg_id,
-          role: item.role === "ai" ? "assistant" : "user",
-          text: normalizeMessageText(item.message),
-          files: item.file_url && item.file_name
-            ? [{
-                file_url: item.file_url,
-                file_name: item.file_name
-              }]
-            : []
-        });
-      }
-
-      return acc;
-    }, []);
-
+        return acc;
+      },
+      []
+    );
 
     console.log("Grouped messages:", messages);
 
@@ -336,14 +378,13 @@ export function ChatApp() {
 
       // Create empty chat
       const data = await apiFetch<{ chat_id: string }>("/newchat", {
-        method: "POST"
+        method: "POST",
       });
 
       const newChatItem = { chat_id: data.chat_id, title: "New chat" };
-      setChatList(prev => [newChatItem, ...prev]);
+      setChatList((prev) => [newChatItem, ...prev]);
 
       setActiveChatId(data.chat_id);
-
     } catch (err) {
       console.error("Failed to create new chat", err);
     }
@@ -351,13 +392,12 @@ export function ChatApp() {
 
   const deleteChat = async (chatId: string) => {
     try {
-
-      await apiFetch<{}>(`/deleteChat?chat_id=${chatId}`, {
+      await apiFetch<Record<string, never>>(`/deleteChat?chat_id=${chatId}`, {
         method: "DELETE",
       });
 
       // Remove from chat list
-      setChatList(prev => prev.filter(c => c.chat_id !== chatId));
+      setChatList((prev) => prev.filter((c) => c.chat_id !== chatId));
 
       // Reset current chat if it was active
       if (activeChatId === chatId) {
@@ -371,143 +411,180 @@ export function ChatApp() {
 
   const clearAllChats = async () => {
     try {
-      await apiFetch<{}>(`/clearAllChats`, {
+      await apiFetch<Record<string, never>>(`/clearAllChats`, {
         method: "DELETE",
       });
 
       setChatList([]);
       setActiveChatId(null);
       setMessages([]);
-
     } catch (err) {
       console.error("Failed to clear all chats", err);
     }
   };
 
   return (
-    <div
-      className="bg-[#F5F7FA] overflow-hidden"
-    >
-      <div className="flex justify-center p-8 sm:px-6 lg:px-8 gap-6">
-        {/* MAIN CHAT UI */}
-        {/* <div
-          className="flex gap-6 w-full max-w-[1390px]
-         rounded-3xl p-8 h-[80vh] shadow-xl"
-        > */}
-          {/* LEFT SIDEBAR */}
-          <div className="bg-white p-6 rounded-3xl w-75 shadow-sm h-[82vh]">
-            <h1 className="mb-8 mt-4 text-left font-bold text-[10px]">
-              CHAT VITATRACK
-            </h1>
+    <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
+      <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
+        {/* LEFT SIDEBAR */}
+        <div className="bg-white p-6 rounded-3xl w-75 border border-gray-200 shrink-0 flex flex-col">
+          <h1 className="mb-6 mt-2 text-left font-bold text-xs text-gray-700 uppercase tracking-wider">
+            Chat History
+          </h1>
 
-            <button 
-              onClick={newChat}
-              className="bg-[#1A381D] hover:bg-green-800 text-white text-[14px] px-4 py-2 w-full rounded-full cursor-pointer">              
-              + New Chat
-            </button>
+          <button
+            onClick={newChat}
+            className="bg-[#2A4A2D] hover:bg-[#1A381D] text-white text-sm font-medium px-4 py-2.5 w-full rounded-xl cursor-pointer transition-colors"
+          >
+            + New Chat
+          </button>
 
-            <div className="flex justify-between text-gray-500 text-[12px] mb-8 mt-8">
-              <span>Your chats</span>
-              <button className="cursor-pointer hover:text-gray-700">
+          <div className="flex justify-between items-center text-gray-600 text-xs mb-4 mt-6">
+            <span className="font-medium">Recent Chats</span>
+            {chatList.length > 0 && (
+              <button
+                onClick={clearAllChats}
+                className="cursor-pointer hover:text-red-600 text-xs transition-colors"
+              >
                 Clear All
               </button>
-            </div>
+            )}
+          </div>
 
-            {/* Chat list */}
-            <div className="flex flex-col overflow-y-auto mt-2 pr-1 h-[52vh]">
-              {chatList.map((chat) => (
+          {/* Chat list */}
+          <div className="flex flex-col overflow-y-auto mt-2 pr-1 flex-1 gap-1.5 scroll-smooth min-h-0">
+            {chatList.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8">
+                No chats yet. Start a new conversation!
+              </p>
+            ) : (
+              chatList.map((chat) => (
                 <div
                   key={chat.chat_id}
-                  className={`flex items-center p-2 rounded-xl transition-all duration-200
-                              hover:bg-[#88987E]/26 hover:shadow-sm hover:scale-[1.02]
-                              ${activeChatId === chat.chat_id ? activeBtn : inactiveBtn}`}
+                  className={`flex items-center p-2.5 rounded-lg transition-all duration-200 cursor-pointer
+                                hover:bg-gray-50
+                                ${
+                                  activeChatId === chat.chat_id
+                                    ? "bg-[#DDF3D8] text-gray-900"
+                                    : "text-gray-600 hover:text-gray-900"
+                                }`}
+                  onClick={() => loadChat(chat.chat_id)}
                 >
                   {/* Left: chat icon */}
-                  <img src="/src/assets/Chatbot/Messages.svg" className="w-6 mr-2 flex-shrink-0" />
+                  <img
+                    src="/src/assets/Chatbot/Messages.svg"
+                    className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
+                    alt="Chat"
+                  />
 
-                  {/* Title: truncate, shrink when delete button shows */}
-                  <p className="text-[12px] text-gray-800 truncate flex-1 min-w-0 cursor-pointer" onClick={() => loadChat(chat.chat_id)}>
+                  {/* Title: truncate */}
+                  <p className="text-xs font-medium truncate flex-1 min-w-0">
                     {chat.title || "Untitled Chat"}
                   </p>
 
                   {/* Delete button only for active chat */}
                   {activeChatId === chat.chat_id && (
                     <button
-                      className="ml-10 mr-2 text-red-500 hover:text-red-700 flex-shrink-0 w-4 h-4 flex justify-center items-center cursor-pointer"
+                      className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 w-6 h-6 flex justify-center items-center rounded transition-colors"
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteChat(chat.chat_id);
                       }}
+                      aria-label="Delete chat"
                     >
-                      <img src="/src/assets/Chatbot/Delete.svg" />
+                      <img
+                        src="/src/assets/Chatbot/Delete.svg"
+                        className="w-4 h-4"
+                        alt="Delete"
+                      />
                     </button>
                   )}
-                </div>               
-              ))}
-            </div>
-          </div>
-
-          {/* MAIN CHAT AREA */}
-          <div className="bg-white flex-1 rounded-3xl p-10 flex flex-col shadow-sm min-h-0 h-[82vh]">
-            
-            {messages.length > 0 && (
-              <div className="flex flex-col w-full gap-6 pr-2 flex-1 min-h-0 overflow-y-auto">
-                {messages.map((msg, index) => (
-                  <ChatBubble
-                    key={index}
-                    role={msg.role}
-                    text={msg.text}
-                    files={[
-                      ...(msg.files || []), // loaded files
-                      ...(msg.file?.map(f => ({ file_name: f.name, file_url: URL.createObjectURL(f) })) || []), // newly uploaded
-                    ]}
-                  />
-                ))}
-              </div>
+                </div>
+              ))
             )}
+          </div>
+        </div>
 
-            {/* Bubble */}
-            {messages.length === 0 && (
-              <div className="flex flex-col items-center justify-start">
+        {/* MAIN CHAT AREA */}
+        <div className="bg-white flex-1 rounded-3xl p-8 flex flex-col min-h-0 border border-gray-200 overflow-hidden">
+          {messages.length > 0 && (
+            <div
+              ref={messagesContainerRef}
+              className="flex flex-col w-full gap-4 pr-2 flex-1 min-h-0 overflow-y-auto scroll-smooth thin-scrollbar"
+            >
+              {messages.map((msg, index) => (
+                <ChatBubble
+                  key={index}
+                  role={msg.role}
+                  text={msg.text}
+                  files={[
+                    ...(msg.files || []), // loaded files
+                    ...(msg.file?.map((f) => ({
+                      file_name: f.name,
+                      file_url: URL.createObjectURL(f),
+                    })) || []), // newly uploaded
+                  ]}
+                />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+
+          {/* Empty State */}
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center flex-1">
+              <div className="flex flex-col items-center gap-4">
                 <img
                   src="/src/assets/Chatbot/Logo.svg"
-                  className="w-[200px] mb-2 mt-4"
+                  className="w-[180px] opacity-90"
+                  alt="VitaTrack Chat"
                 />
-
-                <h2 className="text-xl font-semibold mb-8">
-                  Hi, How can I help You?
+                <h2 className="text-2xl font-semibold text-gray-700">
+                  Hi! How can I help you today?
                 </h2>
+                <p className="text-sm text-gray-500 text-center max-w-md">
+                  Ask me anything about fitness, nutrition, or wellness. I can
+                  help you log meals, track workouts, and provide personalized
+                  recommendations.
+                </p>
               </div>
-            )}
-            
+            </div>
+          )}
 
-            <div className="w-full flex justify-center">
+          <div className="w-full flex justify-center mt-4">
             {/* Input Box */}
-            <div className="flex flex-col bg-white shadow-lg rounded-[20px] px-4 py-3 w-full max-w-2xl">
+            <div className="flex flex-col bg-white rounded-2xl px-5 py-4 w-full max-w-3xl border border-gray-200">
               {/* Uploaded Files */}
               {uploads.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {uploads.map((file, index) => (
                     <div
                       key={index}
-                      className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-[8px] text-sm text-gray-700"
+                      className="flex items-center gap-2 bg-gray-50 px-3 py-2 rounded-lg text-sm text-gray-700 border border-gray-100"
                     >
                       {file.type.startsWith("image/") ? (
                         <img
                           src={URL.createObjectURL(file)}
                           alt={file.name}
-                          className="w-12 h-12 object-cover rounded-[8px]"
+                          className="w-10 h-10 object-cover rounded-md border border-gray-200"
                         />
                       ) : (
-                        <span>📄 {file.name}</span>
+                        <span className="text-xs">
+                          📄{" "}
+                          {file.name.length > 20
+                            ? file.name.substring(0, 20) + "..."
+                            : file.name}
+                        </span>
                       )}
                       <button
                         onClick={() => handleRemoveUpload(index)}
-                        className="text-red-500 hover:text-red-700 font-bold ml-2"
+                        className="text-red-500 hover:text-red-700 ml-1 p-1 rounded hover:bg-red-50 transition-colors"
+                        aria-label="Remove file"
                       >
                         <img
                           src="/src/assets/Chatbot/Button-delete.svg"
-                          className="w-6 cursor-pointer"
+                          className="w-4 h-4"
+                          alt="Remove"
                         />
                       </button>
                     </div>
@@ -516,14 +593,16 @@ export function ChatApp() {
               )}
 
               {/* Input Row */}
-              <div className="flex items-center w-full">
+              <div className="flex items-center w-full gap-3">
                 <button
                   onClick={handleOpenFilePicker}
-                  className="cursor-pointer"
+                  className="cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors"
+                  aria-label="Attach file"
                 >
                   <img
                     src="/src/assets/Chatbot/Button-add.svg"
-                    className="w-6"
+                    className="w-5 h-5 opacity-70"
+                    alt="Add file"
                   />
                 </button>
                 <input
@@ -531,26 +610,34 @@ export function ChatApp() {
                   type="file"
                   className="hidden"
                   onChange={handleFileUpload}
+                  multiple
                 />
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                  className="flex-1 ml-6 outline-none text-gray-700 text-[13px]"
-                  placeholder="What's in your mind?..."
+                  onKeyDown={(e) =>
+                    e.key === "Enter" && !e.shiftKey && sendMessage()
+                  }
+                  className="flex-1 outline-none text-gray-700 text-sm bg-transparent placeholder:text-gray-400"
+                  placeholder="Type your message..."
                 />
-                <button className="cursor-pointer" onClick={sendMessage}>
+                <button
+                  className="cursor-pointer p-2 hover:bg-[#2A4A2D]/10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={sendMessage}
+                  disabled={!input.trim()}
+                  aria-label="Send message"
+                >
                   <img
                     src="/src/assets/Chatbot/Button-send.svg"
-                    className="w-6"
+                    className="w-5 h-5"
+                    alt="Send"
                   />
                 </button>
               </div>
             </div>
-            </div>
           </div>
-        
+        </div>
       </div>
     </div>
   );
