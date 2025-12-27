@@ -7,6 +7,7 @@ interface RecipeDetail {
   title: string;
   image_url?: string;
   procedure: string;
+  source_url?: string;
   ingredients: any[];
   calories?: number;
   protein?: number;
@@ -186,11 +187,46 @@ export default function RecipeDetailPage() {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Instructions</h2>
-              <div className="prose prose-sm max-w-none">
-                <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
-                  {recipe.procedure || "No instructions available"}
-                </p>
-              </div>
+              {recipe.procedure && recipe.procedure.trim() ? (
+                <div className="prose prose-sm max-w-none">
+                  <p className="text-gray-700 leading-relaxed whitespace-pre-wrap">
+                    {recipe.procedure}
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <div className="text-5xl mb-4">📖</div>
+                  <p className="text-gray-600 mb-4">
+                    Instructions for this recipe are currently unavailable.
+                  </p>
+                  {recipe.source_url && (
+                    <a
+                      href={recipe.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 px-6 py-3 bg-lime-800 text-white rounded-lg hover:bg-lime-900 transition font-medium"
+                    >
+                      <span>View Original Recipe</span>
+                      <span>→</span>
+                    </a>
+                  )}
+                </div>
+              )}
+              
+              {/* External Source Link */}
+              {recipe.procedure && recipe.procedure.trim() && recipe.source_url && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <a
+                    href={recipe.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-lime-700 hover:text-lime-800 font-medium"
+                  >
+                    <span>View Original Recipe</span>
+                    <span className="text-sm">↗</span>
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Nutrition Breakdown (Visual) */}
@@ -202,7 +238,7 @@ export default function RecipeDetailPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold text-gray-700">Protein</span>
                     <span className="text-sm font-bold text-blue-600">
-                      {recipe.protein || 0}g
+                      {recipe.protein || 0}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -223,7 +259,7 @@ export default function RecipeDetailPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold text-gray-700">Carbohydrates</span>
                     <span className="text-sm font-bold text-orange-600">
-                      {recipe.carbs || 0}g
+                      {recipe.carbs || 0}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
@@ -244,7 +280,7 @@ export default function RecipeDetailPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-semibold text-gray-700">Fat</span>
                     <span className="text-sm font-bold text-red-600">
-                      {recipe.fat || 0}g
+                      {recipe.fat || 0}
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
