@@ -497,6 +497,10 @@ router.post("/chat", upload.any(), async (req, res) => {
     });
   }
 
+  if (intent === "delete_meal_log") {
+    
+  }
+
   if (intent === 'chat') {
     console.log('Querying Gemini for message:', message);
     

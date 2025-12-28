@@ -1,60 +1,48 @@
-const extractWorkoutGoal = require('../Extraction/extractWorkoutGoal');
+const extractUserGoal = require('../Extraction/extractUserGoal');
 const { queryGemini } = require('../../../services/geminiClient');
 const explainErrorWithGemini = require("../explainErrorWithGemini");
-
-function detectWorkoutGoalRuleBased(text = "") {
-  const t = text.toLowerCase();
-
-  if (/bulk|muscle|hypertrophy|gain muscle/.test(t)) return "Muscle Gain";
-  if (/lose weight|fat loss|burn fat|slim/.test(t)) return "Weight Loss";
-  if (/endurance|stamina|cardio/.test(t)) return "Endurance";
-  if (/strength|power|lift heavier/.test(t)) return "Strength";
-  if (/flexibility|stretch|mobility/.test(t)) return "Flexibility";
-  if (/general fitness|stay healthy|maintain fitness/.test(t)) return "General Fitness";
-
-  return null;
-}
+const detectUserGoalRuleBased = require('../Extraction/extractGoalRuleBased');
 
 async function recommendationHandlerForWorkout(message, user_id, conversationState, supabase) {
     try {   
-        let workoutGoal = "";
+        let userGoal = "";
         let gResponse = "";
 
         // Try rule-based detection from message
-        workoutGoal = detectWorkoutGoalRuleBased(message);
+        userGoal = detectUserGoalRuleBased(message);
         
          // If still unknown, try user profile
-        if (!workoutGoal) {
+        if (!userGoal) {
             const { data: userProfile } = await supabase
                 .from("user_profiles")
                 .select("goals")
                 .eq("user_id", user_id)
                 .single();
 
-            workoutGoal = detectWorkoutGoalRuleBased(userProfile?.goals);
+            userGoal = detectUserGoalRuleBased(userProfile?.goals);
         }
 
         // LAST RESORT: Gemini
-        if (!workoutGoal) {
-            workoutGoal = await extractWorkoutGoal(message);
+        if (!userGoal) {
+            userGoal = await extractUserGoal(message);
 
-            if (workoutGoal === "Unknown") {
+            if (userGoal === "Unknown") {
                 const { data: userProfile } = await supabase
                 .from("user_profiles")
                 .select("goals")
                 .eq("user_id", user_id)
                 .single();
 
-                workoutGoal = await extractWorkoutGoal(userProfile?.goals);
+                userGoal = await extractUserGoal(userProfile?.goals);
             }
         }
 
         // Fallback safety
-        if (!workoutGoal) {
-            workoutGoal = "General Fitness";
+        if (!userGoal) {
+            userGoal = "General Health";
         }
 
-        console.log("Inferred workout goal for recommendation:", workoutGoal);
+        console.log("Inferred workout goal for recommendation:", userGoal);
 
         const { data: workoutLogs, error: logError } = await supabase
             .from("workout_logs")

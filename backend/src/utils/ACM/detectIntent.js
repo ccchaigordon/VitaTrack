@@ -29,9 +29,7 @@ async function detectIntent(text, state, conversationContext = '') {
       - more_recommendation: User wants to see next/another recommendation (e.g., "show me another", "next one", "more")
       - previous_recommendation: User wants to see previous/earlier recommendation (e.g., "previous", "go back", "last one")
       - select_recommendation: User accepts, agrees to, or chooses a shown recommendation. (e.g., "I want that", "I'll take this", "yes this one", "looks good")
-      - modify_recommendation: User wants to change/modify/swap a recommendation (e.g., "change the first one", "swap my meal")
-      - confirm_recommendation: User confirms/logs/saves a recommendation (e.g., "yes", "confirm", "log this")
-      - cancel_recommendation: User cancels/exits/done with recommendations (e.g., "no", "cancel", "exit")
+      - delete_meal_log: User wants to delete a previously logged meal (e.g., "delete my last meal", "remove meal log", "I want to delete a meal I logged")
       - chat: General conversation, questions, advice requests, or unclear intent (e.g., "how can I...", "what is...", "tell me about...")
     
     IMPORTANT: 
