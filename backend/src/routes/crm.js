@@ -15,6 +15,7 @@ const router = express.Router();
 router.get("/feed", async (req, res) => {
   try {
     const { userId, contentType = "all" } = req.query;
+    const userAccessToken = req.user?.accessToken;
 
     if (!userId) {
       return res.status(400).json({ error: "User ID required" });
@@ -22,7 +23,8 @@ router.get("/feed", async (req, res) => {
 
     const result = await healthDataService.getPersonalizedFeed(
       userId,
-      contentType
+      contentType,
+      userAccessToken
     );
 
     if (!result.success) {
@@ -60,12 +62,16 @@ router.get("/feed", async (req, res) => {
 router.get("/recipes", async (req, res) => {
   try {
     const { search, category, dietaryRestriction } = req.query;
+    const userAccessToken = req.user?.accessToken;
 
-    const result = await healthDataService.getRecipes({
-      search,
-      category,
-      dietaryRestriction
-    });
+    const result = await healthDataService.getRecipes(
+      {
+        search,
+        category,
+        dietaryRestriction
+      },
+      userAccessToken
+    );
 
     if (!result.success) {
       return res
@@ -87,8 +93,9 @@ router.get("/recipes", async (req, res) => {
 router.get("/recipes/:recipeId", async (req, res) => {
   try {
     const { recipeId } = req.params;
+    const userAccessToken = req.user?.accessToken;
 
-    const result = await healthDataService.getRecipeById(recipeId);
+    const result = await healthDataService.getRecipeById(recipeId, userAccessToken);
 
     if (!result.success || !result.data) {
       const status = result.error?.toLowerCase().includes("not found") ||
@@ -119,12 +126,16 @@ router.get("/recipes/:recipeId", async (req, res) => {
 router.get("/resources", async (req, res) => {
   try {
     const { search, category, resourceType } = req.query;
+    const userAccessToken = req.user?.accessToken;
 
-    const result = await healthDataService.getWellnessResources({
-      search,
-      category,
-      resourceType
-    });
+    const result = await healthDataService.getWellnessResources(
+      {
+        search,
+        category,
+        resourceType
+      },
+      userAccessToken
+    );
 
     if (!result.success) {
       return res
@@ -148,8 +159,9 @@ router.get("/resources", async (req, res) => {
 router.get("/resources/:resourceId", async (req, res) => {
   try {
     const { resourceId } = req.params;
+    const userAccessToken = req.user?.accessToken;
 
-    const result = await healthDataService.getResourceById(resourceId);
+    const result = await healthDataService.getResourceById(resourceId, userAccessToken);
 
     if (!result.success || !result.data) {
       const status = result.error?.toLowerCase().includes("not found") ||
@@ -175,8 +187,12 @@ router.get("/resources/:resourceId", async (req, res) => {
 router.get("/resources/category/:category", async (req, res) => {
   try {
     const { category } = req.params;
+    const userAccessToken = req.user?.accessToken;
 
-    const result = await healthDataService.getWellnessResources({ category });
+    const result = await healthDataService.getWellnessResources(
+      { category },
+      userAccessToken
+    );
 
     if (!result.success) {
       return res.status(500).json({

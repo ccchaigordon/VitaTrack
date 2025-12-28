@@ -137,7 +137,7 @@ export function App() {
         />
 
         <Route
-          path="/resources"
+          path="/resources/:category?"
           element={
             <RequireAuth>
               <AuthenticatedLayout showFooter>
@@ -148,7 +148,7 @@ export function App() {
         />
 
         <Route
-          path="/recipe/:recipeId"
+          path="/resources/recipes/:recipeId"
           element={
             <RequireAuth>
               <AuthenticatedLayout>
