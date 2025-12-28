@@ -12,7 +12,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         userGoal = detectUserGoalRuleBased(message);
         
          // If still unknown, try user profile
-        if (!userGoal) {
+        if (!userGoal || userGoal === "Unknown") {
             const { data: userProfile } = await supabase
                 .from("user_profiles")
                 .select("goals")
@@ -23,7 +23,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         }
 
         // LAST RESORT: Gemini
-        if (!userGoal) {
+        if (!userGoal || userGoal === "Unknown") {
             userGoal = await extractUserGoal(message);
 
             if (userGoal === "Unknown") {
@@ -38,7 +38,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         }
 
         // Fallback safety
-        if (!userGoal) {
+        if (!userGoal || userGoal === "Unknown") {
             userGoal = "General Health";
         }
 
