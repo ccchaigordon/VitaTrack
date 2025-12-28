@@ -1,6 +1,7 @@
 const express = require('express');
 const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
+const recommendWorkouts = require('../utils/PTF/recommendWorkouts');
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -365,16 +366,19 @@ router.get('/ptf/insights', async (req, res) => {
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
     const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
 
-    if (activeDates.has(todayKey)) { 
-    } else if (activeDates.has(yesterdayKey)) {
-      checkDate.setDate(checkDate.getDate() - 1); 
-    } 
-    
     if (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
-        while (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
-            streak++;
-            checkDate.setDate(checkDate.getDate() - 1);
-        }
+       // Streak includes today
+    } else {
+       checkDate.setDate(checkDate.getDate() - 1); // Check yesterday
+       if (!activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
+         checkDate = null; // Streak broken
+       }
+    }
+    if (checkDate) {
+      while (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
+          streak++;
+          checkDate.setDate(checkDate.getDate() - 1);
+      }
     }
 
     const prompt = 
@@ -401,52 +405,106 @@ router.get('/ptf/insights', async (req, res) => {
     3. Consistency/Streak: Celebration of streak OR encouragement if 0.
     4. Actionable Tip: A specific behavioral tip based on the data (e.g., "Try to hit 20g protein post-workout").`;
 
+    let gResponse;
+
+    // to save our gemini token :D
+    // gResponse = await queryGemini(prompt);
+
+    // dummy data for testing :P
+    gResponse = JSON.stringify({
+       summary: [
+         `Calories burned ${deltaBurned >= 0 ? 'up' : 'down'} by ${Math.abs(deltaBurned)}% this week! 🔥`,
+         `${selectedMacro.name} intake shifted by ${selectedMacro.delta}%.`,
+         `Current streak is ${streak} days. Keep it rolling! 🚀`,
+         "Tip: Try adding 10 mins of cardio after lifting."
+       ],
+       nextFocus: "Focus on maintaining your protein intake consistency next week."
+    });
+
     function extractJson(text) {
       const match = String(text).match(/\{[\s\S]*\}/);
       return match ? match[0] : null;
     }
 
-    function parseSummaryFromGemini(gResponse) {
+    function parseGeminiResponse(gResponse) {
       const jsonStr = extractJson(gResponse);
       if (!jsonStr) throw new Error("No JSON found");
 
       const obj = JSON.parse(jsonStr);
       
       const summary = Array.isArray(obj.summary) ? obj.summary : [];
+      summary = summary.map(b => String(b).trim()).filter(Boolean).slice(0, 4);
+      while (summary.length < 4) summary.push("No sufficient data to generate insights.");
 
-      const cleaned = summary.map(b => String(b).trim()).filter(Boolean).slice(0, 4);
-      while (cleaned.length < 4) cleaned.push("No sufficient data to generate insights.");
-      return cleaned;
+      const nextFocus = (typeof obj.nextFocus === 'string' && obj.nextFocus.length > 0) ? obj.nextFocus : "Maintain your momentum!";
+      return { summary, nextFocus };
     }
 
-    // to save our gemini token :D
-    // const gResponse = await queryGemini(prompt);
+    let result = {};
+    let isFallback = false;
 
-    // let summary;
-    // try {
-    //   summary = parseSummaryFromGemini(gResponse);
-    // } catch {
-    //   summary = [
-    //     "Calories activity data is being processed.",
-    //     "Nutrition data will appear here soon.",
-    //     "Keep logging your workouts to see streaks.",
-    //     "Check back tomorrow for more insights." ],
-    //     nextFocus = "Keep logging your meals and workouts.";
-    // }
+    // Parse Gemini Response
+    try {
+      result = parseGeminiResponse(gResponse);
+    } catch (err) { 
+      // Fallback
+      isFallback = true;
+      const fallbackSummary = [];
 
-    // dummy response without calling Gemini
-    const summary = deltaBurned > 0 ?
-      `Great job! Your average daily calories burned increased by ${deltaBurned}% compared to last week.` : `This week, your average daily calories burned decreased by ${Math.abs(deltaBurned)}% compared to last week. Let's aim to be more active next week!
-      Additionally, your ${selectedMacro.name} intake changed by ${selectedMacro.delta}% compared to last week. Keep an eye on your nutrition to support your fitness goals.`;
+      if (deltaBurned > 0) {
+        fallbackSummary.push(`Calories burned is up by ${deltaBurned}% this week! 🔥`);
+      } else {
+        fallbackSummary.push(`Calories burned is down by ${Math.abs(deltaBurned)}%. Let's move more!`);
+      }
+      if (selectedMacro.delta < 0) {
+        fallbackSummary.push(`Your ${selectedMacro.name} intake dropped by ${Math.abs(selectedMacro.delta)}%.`);
+      } else {
+        fallbackSummary.push(`Your ${selectedMacro.name} intake increased by ${selectedMacro.delta}%.`);
+      }
+      if (streak > 2) {
+        fallbackSummary.push(`You're on a ${streak}-day workout streak! Keep it up! 🏆`);
+      } else {
+        fallbackSummary.push(`Try to log a workout today to build your streak.`);
+      }
+      fallbackSummary.push("Remember to stay hydrated!");
 
-    
+      result = {
+        summary: fallbackSummary,
+        nextFocus: "Maintain your momentum!",
+      };
+    }
+
+    // Final response
     const insight = {
-      summary: summary,
-      nextFocus: next_focus,
-      isFallback: false,
+      summary: result.summary,
+      nextFocus: result.nextFocus,
+      isFallback: isFallback,
     };
 
     res.json(insight);
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+router.get('/ptf/recommendationWorkouts', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id || 1;
+
+  try {
+    const result = await recommendWorkouts(user_id, supabase);
+    const formattedWorkouts = result.recommendations.map(w => ({
+      id: w.resource_id,
+      title: w.title,
+      summary: w.description || "Great workout for you.",
+      badge: "Workout", 
+      link: w.source_url,
+      isRecipe: false,
+      category: "Fitness",
+      image_url: null 
+    }));
+
+    return res.json({ recommendations: formattedWorkouts });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
