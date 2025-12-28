@@ -31,8 +31,8 @@ const DIET_TYPES = [
   "Mediterranean",
   "Low Carb",
   "High Protein",
-  "Gluten-Free",
-  "Dairy-Free",
+  "Gluten Free",
+  "Dairy Free",
 ];
 
 const COUNTRIES = [

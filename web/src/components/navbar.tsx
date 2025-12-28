@@ -103,7 +103,7 @@ export default function Navbar() {
   const profileRef = useRef<HTMLDivElement | null>(null);
 
   // Check active path
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => location.pathname.startsWith(path);
 
   const displayName = useMemo(() => {
     const username = me?.user?.username?.trim();
