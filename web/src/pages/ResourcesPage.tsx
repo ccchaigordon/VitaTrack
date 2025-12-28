@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { getRecipes, getResources } from "../services/healthApi";
 
 type Category = "Articles" | "Recipes" | "Tutorials";
@@ -23,7 +23,10 @@ type ResourceItem = {
 
 export default function ResourcesPage() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Category>("Articles");
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState<Category>(
+    (location.state?.activeTab as Category) || "Articles"
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [recipes, setRecipes] = useState<ResourceItem[]>([]);
   const [articles, setArticles] = useState<ResourceItem[]>([]);

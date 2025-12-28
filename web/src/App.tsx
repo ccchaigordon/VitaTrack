@@ -153,6 +153,11 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout>
                 <RecipeDetailPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
           path="/progress"
           element={
             <RequireAuth>

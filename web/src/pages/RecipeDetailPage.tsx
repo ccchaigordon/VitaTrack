@@ -66,7 +66,7 @@ export default function RecipeDetailPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Oops!</h2>
           <p className="text-gray-600 mb-6">{error || "Recipe not found"}</p>
           <button
-            onClick={() => navigate("/resources")}
+            onClick={() => navigate("/resources", { state: { activeTab: "Recipes" } })}
             className="px-6 py-2 bg-lime-800 text-white rounded-lg hover:bg-lime-900 transition"
           >
             Back to Resources
@@ -85,7 +85,7 @@ export default function RecipeDetailPage() {
   return (
     <div className="min-h-screen bg-[#fdfcf0] p-6 sm:p-8">
       <button
-        onClick={() => navigate("/resources")}
+        onClick={() => navigate("/resources", { state: { activeTab: "Recipes" } })}
         className="mb-6 inline-flex items-center text-lime-800 hover:text-lime-900 font-medium"
       >
         ← Back to Resources
