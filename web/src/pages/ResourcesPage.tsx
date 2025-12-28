@@ -1,82 +1,269 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-// import { Recipe, WellnessResource } from '../types/health';
-// import ResourceCard from './ResourceCard';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getRecipes, getResources } from "../services/healthApi";
 
-const ResourcesPage: React.FC = () => {
-  const [activeCategory, setActiveCategory] = useState<'Articles' | 'Recipes' | 'Tutorials'>('Articles');
-  const [items, setItems] = useState<(Recipe | WellnessResource)[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+type Category = "Articles" | "Recipes" | "Tutorials";
 
+type ResourceItem = {
+  id: string;
+  title: string;
+  summary: string;
+  badge: string;
+  link?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  category?: string;
+  content?: string;
+  cooking_time?: number;
+  ingredients?: string[];
+  isRecipe?: boolean;
+};
+
+export default function ResourcesPage() {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<Category>("Articles");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [recipes, setRecipes] = useState<ResourceItem[]>([]);
+  const [articles, setArticles] = useState<ResourceItem[]>([]);
+  const [tutorials, setTutorials] = useState<ResourceItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch data from API
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      // Determine which table to query based on category
-      const isRecipe = activeCategory === 'Recipes';
-      const table = isRecipe ? 'recipes' : 'wellness_resources';
-      
-      let query = supabase.from(table).select('*');
+      setError(null);
+      try {
+        // Fetch recipes
+        const recipesRes = await getRecipes();
+        const recipesData = recipesRes.recipes?.map((recipe: any) => ({
+          id: recipe.recipe_id,
+          title: recipe.title,
+          summary: recipe.procedure?.substring(0, 100) + "..." || "Delicious recipe",
+          badge: recipe.calories ? `${recipe.calories} kcal` : "Recipe",
+          calories: recipe.calories,
+          protein: recipe.protein,
+          carbs: recipe.carbs,
+          fat: recipe.fat,
+          category: recipe.dietary_tags?.join(", ") || "Recipe",
+          content: recipe.procedure,
+          cooking_time: recipe.cooking_time,
+          ingredients: recipe.ingredients,
+          isRecipe: true
+        })) || [];
+        setRecipes(recipesData);
 
-      // If it's not a recipe, filter by the specific resource type
-      if (!isRecipe) {
-        const typeFilter = activeCategory === 'Articles' ? 'Article' : 'Video';
-        query = query.eq('type', typeFilter);
+        // Fetch articles
+        const articlesRes = await getResources(null, null, "Article");
+        const articlesData = articlesRes.resources?.map((resource: any) => ({
+          id: resource.resource_id,
+          title: resource.title,
+          summary: resource.description || "Read this article to learn more",
+          badge: "Article",
+          link: resource.source_url,
+          content: resource.description,
+          isRecipe: false
+        })) || [];
+        setArticles(articlesData);
+
+        // Fetch tutorials
+        const tutorialsRes = await getResources(null, null, "Video");
+        const tutorialsData = tutorialsRes.resources?.map((resource: any) => ({
+          id: resource.resource_id,
+          title: resource.title,
+          summary: resource.description || "Watch this tutorial to learn more",
+          badge: "Tutorial",
+          link: resource.source_url,
+          content: resource.description,
+          isRecipe: false
+        })) || [];
+        setTutorials(tutorialsData);
+
+      } catch (err) {
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Please try again.");
+      } finally {
+        setLoading(false);
       }
-
-      const { data, error } = await query;
-
-      if (!error && data) {
-        setItems(data);
-      }
-      setLoading(false);
     };
 
     fetchData();
-  }, [activeCategory]);
+  }, []);
+
+  const RESOURCES: Record<Category, ResourceItem[]> = {
+    Articles: articles,
+    Recipes: recipes,
+    Tutorials: tutorials,
+  };
+
+function ResourceCard({ item, navigate }: { item: ResourceItem; navigate: (path: string) => void }) {
+  const handleCardClick = () => {
+    if (item.isRecipe) {
+      navigate(`/recipe/${item.id}`);
+    } else if (item.link) {
+      window.open(item.link, "_blank");
+    }
+  };
 
   return (
-    <div className="flex bg-[#fdfcf0] rounded-3xl p-8 min-h-screen font-sans">
-      {/* Sidebar */}
-      <div className="w-1/4 pr-8 border-r border-gray-200">
-        <h2 className="text-xl font-bold mb-6 text-gray-800">Category</h2>
-        <nav className="space-y-2">
-          {['Articles', 'Recipes', 'Tutorials'].map((cat) => (
+    <div
+      onClick={handleCardClick}
+      className={`block rounded-2xl border border-gray-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${
+        item.isRecipe ? "cursor-pointer" : item.link ? "cursor-pointer" : ""
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <h3 className="text-lg font-semibold text-gray-900">{item.title}</h3>
+        <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700 whitespace-nowrap">
+          {item.badge}
+        </span>
+      </div>
+
+      {/* Recipe Card: Show Macros */}
+      {item.isRecipe && (
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          <div className="bg-lime-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-lime-700">{item.calories || 0}</div>
+            <div className="text-xs text-gray-600">Calories</div>
+          </div>
+          <div className="bg-blue-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-blue-600">{item.carbs || 0}g</div>
+            <div className="text-xs text-gray-600">Carbs</div>
+          </div>
+          <div className="bg-orange-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-orange-600">{item.protein || 0}g</div>
+            <div className="text-xs text-gray-600">Protein</div>
+          </div>
+          <div className="bg-red-50 rounded-lg p-2 text-center">
+            <div className="text-sm font-bold text-red-600">{item.fat || 0}g</div>
+            <div className="text-xs text-gray-600">Fat</div>
+          </div>
+        </div>
+      )}
+
+      {/* Recipe Card: Show Ingredients and Cooking Time */}
+      {item.isRecipe && (
+        <div className="mb-4 space-y-2">
+          {item.cooking_time && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="text-lg">⏱️</span>
+              <span>{item.cooking_time} minutes</span>
+            </div>
+          )}
+          {item.ingredients && item.ingredients.length > 0 && (
+            <div className="flex items-start gap-2 text-sm text-gray-600">
+              <span className="text-lg">🥘</span>
+              <span>{item.ingredients.length} ingredients</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-sm text-gray-600 mb-3">{item.summary}</p>
+
+      {/* External Link for Articles/Tutorials */}
+      {!item.isRecipe && item.link && (
+        <a
+          href={item.link}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-block text-sm font-medium text-blue-600 hover:text-blue-700"
+        >
+          View More →
+        </a>
+      )}
+
+      {/* Recipe Card: Click to View Full Recipe */}
+      {item.isRecipe && (
+        <div className="text-sm font-medium text-blue-600 hover:text-blue-700">
+          View Full Recipe →
+        </div>
+      )}
+    </div>
+  );
+}
+
+  const filteredItems = useMemo(() => {
+    const items = RESOURCES[activeTab];
+    if (!searchQuery.trim()) return items;
+    
+    return items.filter(
+      (item) =>
+        item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.summary.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [activeTab, searchQuery, RESOURCES]);
+
+  return (
+    <div className="flex min-h-screen bg-[#fdfcf0] p-6 sm:p-8">
+      <div className="w-64 shrink-0 border-r border-gray-200 pr-6 sm:pr-8">
+        <h2 className="mb-6 text-xl font-bold text-gray-800">Category</h2>
+        <nav className="space-y-3">
+          {(["Articles", "Recipes", "Tutorials"] as Category[]).map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat as any)}
-              className={`w-full text-left p-4 rounded-xl transition-all duration-200 ${
-                activeCategory === cat 
-                ? 'bg-[#E5E7EB] border-l-4 border-gray-600' 
-                : 'hover:bg-gray-100'
+              onClick={() => setActiveTab(cat)}
+              className={`w-full rounded-xl p-4 text-left transition-all duration-150 ${
+                activeTab === cat
+                  ? "bg-lime-800 text-white shadow-md"
+                  : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              <div className="font-bold text-gray-800">{cat}</div>
-              <div className="text-xs text-gray-500">
-                {cat === 'Recipes' ? 'Food recipes' : `${cat.toLowerCase()} for you`}
+              <div className="font-semibold">{cat}</div>
+              <div className="mt-0.5 text-xs opacity-80">
+                {RESOURCES[cat].length} items
               </div>
             </button>
           ))}
         </nav>
       </div>
 
-      {/* Main Content */}
-      <div className="w-3/4 pl-8">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Recommendations</h2>
+      <div className="flex-1 pl-6 sm:pl-10">
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">{activeTab}</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              {loading ? "Loading..." : `${filteredItems.length} resources available`}
+            </p>
+          </div>
+          <input
+            type="text"
+            placeholder="Search..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-64 rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-blue-600 focus:outline-none"
+          />
+        </div>
+
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
         {loading ? (
-          <div className="flex justify-center p-10">Loading...</div>
+          <div className="flex items-center justify-center py-20">
+            <div className="text-gray-500">Loading resources...</div>
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="text-5xl mb-4">📚</div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No resources found</h3>
+            <p className="text-gray-500">
+              {searchQuery ? "Try a different search term" : "No resources available yet"}
+            </p>
+          </div>
         ) : (
-          <div className="space-y-6">
-            {items.map((item) => (
-              <ResourceCard 
-                key={'recipe_id' in item ? item.recipe_id : item.resource_id} 
-                item={item} 
-              />
+          <div className="grid gap-6 sm:grid-cols-2">
+            {filteredItems.map((item) => (
+              <ResourceCard key={item.id} item={item} navigate={navigate} />
             ))}
           </div>
         )}
       </div>
     </div>
   );
-};
-
-export default ResourcesPage;
+}

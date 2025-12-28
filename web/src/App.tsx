@@ -15,6 +15,8 @@ import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
 import { ProgressDashboardPage } from "./pages/ProgressDashboardPage";
 import PricingPage from "./pages/PricingPage";
+import ResourcesPage from "./pages/ResourcesPage";
+import RecipeDetailPage from "./pages/RecipeDetailPage";
 import { HelpCenterPage } from "./pages/HelpCenterPage";
 import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import Navbar from "./components/navbar";
@@ -135,6 +137,22 @@ export function App() {
         />
 
         <Route
+          path="/resources"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <ResourcesPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+
+        <Route
+          path="/recipe/:recipeId"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <RecipeDetailPage />
           path="/progress"
           element={
             <RequireAuth>
