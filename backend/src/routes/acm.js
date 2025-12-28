@@ -263,8 +263,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         You are a friendly fitness assistant chatbot.
 
         Context:
-        The user is browsing meal recommendations.
-        They selected the next recommended meal.
+        The user is browsing for more meal recommendations and you have just provided one. Just act to suggest the next one. Don't start with "hey there", "hello" or similar greetings.
 
         Meal details:
         - Name: ${meal.title}
@@ -272,15 +271,21 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Protein: ${meal.protein} g
         - Carbs: ${meal.carbs} g
         - Fat: ${meal.fat} g
+        - Ingredients: ${meal.ingredients}
+        - Procedure: ${meal.procedure}
+        - Cooking time: ${meal.cooking_time} minutes
+      
+      Tell the user that, for more information can browse the source link: ${meal.source_url}
 
         Task:
         Write a short, friendly response:
         - Suggest the recommended meal details
         - Mention calories
-        - Ask if the user wants more recommendation or modify the meal
+        - Ask if the user wants more recommendation
         - Use emojis naturally
-        - Keep it under 2 sentences
         `;
+
+
     }
 
     if (state.type === "WORKOUT") {
@@ -289,7 +294,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         You are a friendly fitness assistant chatbot.
 
         Context:
-        The user is browsing workout recommendations.
+        The user is browsing for more workout recommendations.
 
        Wokrout details:
         - Name: ${item.title}
@@ -406,6 +411,62 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     console.log('Gemini response for more recommendation:', gResponse);
 
+    return res.json({
+      chat_id: finalChatId,
+      reply: gResponse,
+    });
+  }
+
+  if (intent === "select_recommendation") {
+    const state = conversationState.get(user.id);
+    const currentIndex = state.selectedIndex || 0;
+    const item = state.recommended[currentIndex];
+    let prompt = "";
+    
+    if (state.type === "MEAL") {
+      const meal = item.meal;
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+        Context:
+        The user selected a meal recommendation.
+        Meal details: 
+        - Name: ${meal.title}
+        - Calories: ${meal.calories} kcal
+        - Protein: ${meal.protein} g
+        - Carbs: ${meal.carbs} g
+        - Fat: ${meal.fat} g
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the selected meal
+        - Ask if is there anything else they would like to assist with
+        - Use emojis naturally
+        `;
+    }
+    if (state.type === "WORKOUT") {
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+        Context:
+        The user selected a workout recommendation.
+        Workout details:
+        - Name: ${item.title} 
+        - Description: ${item.description}
+        - Source: ${item.source_url}
+        - Category: ${item.category_tags}
+        Task: 
+        Write a short, friendly response:
+        - Acknowledge the selected workout
+        - Ask if the user wants more recommendation
+        - Use emojis naturally
+        `;
+    }
+    const gResponse = await queryGemini(prompt);
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: gResponse,
+      created_at: new Date(),  
+    });
+    console.log('Gemini response for select recommendation:', gResponse);
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,

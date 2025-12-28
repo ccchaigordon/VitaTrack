@@ -149,6 +149,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         ingredients: meal.ingredients,
         procedure: meal.procedure,
         cooking_time: meal.cooking_time,
+        source_url: meal.source_url,
         ...nutrition
       };
     });
@@ -271,14 +272,18 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       - Protein: ${m.protein} g
       - Carbs: ${m.carbs} g
       - Fat: ${m.fat} g
+      - Ingredients: ${m.ingredients}
+      - Procedure: ${m.procedure}
+      - Cooking time: ${m.cooking_time} minutes
+    
+      Tell the user that, for more information can browse the source link: ${m.source_url}
 
       Task:
       Write a short, friendly response:
-      - Acknowledge the choice
+      - Suggest the recommended meal details
       - Mention calories
-      - Ask if the user wants more recommendation or modify the meal
+      - Ask if the user wants more recommendation
       - Use emojis naturally
-      - Keep it under 2 sentences
       `;
     
     const gResponse = await queryGemini(prompt);
