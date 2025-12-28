@@ -4,6 +4,7 @@ const supabaseAuth = require('./src/routes/auth');
 const udmRoutes = require('./src/routes/udm');
 const acmRoutes = require('./src/routes/acm');
 const crmRoutes = require('./src/routes/crm');
+const ptfRoutes = require('./src/routes/ptf');
 
 const app = express();
 
@@ -24,14 +25,16 @@ app.use((req, res, next) => {
 });
 
 // AI Conversational and Recommendation APIs (will integrate with auth later)
-app.use('/api', acmRoutes);
+app.use('/api', supabaseAuth, acmRoutes);
+
+// Progress Tracking & Feedback APIs
+app.use('/api', supabaseAuth, ptfRoutes);
 
 // Health & Meal/Workout Tracking APIs (CRM)
 app.use('/api', crmRoutes);
 
 // User & Data Management APIs (auth-required)
 app.use('/api', supabaseAuth, udmRoutes);
-
 
 const PORT = process.env.PORT || 4000;
 

@@ -1,7 +1,9 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { RequireAuth } from "./components/RequireAuth";
 import { RedirectIfAuth } from "./components/RedirectIfAuth";
+import { RequireProfileComplete } from "./components/RequireProfileComplete";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { DocumentTitle } from "./components/DocumentTitle";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { DashboardPage } from "./pages/DashboardPage";
@@ -11,11 +13,15 @@ import { ProfileEditPage } from "./pages/ProfileEditPage";
 import { SignInPage } from "./pages/SignInPage";
 import { SignUpPage } from "./pages/SignUpPage";
 import { ChatApp } from "./pages/ChatApp";
+import { ProgressDashboardPage } from "./pages/ProgressDashboardPage";
 import PricingPage from "./pages/PricingPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import RecipeDetailPage from "./pages/RecipeDetailPage";
+import { HelpCenterPage } from "./pages/HelpCenterPage";
+import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
+import { LandingPage } from "./pages/LandingPage";
 
 function AuthenticatedLayout({
   children,
@@ -24,13 +30,26 @@ function AuthenticatedLayout({
   children: React.ReactNode;
   showFooter?: boolean;
 }) {
+  const location = useLocation();
+  const isChatbot = location.pathname.startsWith("/chatbot");
+
   return (
     <UserProvider>
-      <div className="flex min-h-screen flex-col">
-        <Navbar />
-        <main className="flex-1">{children}</main>
-        {showFooter && <Footer />}
-      </div>
+      <RequireProfileComplete>
+        <div
+          className={`flex ${isChatbot ? "h-screen" : "min-h-screen"} flex-col`}
+        >
+          <Navbar />
+          <main
+            className={`flex-1 min-h-0 flex flex-col ${
+              isChatbot ? "overflow-hidden" : "overflow-auto"
+            }`}
+          >
+            {children}
+          </main>
+          {showFooter && <Footer />}
+        </div>
+      </RequireProfileComplete>
     </UserProvider>
   );
 }
@@ -39,8 +58,16 @@ export function App() {
   return (
     <>
       <ScrollToTop />
+      <DocumentTitle />
       <Routes>
-        <Route path="/" element={<Navigate to="/signin" replace />} />
+        <Route
+          path="/"
+          element={
+            <RedirectIfAuth>
+              <LandingPage />
+            </RedirectIfAuth>
+          }
+        />
         <Route
           path="/signin"
           element={
@@ -99,7 +126,7 @@ export function App() {
         />
 
         <Route
-          path="/chatbot"
+          path="/chatbot/:chatId?"
           element={
             <RequireAuth>
               <AuthenticatedLayout>
@@ -126,6 +153,11 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout>
                 <RecipeDetailPage />
+          path="/progress"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout>
+                <ProgressDashboardPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }
@@ -141,8 +173,28 @@ export function App() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/help"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <HelpCenterPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/privacy"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <PrivacyPolicyPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
 
-        <Route path="*" element={<Navigate to="/signin" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );

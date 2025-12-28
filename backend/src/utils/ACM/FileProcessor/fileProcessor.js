@@ -1,4 +1,4 @@
-const parsePdfFiles = require("../utils/pdfParser");
+const parsePdfFiles = require("./pdfParser");
 
 async function processFiles(files = []) {
   const textFiles = [];

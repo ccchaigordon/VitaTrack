@@ -21,7 +21,7 @@ export function DashboardPage() {
       localStorage.clear();
       sessionStorage.clear();
     }
-    nav("/signin", { replace: true });
+    nav("/", { replace: true });
   }
 
   return (
