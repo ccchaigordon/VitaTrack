@@ -19,10 +19,16 @@ async function extractWorkoutGoal(message) {
     - General Fitness: User want to maintain overall health and fitness.
     - Unknown: If the goal is unclear or not listed above.
 
-    Rules:
-    - No explanations
-    - No emojis
-    - No extra text
+    
+    STRICT RULES:
+    - Return "Unknown" if the user does NOT clearly mention a specific fitness goal.
+    - Generic exercise requests (e.g. "I want to exercise", "suggest workouts", "recommend exercises") MUST be classified as "Unknown".
+    - Do NOT infer or guess the goal.
+    - Only classify as "General Fitness" if the user explicitly says they want to maintain overall health or general fitness.
+    - If multiple goals are mentioned, choose the most dominant one.
+    - No explanations.
+    - No emojis.
+    - No extra text.
     `;
 
   const response = await queryGemini(prompt);

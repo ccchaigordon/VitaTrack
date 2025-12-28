@@ -294,13 +294,15 @@ router.post("/chat", upload.any(), async (req, res) => {
         You are a friendly fitness assistant chatbot.
 
         Context:
-        The user is browsing for more workout recommendations.
+        The user is browsing for more workout recommendations and you have just provided one. Just act to suggest the next one. Don't start with "hey there", "hello" or similar greetings.
 
        Wokrout details:
         - Name: ${item.title}
         - Description: ${item.description}
         - Source: ${item.source_url}
         - Category: ${item.category_tags}
+
+      Tell the user that, for more information can browse the source link: ${item.source_url}
 
         Task:
         Write a short, friendly response:
@@ -422,9 +424,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     const currentIndex = state.selectedIndex || 0;
     const item = state.recommended[currentIndex];
     let prompt = "";
+    let recipe_id = null;
+    let resource_id = null;
+    let type = state.type;
     
     if (state.type === "MEAL") {
       const meal = item.meal;
+      recipe_id = meal.recipe_id;
+
       prompt = `
         You are a friendly fitness assistant chatbot.
         Context:
@@ -439,10 +446,14 @@ router.post("/chat", upload.any(), async (req, res) => {
         Write a short, friendly response:
         - Acknowledge the selected meal
         - Ask if is there anything else they would like to assist with
+        - Tell user that you have saved this meal to their recommendation list. User can view it anytime
         - Use emojis naturally
         `;
     }
+
     if (state.type === "WORKOUT") {
+      resource_id = item.resource_id;
+
       prompt = `
         You are a friendly fitness assistant chatbot.
         Context:
@@ -456,10 +467,12 @@ router.post("/chat", upload.any(), async (req, res) => {
         Write a short, friendly response:
         - Acknowledge the selected workout
         - Ask if the user wants more recommendation
+        - Tell user that you have saved this workout to their recommendation list. User can view it anytime
         - Use emojis naturally
         `;
     }
     const gResponse = await queryGemini(prompt);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
@@ -467,6 +480,17 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
     console.log('Gemini response for select recommendation:', gResponse);
+
+    // save recommendation to recommendation_history
+    await supabase.from("recommendation_history").insert({
+      user_id: user.id,
+      recipe_id: recipe_id,
+      resource_id: resource_id,
+      rec_text: gResponse,
+      type: type,
+      created_at: new Date(),
+    });
+
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,

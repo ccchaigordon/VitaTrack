@@ -2,24 +2,56 @@ const extractWorkoutGoal = require('../Extraction/extractWorkoutGoal');
 const { queryGemini } = require('../../../services/geminiClient');
 const explainErrorWithGemini = require("../explainErrorWithGemini");
 
+function detectWorkoutGoalRuleBased(text = "") {
+  const t = text.toLowerCase();
+
+  if (/bulk|muscle|hypertrophy|gain muscle/.test(t)) return "Muscle Gain";
+  if (/lose weight|fat loss|burn fat|slim/.test(t)) return "Weight Loss";
+  if (/endurance|stamina|cardio/.test(t)) return "Endurance";
+  if (/strength|power|lift heavier/.test(t)) return "Strength";
+  if (/flexibility|stretch|mobility/.test(t)) return "Flexibility";
+  if (/general fitness|stay healthy|maintain fitness/.test(t)) return "General Fitness";
+
+  return null;
+}
+
 async function recommendationHandlerForWorkout(message, user_id, conversationState, supabase) {
     try {   
         let workoutGoal = "";
         let gResponse = "";
 
-        workoutGoal = await extractWorkoutGoal(message);
+        // Try rule-based detection from message
+        workoutGoal = detectWorkoutGoalRuleBased(message);
         
-        // p.s. Goal in user profile must not be null/empty/unknown here 
-        if (!workoutGoal || workoutGoal === "Unknown") {
+         // If still unknown, try user profile
+        if (!workoutGoal) {
+            const { data: userProfile } = await supabase
+                .from("user_profiles")
+                .select("goals")
+                .eq("user_id", user_id)
+                .single();
 
-            // Fetch user goal from user profile
-            const { data: userProfile, error: profileError } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();
-    
-            workoutGoal = userProfile?.goals || null;
+            workoutGoal = detectWorkoutGoalRuleBased(userProfile?.goals);
+        }
+
+        // LAST RESORT: Gemini
+        if (!workoutGoal) {
+            workoutGoal = await extractWorkoutGoal(message);
+
+            if (workoutGoal === "Unknown") {
+                const { data: userProfile } = await supabase
+                .from("user_profiles")
+                .select("goals")
+                .eq("user_id", user_id)
+                .single();
+
+                workoutGoal = await extractWorkoutGoal(userProfile?.goals);
+            }
+        }
+
+        // Fallback safety
+        if (!workoutGoal) {
+            workoutGoal = "General Fitness";
         }
 
         console.log("Inferred workout goal for recommendation:", workoutGoal);
@@ -118,9 +150,9 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             Write a short, friendly response:
             - Suggest the recommended workout details
             - Mention the workout description, source url and category
+            - Can add any extra explanation if needed
             - Ask if the user wants more recommendation
             - Use emojis naturally
-            - Keep it under 2 sentences
             `;
         
         gResponse = await queryGemini(prompt);
