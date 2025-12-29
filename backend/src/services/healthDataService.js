@@ -158,6 +158,8 @@ async function getPersonalizedFeed(
           .split(",")
           .map((item) => item.trim());
         query = query.overlaps("dietary_tags", dietArray);
+      } else {
+        query = query.contains("dietary_tags", ["Popular"]);
       }
 
       let { data: recipeData, error: recipeError } = await query;
@@ -167,7 +169,7 @@ async function getPersonalizedFeed(
         const { data: fallback } = await client
           .from("recipes")
           .select("*")
-          .limit(10);
+          .limit(20);
         recipeData = fallback || [];
       }
 
@@ -203,7 +205,7 @@ async function getPersonalizedFeed(
         const { data: fallbackW } = await client
           .from("wellness_resources")
           .select("*")
-          .limit(10);
+          .limit(20);
         wellnessData = fallbackW || [];
       }
 

@@ -26,13 +26,15 @@ const DIET_TYPES = [
   "Balanced",
   "Vegetarian",
   "Vegan",
-  "Keto",
-  "Paleo",
+  "Ketogenic",
+  "Paleolithic",
   "Mediterranean",
   "Low Carb",
   "High Protein",
   "Gluten Free",
   "Dairy Free",
+  "Whole30",
+  "Pescatarian"
 ];
 
 const COUNTRIES = [
