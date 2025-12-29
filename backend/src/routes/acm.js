@@ -370,7 +370,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
         Context:
         The user is browsing meal recommendations.
-        They selected the next recommended meal.
+        They selected the previous recommended meal.
 
         Meal details:
         - Name: ${meal.title}
@@ -383,7 +383,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         Write a short, friendly response:
         - Acknowledge the choice
         - Mention calories
-        - Ask if the user wants more recommendation or modify the meal
+        - Ask if the user wants more recommendation
         - Use emojis naturally
         - Keep it under 2 sentences
         `;
@@ -396,6 +396,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
         Context:
         The user is browsing workout recommendations.
+        They selected the previous recommended exercise.
 
        Wokrout details:
         - Name: ${item.title}
@@ -413,11 +414,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
     
     const gResponse = await queryGemini(prompt);
-    // gResponse = gResponse = `Workout details:
-    //  - Name: ${item.title}
-    // - Description: ${item.description}
-    // - Source: ${item.source_url}
-    // - Category: ${item.category_tags.join(', ')}`
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
