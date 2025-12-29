@@ -1,22 +1,31 @@
-/**
- * Spoonacular Recipe Migration Handler
- * Transforms Spoonacular API data and inserts into Supabase recipes table
- */
+/*-------------------------------------------------------------
+  Transforms Spoonacular API raw data and inserts into Supabase recipes table
+ -------------------------------------------------------------*/
 
 const supabaseServer = require("../../services/supabaseClient");
 const fs = require("fs");
 const path = require("path");
 
-// 1. READ DATA FROM EXTERNAL FILE
-const filePath = path.join(__dirname, "recipes_data.json");
-const fileContent = fs.readFileSync(filePath, "utf8");
-const rawData = JSON.parse(fileContent);
+// Load all JSON data files
+const recipesData = require("./recipes_data.json");
+const ketogenicData = require("./keto_data.json");
+const paleoPaleo30Data = require("./paleo_whole30_data.json");
+const plantBasedAllergenFreeData = require("./plantBased_allergenFree_data.json");
+
+// Combine all data into one array
+const rawData = {
+  results: [
+    ...recipesData.results,
+    ...ketogenicData.results,
+    ...paleoPaleo30Data.results,
+    ...plantBasedAllergenFreeData.results,
+  ],
+};
 
 // Pointing specifically to the results array
-const spoonacularData = rawData.results || rawData[0].results;
+const spoonacularData = rawData.results;
 
-/** * Clean standard text (titles, ingredients)
- */
+// Clean and format text (REMOVE HTML TAGS, EMOJIS, EXTRA SPACES)
 function cleanText(str) {
   if (!str) return "";
   return str
@@ -26,8 +35,7 @@ function cleanText(str) {
     .trim();
 }
 
-/** * Clean and format instructions (PRESERVE NEWLINES)
- */
+// Clean procedure text specifically (remain newlines for readability of procedure/instructions)
 function cleanProcedure(str) {
   if (!str) return "";
   return str
@@ -36,11 +44,13 @@ function cleanProcedure(str) {
     .trim();
 }
 
-/**
- * Maps Spoonacular JSON to your Supabase schema
- */
+
+ /*-------------------------------------------------------------
+    MAIN LOGIC: transform Spoonacular recipe to supabase schema
+ -------------------------------------------------------------*/
+
 function transformRecipe(r) {
-  // Extract key nutrients into a simple object
+  // Extract macronutrients only
   const nutrition = {};
   if (r.nutrition?.nutrients) {
     const targets = {
@@ -50,17 +60,22 @@ function transformRecipe(r) {
       fat: "Fat",
     };
     Object.entries(targets).forEach(([key, label]) => {
+      // Find matching nutrient and round value
       const match = r.nutrition.nutrients.find((n) => n.name === label);
       if (match) nutrition[key] = Math.round(match.amount);
     });
   }
 
   // Combine flags into dietary_tags
+  /* Spoonacular splits diet info between the 'diets' array and boolean flags.
+     We manually check flags (e.g., r.vegetarian = true) to ensure no tags are missed.*/
   const tags = r.diets ? [...r.diets] : [];
   if (r.vegetarian) tags.push("vegetarian");
   if (r.vegan) tags.push("vegan");
   if (r.glutenFree) tags.push("gluten free");
   if (r.dairyFree) tags.push("dairy free");
+  if (r.veryPopular) tags.push("popular");  
+  // Remove duplicates and capitalize first letter to match diet_type format (e.g. 'vegan' -> 'Vegan')
   const uniqueTags = [...new Set(tags)].map(
     (t) => t.charAt(0).toUpperCase() + t.slice(1)
   );
@@ -72,8 +87,8 @@ function transformRecipe(r) {
       .map((s) => `${s.number}. ${s.step}`)
       .join("\n\n"); 
   } else if (r.instructions) {
-    // If only raw instructions exist, force newlines before numbers
-    procedureText = r.instructions.replace(/(\d+\.)/g, "\n\n$1");
+    // Format numbered lists with spacing
+    procedureText = r.instructions.replace(/(\d+\.\s)/g, "\n\n$1");
   } else {
     procedureText =
       r.summary || "Instructions for this recipe are currently unavailable.";
@@ -104,9 +119,40 @@ async function insertRecipes() {
   try {
     const transformed = spoonacularData.map(transformRecipe);
 
+    // Remove duplicates by source_url (keep first occurrence)
+    const deduplicated = [];
+    const sourceUrlSet = new Set();
+    for (const recipe of transformed) {
+      if (recipe.source_url && !sourceUrlSet.has(recipe.source_url)) {
+        deduplicated.push(recipe);
+        sourceUrlSet.add(recipe.source_url);
+      } else if (!recipe.source_url) {
+        // Include recipes without source_url
+        deduplicated.push(recipe);
+      }
+    }
+
+    console.log(`Deduplicated: ${transformed.length} → ${deduplicated.length} recipes.`);
+
+    // Check for existing source_urls in database to avoid duplicates
+    const { data: existingRecipes } = await supabaseServer
+      .from("recipes")
+      .select("source_url");
+    
+    const existingSourceUrls = new Set(
+      existingRecipes?.map(r => r.source_url).filter(Boolean) || []
+    );
+
+    // Filter out recipes that already exist
+    const newRecipes = deduplicated.filter(
+      recipe => !recipe.source_url || !existingSourceUrls.has(recipe.source_url)
+    );
+
+    console.log(`After filtering existing: ${deduplicated.length} → ${newRecipes.length} new recipes.`);
+
     const { data, error } = await supabaseServer
       .from("recipes")
-      .upsert(transformed, { onConflict: 'title' })
+      .insert(newRecipes)
       .select('title');
 
     if (error) {

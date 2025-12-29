@@ -4,13 +4,9 @@ const healthDataService = require("../services/healthDataService");
 const router = express.Router();
 
 /**
- * PERSONALIZED FEED - Wellness content based on user's fitness profile
- */
-
-/**
  * GET /api/feed
  * Get personalized wellness content for a user based on their fitness profile
- * Query: userId, contentType? (recipe|article|tutorial|all)
+ * Query: userId?, contentType? (recipes|article|video|all)
  */
 router.get("/feed", async (req, res) => {
   try {
@@ -21,6 +17,7 @@ router.get("/feed", async (req, res) => {
       return res.status(400).json({ error: "User ID required" });
     }
 
+    // Ask healthDataService to go to supabase and find content based on user's fitness profile
     const result = await healthDataService.getPersonalizedFeed(
       userId,
       contentType,
@@ -36,8 +33,10 @@ router.get("/feed", async (req, res) => {
         .json({ error: result.error || "Failed to fetch personalized feed" });
     }
 
+    // Grab the list of matching content
     const resources = result.data.resources || [];
 
+    // Send the success response back to app
     res.json({
       success: true,
       userProfile: result.data.userProfile,
@@ -51,23 +50,19 @@ router.get("/feed", async (req, res) => {
 });
 
 /**
- * RECIPES - Healthy food recipes
- */
-
-/**
  * GET /api/recipes
  * Get recipes, optionally filtered by search/category
- * Query: search?, category?, dietaryRestriction?
+ * Query: search?, dietaryRestriction?
  */
 router.get("/recipes", async (req, res) => {
   try {
-    const { search, category, dietaryRestriction } = req.query;
+    const { search, dietaryRestriction } = req.query;
     const userAccessToken = req.user?.accessToken;
 
+    // Ask healthDataService to fetch recipes with filters
     const result = await healthDataService.getRecipes(
       {
         search,
-        category,
         dietaryRestriction
       },
       userAccessToken
@@ -92,7 +87,7 @@ router.get("/recipes", async (req, res) => {
  */
 router.get("/recipes/:recipeId", async (req, res) => {
   try {
-    const { recipeId } = req.params;
+    const { recipeId } = req.params;  // grab the recipeId from the URL path
     const userAccessToken = req.user?.accessToken;
 
     const result = await healthDataService.getRecipeById(recipeId, userAccessToken);
@@ -107,7 +102,7 @@ router.get("/recipes/:recipeId", async (req, res) => {
         .json({ error: result.error || "Recipe not found" });
     }
 
-    res.json({ success: true, recipe: result.data });
+    res.json({ success: true, recipe: result.data }); // return full formatted recipe details
   } catch (err) {
     console.error("Get recipe details error:", err);
     res.status(500).json({ error: "Failed to fetch recipe details" });
@@ -115,7 +110,7 @@ router.get("/recipes/:recipeId", async (req, res) => {
 });
 
 /**
- * WELLNESS RESOURCES - Articles, tutorials, guides
+ * WELLNESS RESOURCES - Articles, tutorials
  */
 
 /**

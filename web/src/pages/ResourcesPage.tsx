@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getRecipes, getResources } from "../services/healthApi";
+import { getPersonalizedFeed } from "../services/healthApi";
+import { useUser } from "../contexts/UserContext";
 
 type Category = "Articles" | "Recipes" | "Tutorials";
 
@@ -21,6 +22,7 @@ type ResourceItem = {
   isRecipe?: boolean;
   image_url?: string;
   dietary_tags?: string[];
+  category_tags?: string[];
 };
 
 type RecipeResponse = {
@@ -56,6 +58,8 @@ export default function ResourcesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const { me } = useUser();
+  const userId = me?.user?.user_id || "";
 
   // Map URL category to Category type
   const getCategoryFromUrl = (urlCategory?: string): Category => {
@@ -79,11 +83,20 @@ export default function ResourcesPage() {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
+
       try {
-        // Fetch recipes
-        const recipesRes = await getRecipes();
-        const recipesData: ResourceItem[] =
-          (recipesRes.recipes as RecipeResponse[])?.map((recipe) => ({
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch personalized feed (recipes + wellness resources)
+        const feed = await getPersonalizedFeed(userId, "all");
+        const feedResources = (feed.resources as any[]) || [];
+
+        const recipeItems: ResourceItem[] = feedResources
+          .filter((item) => "recipe_id" in item)
+          .map((recipe: RecipeResponse) => ({
             id: recipe.recipe_id,
             title: recipe.title,
             summary:
@@ -100,42 +113,46 @@ export default function ResourcesPage() {
             image_url: recipe.image_url,
             dietary_tags: recipe.dietary_tags || [],
             isRecipe: true,
-          })) || [];
-        setRecipes(recipesData);
+          }));
 
-        // Fetch articles - filters wellness_resources where type contains "Article"
-        const articlesRes = await getResources(null, null, "Article");
-        const articlesData: ResourceItem[] =
-          (articlesRes.resources as WellnessResourceResponse[])?.map(
-            (resource) => ({
-              id: resource.resource_id,
-              title: resource.title,
-              summary:
-                resource.description || "Read this article to learn more",
-              badge: "Article",
-              link: resource.source_url,
-              content: resource.description,
-              isRecipe: false,
-            })
-          ) || [];
+        const wellnessItems = feedResources.filter(
+          (item) => "resource_id" in item || (item as any).type
+        ) as WellnessResourceResponse[];
+
+        const articlesData: ResourceItem[] = wellnessItems
+          .filter((resource) =>
+            (resource.type || "").toLowerCase().includes("article")
+          )
+          .map((resource) => ({
+            id: resource.resource_id,
+            title: resource.title,
+            summary: resource.description || "Read this article to learn more",
+            badge: "Article",
+            link: resource.source_url,
+            content: resource.description,
+            isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
+          }));
+
+        const tutorialsData: ResourceItem[] = wellnessItems
+          .filter((resource) => {
+            const type = (resource.type || "").toLowerCase();
+            return type.includes("video");
+          })
+          .map((resource) => ({
+            id: resource.resource_id,
+            title: resource.title,
+            summary:
+              resource.description || "Watch this tutorial to learn more",
+            badge: "Tutorial",
+            link: resource.source_url,
+            content: resource.description,
+            isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
+          }));
+
+        setRecipes(recipeItems);
         setArticles(articlesData);
-
-        // Fetch tutorials - filters wellness_resources where type contains "Video"
-        // The backend uses ilike('%Video%') for case-insensitive partial matching
-        const tutorialsRes = await getResources(null, null, "Video");
-        const tutorialsData: ResourceItem[] =
-          (tutorialsRes.resources as WellnessResourceResponse[])?.map(
-            (resource) => ({
-              id: resource.resource_id,
-              title: resource.title,
-              summary:
-                resource.description || "Watch this tutorial to learn more",
-              badge: "Tutorial",
-              link: resource.source_url,
-              content: resource.description,
-              isRecipe: false,
-            })
-          ) || [];
         setTutorials(tutorialsData);
       } catch (err) {
         console.error("Failed to fetch resources:", err);
@@ -146,7 +163,7 @@ export default function ResourcesPage() {
     };
 
     fetchData();
-  }, []);
+  }, [userId]);
 
   // Update URL when category changes
   const handleCategoryChange = (newCategory: Category) => {
@@ -298,13 +315,13 @@ export default function ResourcesPage() {
     );
   }
 
-  // Get all unique tags from recipes (case-insensitive)
+  // Get all unique tags (category_tags + dietary_tags) for the active tab
   const allTags = useMemo(() => {
     const normalizedToOriginal = new Map<string, string>();
-    recipes.forEach((recipe) => {
-      recipe.dietary_tags?.forEach((tag) => {
+    RESOURCES[activeTab].forEach((item) => {
+      const tags = [...(item.category_tags || []), ...(item.dietary_tags || [])];
+      tags.forEach((tag) => {
         const normalized = tag.toLowerCase();
-        // Keep the first occurrence of each normalized tag
         if (!normalizedToOriginal.has(normalized)) {
           normalizedToOriginal.set(normalized, tag);
         } else {
@@ -319,7 +336,7 @@ export default function ResourcesPage() {
       });
     });
     return Array.from(normalizedToOriginal.values()).sort();
-  }, [recipes]);
+  }, [RESOURCES, activeTab]);
 
   const filteredItems = useMemo(() => {
     let items = RESOURCES[activeTab];
@@ -333,15 +350,18 @@ export default function ResourcesPage() {
       );
     }
 
-    // Apply tag filter
-    if (activeTab === "Recipes" && selectedTags.length > 0) {
+    // Apply tag filter (category_tags + dietary_tags)
+    if (selectedTags.length > 0) {
       items = items.filter((item) => {
-        if (!item.dietary_tags || item.dietary_tags.length === 0) return false;
-        const itemTagsNormalized = item.dietary_tags.map((tag) =>
-          tag.toLowerCase()
-        );
+        const itemTags = [
+          ...(item.category_tags || []),
+          ...(item.dietary_tags || []),
+        ].map((tag) => tag.toLowerCase());
+
+        if (itemTags.length === 0) return false;
+
         return selectedTags.every((selectedTag) =>
-          itemTagsNormalized.includes(selectedTag.toLowerCase())
+          itemTags.includes(selectedTag.toLowerCase())
         );
       });
     }
@@ -361,11 +381,9 @@ export default function ResourcesPage() {
     setCurrentPage(1);
   }, [activeTab, searchQuery, selectedTags]);
 
-  // Clear tag filters when switching away from Recipes tab
+  // Reset tags when switching categories to avoid stale filters
   useEffect(() => {
-    if (activeTab !== "Recipes") {
-      setSelectedTags([]);
-    }
+    setSelectedTags([]);
   }, [activeTab]);
 
   return (
@@ -400,8 +418,8 @@ export default function ResourcesPage() {
                   </svg>
                 </div>
 
-                {/* Tag Filter */}
-                {activeTab === "Recipes" && allTags.length > 0 && (
+                {/* Tag Filter (category + dietary) */}
+                {allTags.length > 0 && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-2">
                       Filter by Tags
@@ -424,7 +442,6 @@ export default function ResourcesPage() {
                                   )
                                 );
                               } else {
-                                // Check if a case variant is already selected
                                 const hasVariant = selectedTags.some(
                                   (t) => t.toLowerCase() === tagNormalized
                                 );
@@ -432,7 +449,7 @@ export default function ResourcesPage() {
                                   setSelectedTags([...selectedTags, tag]);
                                 }
                               }
-                              setCurrentPage(1); // Reset to first page when filter changes
+                              setCurrentPage(1);
                             }}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                               isSelected
