@@ -32,6 +32,7 @@ app.use('/api', supabaseAuth, ptfRoutes);
 
 // Health & Meal/Workout Tracking APIs (CRM)
 app.use('/api', supabaseAuth, crmRoutes);
+// app.use('/api', crmRoutes); // debug without auth
 
 // User & Data Management APIs (auth-required)
 app.use('/api', supabaseAuth, udmRoutes);

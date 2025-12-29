@@ -1,10 +1,5 @@
 const supabaseServer = require("./supabaseClient");
 
-/**
- * CRM Data Service - Recipes and Wellness Resources
- * Handles database operations for content and recipes module
- */
-
 // Utility to project recipe fields from current schema
 function mapRecipeRow(row) {
   const nutrition = row.nutrition_info || {};
@@ -132,13 +127,16 @@ async function getResourceById(resourceId, userAccessToken = null) {
 /**
  * Get personalized content feed based on user's fitness profile
  */
-async function getPersonalizedFeed(userId, contentType = "all", userAccessToken = null) {
+async function getPersonalizedFeed(
+  userId,
+  contentType = "all",
+  userAccessToken = null
+) {
   try {
     const client = userAccessToken
       ? supabaseServer.createUserSupabaseClient(userAccessToken)
       : supabaseServer;
 
-    // Get user profile
     const { data: userProfile, error: profileError } = await client
       .from("user_profiles")
       .select("*")
@@ -147,31 +145,82 @@ async function getPersonalizedFeed(userId, contentType = "all", userAccessToken 
 
     if (profileError) throw profileError;
 
-    // Build query based on user's fitness goals
-    let query = client.from("wellness_resources").select("*");
+    let finalResources = [];
+    // Normalize type for consistent checking
+    const type = contentType.toLowerCase();
 
-    if (contentType !== "all") {
-      query = query.ilike("type", contentType);
+    // --- 1. RECIPES BLOCK ---
+    if (type === "recipes" || type === "all") {
+      let query = client.from("recipes").select("*");
+
+      if (userProfile.diet_type && userProfile.diet_type !== "Balanced") {
+        const dietArray = userProfile.diet_type
+          .split(",")
+          .map((item) => item.trim());
+        query = query.overlaps("dietary_tags", dietArray);
+      }
+
+      let { data: recipeData, error: recipeError } = await query;
+      if (recipeError) throw recipeError;
+
+      if (!recipeData || recipeData.length === 0) {
+        const { data: fallback } = await client
+          .from("recipes")
+          .select("*")
+          .limit(10);
+        recipeData = fallback || [];
+      }
+
+      const mappedRecipes = recipeData.map(mapRecipeRow);
+      finalResources = [...finalResources, ...mappedRecipes];
     }
 
-    // Optional: filter by category_tags matching fitness_goal, if present
-    if (userProfile.fitness_goal) {
-      query = query.contains("category_tags", [userProfile.fitness_goal]);
+    // --- 2. WELLNESS BLOCK ---
+    if (type !== "recipes") {
+      let query = client.from("wellness_resources").select("*");
+
+      if (type !== "all") {
+        const singleType = type.replace(/s$/, "");
+        const capType =
+          singleType.charAt(0).toUpperCase() + singleType.slice(1);
+        query = query.eq("type", capType);
+      }
+
+      if (userProfile.goals) {
+        const formattedGoal = userProfile.goals
+          .split(" ")
+          .map(
+            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          )
+          .join(" ");
+        query = query.contains("category_tags", [formattedGoal]);
+      }
+
+      let { data: wellnessData, error: wellnessError } = await query;
+      if (wellnessError) throw wellnessError;
+
+      if (!wellnessData || wellnessData.length === 0) {
+        const { data: fallbackW } = await client
+          .from("wellness_resources")
+          .select("*")
+          .limit(10);
+        wellnessData = fallbackW || [];
+      }
+
+      finalResources = [...finalResources, ...wellnessData];
     }
 
-    const { data, error } = await query;
-
-    if (error) throw error;
-
+    // --- 3. RETURN BLOCK (Outside the IFs) ---
     return {
       success: true,
       data: {
         userProfile: {
-          fitness_goal: userProfile.fitness_goal,
-          dietary_preferences: userProfile.dietary_preferences
+          goals: userProfile.goals,
+          diet_type: userProfile.diet_type,
         },
-        resources: data
-      }
+        contentCount: finalResources.length,
+        resources: finalResources, // Changed from 'resources' to 'finalResources'
+      },
     };
   } catch (err) {
     console.error("Get personalized feed error:", err);
@@ -184,5 +233,5 @@ module.exports = {
   getRecipeById,
   getWellnessResources,
   getResourceById,
-  getPersonalizedFeed
+  getPersonalizedFeed,
 };

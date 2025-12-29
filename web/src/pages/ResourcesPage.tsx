@@ -22,6 +22,7 @@ type ResourceItem = {
   isRecipe?: boolean;
   image_url?: string;
   dietary_tags?: string[];
+  category_tags?: string[];
 };
 
 type RecipeResponse = {
@@ -130,12 +131,13 @@ export default function ResourcesPage() {
             link: resource.source_url,
             content: resource.description,
             isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
           }));
 
         const tutorialsData: ResourceItem[] = wellnessItems
           .filter((resource) => {
             const type = (resource.type || "").toLowerCase();
-            return type.includes("video") || type.includes("tutorial");
+            return type.includes("video");
           })
           .map((resource) => ({
             id: resource.resource_id,
@@ -146,6 +148,7 @@ export default function ResourcesPage() {
             link: resource.source_url,
             content: resource.description,
             isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
           }));
 
         setRecipes(recipeItems);
@@ -312,13 +315,13 @@ export default function ResourcesPage() {
     );
   }
 
-  // Get all unique tags from recipes (case-insensitive)
+  // Get all unique tags (category_tags + dietary_tags) for the active tab
   const allTags = useMemo(() => {
     const normalizedToOriginal = new Map<string, string>();
-    recipes.forEach((recipe) => {
-      recipe.dietary_tags?.forEach((tag) => {
+    RESOURCES[activeTab].forEach((item) => {
+      const tags = [...(item.category_tags || []), ...(item.dietary_tags || [])];
+      tags.forEach((tag) => {
         const normalized = tag.toLowerCase();
-        // Keep the first occurrence of each normalized tag
         if (!normalizedToOriginal.has(normalized)) {
           normalizedToOriginal.set(normalized, tag);
         } else {
@@ -333,7 +336,7 @@ export default function ResourcesPage() {
       });
     });
     return Array.from(normalizedToOriginal.values()).sort();
-  }, [recipes]);
+  }, [RESOURCES, activeTab]);
 
   const filteredItems = useMemo(() => {
     let items = RESOURCES[activeTab];
@@ -347,15 +350,18 @@ export default function ResourcesPage() {
       );
     }
 
-    // Apply tag filter
-    if (activeTab === "Recipes" && selectedTags.length > 0) {
+    // Apply tag filter (category_tags + dietary_tags)
+    if (selectedTags.length > 0) {
       items = items.filter((item) => {
-        if (!item.dietary_tags || item.dietary_tags.length === 0) return false;
-        const itemTagsNormalized = item.dietary_tags.map((tag) =>
-          tag.toLowerCase()
-        );
+        const itemTags = [
+          ...(item.category_tags || []),
+          ...(item.dietary_tags || []),
+        ].map((tag) => tag.toLowerCase());
+
+        if (itemTags.length === 0) return false;
+
         return selectedTags.every((selectedTag) =>
-          itemTagsNormalized.includes(selectedTag.toLowerCase())
+          itemTags.includes(selectedTag.toLowerCase())
         );
       });
     }
@@ -375,11 +381,9 @@ export default function ResourcesPage() {
     setCurrentPage(1);
   }, [activeTab, searchQuery, selectedTags]);
 
-  // Clear tag filters when switching away from Recipes tab
+  // Reset tags when switching categories to avoid stale filters
   useEffect(() => {
-    if (activeTab !== "Recipes") {
-      setSelectedTags([]);
-    }
+    setSelectedTags([]);
   }, [activeTab]);
 
   return (
@@ -414,8 +418,8 @@ export default function ResourcesPage() {
                   </svg>
                 </div>
 
-                {/* Tag Filter */}
-                {activeTab === "Recipes" && allTags.length > 0 && (
+                {/* Tag Filter (category + dietary) */}
+                {allTags.length > 0 && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-2">
                       Filter by Tags
@@ -438,7 +442,6 @@ export default function ResourcesPage() {
                                   )
                                 );
                               } else {
-                                // Check if a case variant is already selected
                                 const hasVariant = selectedTags.some(
                                   (t) => t.toLowerCase() === tagNormalized
                                 );
@@ -446,7 +449,7 @@ export default function ResourcesPage() {
                                   setSelectedTags([...selectedTags, tag]);
                                 }
                               }
-                              setCurrentPage(1); // Reset to first page when filter changes
+                              setCurrentPage(1);
                             }}
                             className={`px-3 py-1.5 rounded-md text-xs font-medium transition ${
                               isSelected
