@@ -199,9 +199,21 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         if (goal === "Muscle Gain") {
           return meal.protein >= 25;
         }
-        if (goal === "Fat Loss") {
+        if (goal === "Weight Loss") {
           return meal.calories <= 600 && meal.fat <= 20;
         }
+        if (goal === "Strength") {
+          return meal.protein >= 20 && meal.carbs >= 30;
+        }
+        if (goal === "Endurance") {
+          return meal.carbs >= 40;
+        }
+        if (goal === "Flexibility") {
+          return meal.fat <= 25;
+        }
+        if (goal === "General Health") {
+          return meal.calories >= 300 && meal.calories <= 700;
+        }        
         if (goal === "Maintenance") {
           return meal.calories >= 400 && meal.calories <= 700;
         }
@@ -294,7 +306,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       };
     });
 
-    filteredMealsFromMealLibrary = parsedMeals
+    let filteredMealsFromMealLibrary = parsedMeals
 
       // diet type
       .filter(meal => matchesDietType(meal.dietary_tags, userPreferences.diet_type))
@@ -305,21 +317,21 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       // goals
       .filter(meal => matchesGoals(meal, goalsArray));
 
-    // if (!filteredMealsFromMealLibrary.length) {
-    //   conversationState.set(user_id, {
-    //       state: "IDLE",
-    //       type: "MEAL",
-    //   });
+      if (!filteredMealsFromMealLibrary.length) {
+        conversationState.set(user_id, {
+            state: "IDLE",
+            type: "MEAL",
+        });
 
-    //   const prompt = `You are a friendly fitness assistant chatbot.
-    //     Context:
-    //     The user requested a meal recommendation, but no suitable meals match the criteria.
+        const prompt = `You are a friendly fitness assistant chatbot.
+          Context:
+          The user requested a meal recommendation, but no suitable meals match the criteria.
 
-    //     Meal time: ${mealTime || "any"}`;
+          Meal time: ${mealTime || "any"}`;
 
-    //   const gResponse = await queryGemini(prompt);
-    //   return { reply: gResponse };
-    // }     
+        const gResponse = await queryGemini(prompt);
+        return { reply: gResponse };
+      }     
 
     console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
