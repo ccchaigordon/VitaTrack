@@ -1,11 +1,17 @@
 function cleanLLMJSON(text) {
-  // Remove ```json or ``` and extra whitespace
-  let cleaned = text
-    .replace(/```json/g, "")
-    .replace(/```/g, "")
-    .trim();
+  // Ensure text is a string
+  if (typeof text !== "string") {
+    if (Array.isArray(text)) {
+      text = text.join("\n");
+    } else {
+      text = String(text);
+    }
+  }
 
-  return cleaned;
+  // Remove markdown ```json blocks
+  text = text.replace(/```json/g, "").replace(/```/g, "").trim();
+
+  return text;
 }
 
 module.exports = cleanLLMJSON;

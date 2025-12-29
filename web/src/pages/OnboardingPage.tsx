@@ -55,15 +55,17 @@ const ACTIVITY_LEVELS = [
 ];
 
 const DIET_TYPES = [
-  "Balanced",
+  "Gluten free",
+  "Ketogenic",
   "Vegetarian",
+  "Lacto-Vegetarian",
+  "Ovo-Vegetarian",
   "Vegan",
-  "Keto",
+  "Pescetarian",
   "Paleo",
-  "Mediterranean",
-  "Low Carb",
-  "High Protein",
-  "Other",
+  "Primal",
+  "Low FODMAP",
+  "Whole30"
 ];
 
 const WORKOUT_DAYS = ["0", "1", "2", "3", "4", "5", "6", "7"];

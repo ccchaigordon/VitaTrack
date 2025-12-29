@@ -47,11 +47,13 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
       
       console.log("Extraction result:", extraction);
 
-      let mealData;
+      let mealDataParsed = [];
 
       try {
-        mealData = cleanLLMJSON(extraction);      
-        console.log("Cleaned meal data:", mealData);
+        const combinedTextArray = JSON.parse(cleanLLMJSON(extraction.responseForCombinedText) || "[]");
+        const combinedImageArray = JSON.parse(cleanLLMJSON(extraction.responseForImages) || "[]");
+        mealDataParsed = [...combinedTextArray, ...combinedImageArray];     
+        console.log("Cleaned meal data:", mealDataParsed);
       } catch (err) {
         console.error("JSON parse error:", err);
         return {
@@ -109,21 +111,6 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
           throw new Error(`Nutrition lookup failed for ${foodDescription}`);
         }
           
-      }
-
-      let mealDataParsed;
-
-      try {
-        mealDataParsed = typeof mealData === "string" ? JSON.parse(mealData) : mealData;
-      } catch (err) {
-        console.error("Failed to parse mealData:", err);
-        return {
-          reply: await explainErrorWithGemini({
-            errorType: "MEAL_DATA_FORMAT_ERROR",
-            userMessage: message,
-            technicalMessage: err.message
-          })
-        };
       }
 
       for(const meal of mealDataParsed) {
@@ -209,7 +196,7 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
         The user is logging meal.
 
         Meal details:
-        - ${mealData}
+        - ${mealDataParsed}
 
         Task:
         Write a short, friendly response. Can use emojis naturally.
