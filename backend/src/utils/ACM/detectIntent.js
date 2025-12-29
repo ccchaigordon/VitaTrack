@@ -40,7 +40,7 @@ async function detectIntent(text, state, conversationContext = '') {
       - chat: General conversation, questions, advice requests, or unclear intent (e.g., "how can I...", "what is...", "tell me about...")
     
     IMPORTANT: 
-    - If the user mentions any fitness, nutrition, or wellness goals (e.g., "I want to bulk up", "I want to lose weight", "I aim to gain muscle"), include it as "goal". If no goal is mentioned, use an empty string "".
+    - If the user mentions any fitness, nutrition, or wellness goals (e.g., "I want to bulk up", "I want to lose weight", "I aim to gain muscle"), include it as "goal". If no goal is mentioned, use an empty string "". You can return the goal as a single phrase. (e.g., "I want to lose weight", "Bulking up is my main goal", "My goal is to improve cardio fitness")
     - If the user is asking a question, seeking advice, or having a general conversation, use "chat"
     - Only use log_meal or log_workout if the user explicitly states they want to LOG something they already did
     - Only use recommendation_* if the user explicitly asks for recommendations/suggestions

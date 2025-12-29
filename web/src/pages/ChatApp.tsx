@@ -170,7 +170,7 @@ function ChatBubble({
                   text,
                   () => onTypingEnd?.(), // callback after typing finishes
                 ]}
-                speed={70}
+                speed={80}
                 cursor={false}
                 wrapper="div"
               />
