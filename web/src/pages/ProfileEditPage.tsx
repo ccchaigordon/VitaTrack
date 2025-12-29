@@ -23,16 +23,17 @@ function normalizeActivityLevel(value: string | null | undefined): string {
 }
 
 const DIET_TYPES = [
-  "Balanced",
+  "Gluten free",
+  "Ketogenic",
   "Vegetarian",
+  "Lacto-Vegetarian",
+  "Ovo-Vegetarian",
   "Vegan",
-  "Keto",
+  "Pescetarian",
   "Paleo",
-  "Mediterranean",
-  "Low Carb",
-  "High Protein",
-  "Gluten-Free",
-  "Dairy-Free",
+  "Primal",
+  "Low FODMAP",
+  "Whole30"
 ];
 
 const COUNTRIES = [
