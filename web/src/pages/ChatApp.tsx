@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { useUser } from "../contexts/UserContext";
 import ReactMarkdown from "react-markdown";
+import { TypeAnimation } from "react-type-animation";
 
 type Message = {
   role: "user" | "assistant";
@@ -11,12 +12,14 @@ type Message = {
   files?: FileItem[]; // For loaded messages from backend
   file_name?: string;
   file_url?: string;
+  msg_id?: string;
+  isTyping?: boolean;
 };
 
 type TimelineItem = {
   created_at: string;
   file_name: string | null;
-  file_url: string | null;
+  file_url: string | null;  
   message: string | null;
   msg_id: string;
   role: "user" | "ai";
@@ -26,6 +29,20 @@ type FileItem = {
   file_url: string;
   file_name: string;
 };
+
+export function TypingIndicator() {
+  return (
+    <div className="flex gap-1">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="w-1.5 h-1.5 bg-[#2A4A2D] rounded-full animate-bounce"
+          style={{ animationDelay: `${i * 150}ms` }}
+        />
+      ))}
+    </div>
+  );
+}
 
 const normalizeMessageText = (message: unknown): string => {
   if (typeof message === "string") {
@@ -59,10 +76,14 @@ function ChatBubble({
   role,
   text,
   files,
+  isTyping,
+  onTypingEnd,
 }: {
   role: "user" | "assistant";
   text: string;
   files: FileItem[];
+  isTyping?: boolean;
+  onTypingEnd?: () => void;
 }) {
   const isUser = role === "user";
   const { me } = useUser();
@@ -141,6 +162,18 @@ function ChatBubble({
           >
             {isUser ? (
               text
+            ) : text === "..." ? (
+              <TypingIndicator />
+            ) : isTyping ? (
+              <TypeAnimation
+                sequence={[
+                  text,
+                  () => onTypingEnd?.(), // callback after typing finishes
+                ]}
+                speed={70}
+                cursor={false}
+                wrapper="div"
+              />
             ) : (
               <ReactMarkdown
                 components={{
@@ -449,6 +482,15 @@ export function ChatApp() {
 
     console.log("Active Chat ID:", activeChatId);
 
+    const typingMessageId = Date.now().toString() + "-typing"; // unique id
+    const typingMessage: Message = {
+      role: "assistant",
+      text: "...",
+      file: [],
+      msg_id: typingMessageId
+    };
+    setMessages((prev) => [...prev, typingMessage]);
+
     const formData = new FormData();
     formData.append("message", messageText);
     formData.append("chat_id", activeChatId ?? "");
@@ -489,20 +531,22 @@ export function ChatApp() {
         }
       });
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", text: data.reply, file: [] },
-      ]);
+      setMessages((prev) =>
+      prev.map((msg) =>
+        msg.msg_id === typingMessageId
+          ? { ...msg, text: data.reply, isTyping: true }
+          : msg
+      )
+    );
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Error: failed to contact server.",
-          file: [],
-        },
-      ]);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.msg_id === typingMessageId
+            ? { ...msg, text: "Error: failed to contact server.", isTyping: true }
+            : msg
+        )
+      );
     }
   };
 
@@ -730,6 +774,16 @@ export function ChatApp() {
                       file_url: URL.createObjectURL(f),
                     })) || []), // newly uploaded
                   ]}
+                  isTyping={msg.isTyping}
+                  onTypingEnd={() => {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.msg_id === msg.msg_id
+                          ? { ...m, isTyping: false }
+                          : m
+                      )
+                    );
+                  }}
                 />
               ))}
               <div ref={messagesEndRef} />
