@@ -6,7 +6,7 @@ create table if not exists public.wellness_resources (
   type text, -- e.g., 'Article', 'Video'
   source_url text not null,
   description text,
-  category_tags text[] default '{}', -- e.g., {'Weight Loss', 'Yoga'}
+  category_tags text[] default '{}', 
 
   constraint fk_resources_user
     foreign key (user_id)
