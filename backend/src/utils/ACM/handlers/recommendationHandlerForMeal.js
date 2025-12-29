@@ -1,9 +1,105 @@
 const tf = require('@tensorflow/tfjs');
 const extractMealTime = require('../Extraction/extractMealTime');
 const { queryGemini } = require('../../../services/geminiClient');
+const detectUserGoalRuleBased = require('../Extraction/extractGoalRuleBased');
+const extractUserGoal = require('../Extraction/extractUserGoal');
 
 async function recommendationHandlerForMeal(message, user_id, conversationState, supabase) {
     let mealTime = "";
+    let userGoal = "";
+    const allergenAliases = {
+      dairy: [
+        "milk", "cream", "cheese", "butter", "yogurt",
+        "whey", "casein", "lactose", "cream cheese",
+        "ice cream", "sour cream"
+      ],
+
+      gluten: [
+        "wheat", "flour", "bread", "pasta", "noodles",
+        "barley", "rye", "malt", "semolina", "couscous"
+      ],
+
+      egg: [
+        "egg", "eggs", "egg white", "egg yolk", "mayonnaise"
+      ],
+
+      peanut: [
+        "peanut", "peanuts", "groundnut", "peanut butter"
+      ],
+
+      tree_nut: [
+        "almond", "cashew", "walnut", "pecan", "hazelnut",
+        "pistachio", "macadamia", "brazil nut"
+      ],
+
+      soy: [
+        "soy", "soya", "soybean", "tofu",
+        "soy sauce", "miso", "edamame"
+      ],
+
+      shellfish: [
+        "shrimp", "prawn", "crab", "lobster", "crawfish"
+      ],
+
+      fish: [
+        "fish", "salmon", "tuna", "cod", "anchovy"
+      ],
+
+      sesame: [
+        "sesame", "tahini", "sesame oil", "sesame seed"
+      ]
+    };
+
+    const { data: p } = await supabase
+        .from("user_profiles")
+        .select("diet_type, allergies")
+        .eq("user_id", user_id)
+        .single();
+    
+    const { diet_type, allergies } = p;
+
+    const userPreferences = {
+      diet_type,
+      allergies
+    };    
+
+    // Try rule-based detection from message
+    userGoal = detectUserGoalRuleBased(message);
+
+    // If still unknown, try user profile
+    if (!userGoal || userGoal === "Unknown") {
+        const { data: userProfile } = await supabase
+            .from("user_profiles")
+            .select("goals")
+            .eq("user_id", user_id)
+            .single();
+    
+        userGoal = detectUserGoalRuleBased(userProfile?.goals);
+    }
+
+    // LAST RESORT: Gemini
+    if (!userGoal || userGoal === "Unknown") {
+        userGoal = await extractUserGoal(message);
+
+        if (userGoal === "Unknown") {
+            const { data: userProfile } = await supabase
+            .from("user_profiles")
+            .select("goals")
+            .eq("user_id", user_id)
+            .single();  
+
+            userGoal = await extractUserGoal(userProfile?.goals);
+        }
+    }
+
+    // Fallback safety
+    if (!userGoal) {
+        userGoal = "General Health";
+    }
+
+    // append inferred goal to preferences
+    userPreferences.goal = userGoal;
+    console.log("Inferred user goal for recommendation:", userGoal);
 
     mealTime = extractMealTime(message);
     console.log("Inferred meal time for recommendation:", mealTime);
@@ -15,10 +111,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       .select("*")
       .eq("user_id", user_id);
 
-    //console.log("Fetched Meals:", meals);
-
     if (error || !meals.length) {
-
       conversationState.set(user_id, {
           state: "IDLE",
           type: "MEAL",
@@ -37,45 +130,95 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return { reply: gResponse };
     }
 
-    // Filter by rules based on meal time
-    function filterMealsByTime(meals, mealTime) {
-      if (mealTime === "breakfast") {
-        return meals.filter(m => m.calories >= 300 && m.calories <= 550);
+    console.log("User profile preferences:", userPreferences);
+
+    function normalizeAllergies(allergies) {
+      if (!allergies) return [];
+
+      // If string input
+      if (typeof allergies === "string") {
+        const val = allergies.trim().toLowerCase();
+        if (val === "none" || val === "-" || val === "n/a") return [];
+        return [allergies];
       }
-      if (mealTime === "lunch") {
-        return meals.filter(m => m.calories >= 500 && m.calories <= 750);
+
+      // If array input
+      if (Array.isArray(allergies)) {
+        return allergies
+          .map(a => String(a).trim())
+          .filter(a => {
+            const v = a.toLowerCase();
+            return v && v !== "none" && v !== "-" && v !== "n/a";
+          });
       }
-      if (mealTime === "dinner") {
-        return meals.filter(m => m.calories >= 500 && m.calories <= 800);
-      }
-      return meals;
+
+      return [];
     }
 
-    function filterMealsByTime_Calories(meals, mealTime) {
+    const normalizedAllergies = normalizeAllergies(userPreferences.allergies);
+
+    const goalsArray = Array.isArray(userPreferences.goal)
+      ? userPreferences.goal
+      : [userPreferences.goal];
+
+    function containsAllergen(ingredients, allergies = []) {
+      if (!ingredients || !allergies.length) return false;
+
+      const text = Array.isArray(ingredients)
+        ? ingredients.join(" ").toLowerCase()
+        : ingredients.toLowerCase();
+
+      return allergies.some(allergy => {
+        const key = allergy.toLowerCase().replace(/\s+/g, "_");
+
+        const aliases = allergenAliases[key] || [key];
+
+        return aliases.some(alias => text.includes(alias));
+      });
+    }
+
+    function matchesDietType(dietaryTags, dietTypeText) {
+      if (!dietTypeText) return true;
+      if (!dietaryTags) return false;
+
+      // Split user input into individual diet types, trim and normalize
+      const userDietTypes = dietTypeText.split(",").map(d => d.trim().toLowerCase());
+
+      // Normalize meal dietary tags
+      const mealTags = dietaryTags.map(t => t.trim().toLowerCase());
+
+      // Return true if **all** user diet types are in the meal tags
+      return userDietTypes.every(tag => mealTags.includes(tag));
+    }
+
+    function matchesGoals(meal, goals = []) {
+      if (!goals.length) return true;
+
+      // Simple macro-based rules (adjust later)
+      return goals.every(goal => {
+        if (goal === "Muscle Gain") {
+          return meal.protein >= 25;
+        }
+        if (goal === "Fat Loss") {
+          return meal.calories <= 600 && meal.fat <= 20;
+        }
+        if (goal === "Maintenance") {
+          return meal.calories >= 400 && meal.calories <= 700;
+        }
+        return true;
+      });
+    }
+
+    // Filter by rules 
+    function filterMealsByTime(meals, mealTime) {
       if (!mealTime) return meals;
 
-      let min = 0;
-      let max = Infinity;
-
-      if (mealTime === "breakfast") {
-        min = 300;
-        max = 550;
-      } else if (mealTime === "lunch") {
-        min = 500;
-        max = 750;
-      } else if (mealTime === "dinner") {
-        min = 500;
-        max = 800;
-      }
-
       return meals.filter(m =>
-        m.meal_time === mealTime &&
-        m.calories >= min &&
-        m.calories <= max
+        m.meal_time === mealTime
       );
     }
 
-    const filteredMealsFromMealLogs = filterMealsByTime_Calories(meals, mealTime);
+    const filteredMealsFromMealLogs = filterMealsByTime(meals, mealTime);
 
     if (!filteredMealsFromMealLogs.length) {
 
@@ -96,8 +239,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
     }
-
-    //console.log("Filtered Meals:", filteredMealsFromMealLogs);
 
     const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
       m.calories,
@@ -129,8 +270,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return { reply: gResponse };
     }
 
-    console.log("Fetched Meal Library:", mealLibrary);
-
     function parseNutritionJSON(nutrition) {
       return {
         calories: Number(nutrition.calories) || 0,
@@ -147,32 +286,40 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         recipe_id: meal.recipe_id,
         title: meal.title,
         ingredients: meal.ingredients,
+        dietary_tags: meal.dietary_tags || [],
         procedure: meal.procedure,
         cooking_time: meal.cooking_time,
+        source_url: meal.source_url,
         ...nutrition
       };
     });
 
-    console.log("Parsed Meals from Library:", parsedMeals);
+    filteredMealsFromMealLibrary = parsedMeals
 
-    filteredMealsFromMealLibrary = filterMealsByTime(parsedMeals, mealTime);
+      // diet type
+      .filter(meal => matchesDietType(meal.dietary_tags, userPreferences.diet_type))
 
-    if (!filteredMealsFromMealLibrary.length) {
+      // allergies
+      .filter(meal => !containsAllergen(meal.ingredients, normalizedAllergies))
 
-      conversationState.set(user_id, {
-          state: "IDLE",
-          type: "MEAL",
-      });
+      // goals
+      .filter(meal => matchesGoals(meal, goalsArray));
 
-      const prompt = `You are a friendly fitness assistant chatbot.
-        Context:
-        The user requested a meal recommendation, but no suitable meals match the criteria.
+    // if (!filteredMealsFromMealLibrary.length) {
+    //   conversationState.set(user_id, {
+    //       state: "IDLE",
+    //       type: "MEAL",
+    //   });
 
-        Meal time: ${mealTime || "any"}`;
+    //   const prompt = `You are a friendly fitness assistant chatbot.
+    //     Context:
+    //     The user requested a meal recommendation, but no suitable meals match the criteria.
 
-      const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
-    }     
+    //     Meal time: ${mealTime || "any"}`;
+
+    //   const gResponse = await queryGemini(prompt);
+    //   return { reply: gResponse };
+    // }     
 
     console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
@@ -183,7 +330,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       m.fat
     ]);
 
-    console.log(vectorsFromMealLibrary);
+    //console.log(vectorsFromMealLibrary);
 
     function normalizeVector(v) {
       const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
@@ -211,7 +358,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     // Cosine similarity = dot product of normalized vectors
     const similarity = tf
       .matMul(mealTensor, refTensor.expandDims(1))
-      .squeeze();
+      .reshape([-1]);
 
     const similarityTensor = similarity;
 
@@ -227,7 +374,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       similarity: topScores[i]
     }));
 
-    console.log("Recommendations:", recommendations);
+    //console.log("Recommendations:", recommendations);
 
     tf.dispose([
       mealTensor,
@@ -271,14 +418,18 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       - Protein: ${m.protein} g
       - Carbs: ${m.carbs} g
       - Fat: ${m.fat} g
+      - Ingredients: ${m.ingredients}
+      - Procedure: ${m.procedure}
+      - Cooking time: ${m.cooking_time} minutes
+    
+      Tell the user that, for more information can browse the source link: ${m.source_url}
 
       Task:
       Write a short, friendly response:
-      - Acknowledge the choice
+      - Suggest the recommended meal details
       - Mention calories
-      - Ask if the user wants more recommendation or modify the meal
+      - Ask if the user wants more recommendation
       - Use emojis naturally
-      - Keep it under 2 sentences
       `;
     
     const gResponse = await queryGemini(prompt);
