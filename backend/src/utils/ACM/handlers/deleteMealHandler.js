@@ -18,7 +18,7 @@ function isGeminiFallback(text) {
   );
 }
 
-async function logMealHandler(message, files, conversationState, user_id, supabase) {
+async function deleteMealHandler(message, files, conversationState, user_id, supabase) {
   try {
       let combinedText = "";
       let imagesForGemini = [];
@@ -47,13 +47,11 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
       
       console.log("Extraction result:", extraction);
 
-      let mealDataParsed = [];
+      let mealData;
 
       try {
-        const combinedTextArray = JSON.parse(cleanLLMJSON(extraction.responseForCombinedText) || "[]");
-        const combinedImageArray = JSON.parse(cleanLLMJSON(extraction.responseForImages) || "[]");
-        mealDataParsed = [...combinedTextArray, ...combinedImageArray];     
-        console.log("Cleaned meal data:", mealDataParsed);
+        mealData = cleanLLMJSON(extraction);      
+        console.log("Cleaned meal data:", mealData);
       } catch (err) {
         console.error("JSON parse error:", err);
         return {
@@ -111,6 +109,21 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
           throw new Error(`Nutrition lookup failed for ${foodDescription}`);
         }
           
+      }
+
+      let mealDataParsed;
+
+      try {
+        mealDataParsed = typeof mealData === "string" ? JSON.parse(mealData) : mealData;
+      } catch (err) {
+        console.error("Failed to parse mealData:", err);
+        return {
+          reply: await explainErrorWithGemini({
+            errorType: "MEAL_DATA_FORMAT_ERROR",
+            userMessage: message,
+            technicalMessage: err.message
+          })
+        };
       }
 
       for(const meal of mealDataParsed) {
@@ -196,7 +209,7 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
         The user is logging meal.
 
         Meal details:
-        - ${mealDataParsed}
+        - ${mealData}
 
         Task:
         Write a short, friendly response. Can use emojis naturally.
@@ -226,4 +239,4 @@ async function logMealHandler(message, files, conversationState, user_id, supaba
   }
 }
 
-module.exports = logMealHandler;
+module.exports = deleteMealHandler;

@@ -16,4 +16,33 @@ async function queryGemini(prompt) {
   }
 }
 
-module.exports = { queryGemini };
+async function queryGeminiWithImages(prompt, images = []) {
+  try {
+    const parts = [
+      { text: prompt },
+      ...images.map(img => ({
+        inlineData: {
+          data: img.base64,
+          mimeType: img.mimeType
+        }
+      }))
+    ];
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          parts
+        }
+      ]
+    });
+
+    return response.text;
+  } catch (err) {
+    console.error("Gemini error with images:", err);
+    return "Oops 😅 I’m having a little trouble thinking right now. Please try again in a moment!";
+  }
+}
+
+
+module.exports = { queryGemini, queryGeminiWithImages };

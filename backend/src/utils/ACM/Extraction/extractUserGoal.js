@@ -18,6 +18,7 @@ async function extractUserGoal(message) {
     - Flexibility: User want to enhance flexibility and range of motion.
     - General Health: User want to maintain overall health and fitness.
     - Unknown: If the goal is unclear or not listed above.
+
     
     STRICT RULES:
     - Return "Unknown" if the user does NOT clearly mention a specific fitness goal.
