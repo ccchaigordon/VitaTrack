@@ -164,8 +164,23 @@ router.post("/chat", upload.any(), async (req, res) => {
   const state = conversationState.get(user.id);
 
   // Pass conversation context to intent detection for better accuracy
-  const intent = await detectIntent(message, state, conversationContext);
-  console.log("Intent:", intent);
+  const { intent, goal } = await detectIntent(message, state, conversationContext);
+  console.log("Intent, goal:", intent, goal);
+
+  // if goal is not equal to empty string, replace the existing goal in user profile
+  if (goal) {
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .update({ goals: goal })
+      .eq("user_id", user.id)
+      .select()
+      .single();
+    if (profileError) {
+      console.error("Error updating user goal in profile:", profileError);
+    } else {
+      console.log("Updated user goal in profile to:", goal);
+    }
+  }
   
   if (intent === "log_meal") {
     const response = await logMealHandler(message, files, conversationState, user.id, supabase);
@@ -495,10 +510,6 @@ router.post("/chat", upload.any(), async (req, res) => {
       chat_id: finalChatId,
       reply: gResponse,
     });
-  }
-
-  if (intent === "delete_meal_log") {
-    
   }
 
   if (intent === 'chat') {
