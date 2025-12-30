@@ -19,9 +19,7 @@ function mapRecipeRow(row) {
   };
 }
 
-/**
- * Get recipes from database (current schema fields: title, nutrition_info, procedure)
- */
+// Get recipes from database (current schema fields: title, nutrition_info, procedure)
 async function getRecipes(filters = {}, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -47,9 +45,8 @@ async function getRecipes(filters = {}, userAccessToken = null) {
   }
 }
 
-/**
- * Get single recipe by ID
- */
+
+// Get single recipe by ID
 async function getRecipeById(recipeId, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -70,9 +67,7 @@ async function getRecipeById(recipeId, userAccessToken = null) {
   }
 }
 
-/**
- * Get wellness resources from database
- */
+// Get wellness resources from database
 async function getWellnessResources(filters = {}, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -101,9 +96,7 @@ async function getWellnessResources(filters = {}, userAccessToken = null) {
   }
 }
 
-/**
- * Get single wellness resource by ID
- */
+// Get single wellness resource by ID
 async function getResourceById(resourceId, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -124,9 +117,7 @@ async function getResourceById(resourceId, userAccessToken = null) {
   }
 }
 
-/**
- * Get personalized content feed based on user's fitness profile
- */
+// Get personalized content feed based on user's fitness profile
 async function getPersonalizedFeed(
   userId,
   contentType = "all",
@@ -236,22 +227,24 @@ async function getPersonalizedFeed(
       finalResources = [...finalResources, ...mappedRecipes];
     }
 
-    // WELLNESS RESOURCES
+    // WELLNESS RESOURCES, if the type is not recipes
     if (type !== "recipes") {
       let query = client.from("wellness_resources").select("*");
 
+      // 1. Apply type filter, search by type if specified: Article, Video
       if (type !== "all") {
         const singleType = type.replace(/s$/, "");
         const capType =
           singleType.charAt(0).toUpperCase() + singleType.slice(1);
-        query = query.eq("type", capType);
+        query = query.eq("type", capType);  // Article or Video
       }
 
+      // 2. Apply goal-based filtering
       if (userProfile.goals) {
         const formattedGoal = userProfile.goals
           .split(" ")
           .map(
-            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()  // Capitalize first letter, category tags are capitalized
           )
           .join(" ");
         query = query.contains("category_tags", [formattedGoal]);
@@ -260,6 +253,7 @@ async function getPersonalizedFeed(
       let { data: wellnessData, error: wellnessError } = await query;
       if (wellnessError) throw wellnessError;
 
+      // Fallback if no wellness resources found
       if (!wellnessData || wellnessData.length === 0) {
         const { data: fallbackW } = await client
           .from("wellness_resources")
