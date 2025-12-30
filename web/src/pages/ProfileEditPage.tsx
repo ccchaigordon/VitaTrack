@@ -5,7 +5,7 @@ import { getErrorMessage } from "../utils/errors";
 import { useUser } from "../contexts/UserContext";
 import DIET_TYPES_DATA from "../data/dietTypes.json";
 
-const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
+const GENDER_OPTIONS = ["Male", "Female"];
 
 const ACTIVITY_LEVELS = [
   "sedentary",
@@ -68,18 +68,24 @@ function SelectField({
   onChange,
   options,
   placeholder,
+  hasError = false,
 }: {
   value: string;
   onChange: (v: string) => void;
   options: string[];
   placeholder: string;
+  hasError?: boolean;
 }) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+        className={`w-full appearance-none rounded-xl border bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+          hasError
+            ? "border-red-300 focus:border-red-500"
+            : "border-gray-200 focus:border-[#34A853]"
+        }`}
       >
         <option value="">{placeholder}</option>
         {options.map((opt) => (
@@ -170,6 +176,9 @@ export function ProfileEditPage() {
   const [dietTypes, setDietTypes] = useState<string[]>([]);
   const [allergies, setAllergies] = useState("");
   const [goals, setGoals] = useState("");
+  const [validationErrors, setValidationErrors] = useState<
+    Record<string, string>
+  >({});
 
   useEffect(() => {
     if (!contextLoading && me && !initialized) {
@@ -199,7 +208,68 @@ export function ProfileEditPage() {
 
   const loading = contextLoading || !initialized;
 
+  function validateForm(): boolean {
+    const errors: Record<string, string> = {};
+
+    if (!fullName.trim()) {
+      errors.fullName = "Full Name is required";
+    }
+    if (!age.trim()) {
+      errors.age = "Age is required";
+    } else {
+      const ageNum = parseInt(age, 10);
+      if (isNaN(ageNum) || ageNum < 13 || ageNum > 120) {
+        errors.age = "Age must be between 13 and 120";
+      }
+    }
+    if (!gender) {
+      errors.gender = "Gender is required";
+    }
+    if (!country) {
+      errors.country = "Country/Region is required";
+    }
+    if (!height.trim()) {
+      errors.height = "Height is required";
+    } else {
+      const heightNum = parseFloat(height);
+      if (isNaN(heightNum) || heightNum < 50 || heightNum > 300) {
+        errors.height = "Height must be between 50 and 300 cm";
+      }
+    }
+    if (!weight.trim()) {
+      errors.weight = "Weight is required";
+    } else {
+      const weightNum = parseFloat(weight);
+      if (isNaN(weightNum) || weightNum < 20 || weightNum > 500) {
+        errors.weight = "Weight must be between 20 and 500 kg";
+      }
+    }
+    if (!activityLevel) {
+      errors.activityLevel = "Activity Level is required";
+    }
+    if (!workoutDays) {
+      errors.workoutDays = "Workout Days per Week is required";
+    }
+    if (dietTypes.length === 0) {
+      errors.dietTypes = "At least one Diet Preference is required";
+    }
+    if (!allergies.trim()) {
+      errors.allergies = "Allergies is required (enter 'None' if no allergies)";
+    }
+    if (!goals.trim()) {
+      errors.goals = "Goals is required";
+    }
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  }
+
   async function handleSave() {
+    if (!validateForm()) {
+      setErrorMsg("Please fill in all required fields");
+      return;
+    }
+
     setErrorMsg(null);
     setSuccessMsg(null);
     setSaving(true);
@@ -279,40 +349,89 @@ export function ProfileEditPage() {
               Basic Information
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
-              <FormField label="Full Name">
+              <FormField label="Full Name" error={validationErrors.fullName}>
                 <input
                   type="text"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (validationErrors.fullName) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.fullName;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="Enter your full name"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                  className={`w-full rounded-xl border px-4 py-2.5 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                    validationErrors.fullName
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-200 focus:border-[#34A853]"
+                  }`}
                 />
               </FormField>
-              <FormField label="Age">
+              <FormField label="Age" error={validationErrors.age}>
                 <input
                   type="number"
                   value={age}
-                  onChange={(e) => setAge(e.target.value)}
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    if (validationErrors.age) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.age;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="Enter your age"
                   min="13"
                   max="120"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                  className={`w-full rounded-xl border px-4 py-2.5 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                    validationErrors.age
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-200 focus:border-[#34A853]"
+                  }`}
                 />
               </FormField>
-              <FormField label="Gender">
+              <FormField label="Gender" error={validationErrors.gender}>
                 <SelectField
                   value={gender}
-                  onChange={setGender}
+                  onChange={(value) => {
+                    setGender(value);
+                    if (validationErrors.gender) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.gender;
+                        return next;
+                      });
+                    }
+                  }}
                   options={GENDER_OPTIONS}
                   placeholder="Select gender"
+                  hasError={!!validationErrors.gender}
                 />
               </FormField>
-              <FormField label="Country / Region">
+              <FormField
+                label="Country / Region"
+                error={validationErrors.country}
+              >
                 <SelectField
                   value={country}
-                  onChange={setCountry}
+                  onChange={(value) => {
+                    setCountry(value);
+                    if (validationErrors.country) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.country;
+                        return next;
+                      });
+                    }
+                  }}
                   options={COUNTRIES}
                   placeholder="Select country"
+                  hasError={!!validationErrors.country}
                 />
               </FormField>
             </div>
@@ -323,27 +442,53 @@ export function ProfileEditPage() {
               Body Metrics
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
-              <FormField label="Height (cm)">
+              <FormField label="Height (cm)" error={validationErrors.height}>
                 <input
                   type="number"
                   value={height}
-                  onChange={(e) => setHeight(e.target.value)}
+                  onChange={(e) => {
+                    setHeight(e.target.value);
+                    if (validationErrors.height) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.height;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="e.g., 170"
                   min="50"
                   max="300"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                  className={`w-full rounded-xl border px-4 py-2.5 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                    validationErrors.height
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-200 focus:border-[#34A853]"
+                  }`}
                 />
               </FormField>
-              <FormField label="Weight (kg)">
+              <FormField label="Weight (kg)" error={validationErrors.weight}>
                 <input
                   type="number"
                   value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
+                  onChange={(e) => {
+                    setWeight(e.target.value);
+                    if (validationErrors.weight) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.weight;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="e.g., 70"
                   min="20"
                   max="500"
                   step="0.1"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                  className={`w-full rounded-xl border px-4 py-2.5 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                    validationErrors.weight
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-200 focus:border-[#34A853]"
+                  }`}
                 />
               </FormField>
             </div>
@@ -354,12 +499,28 @@ export function ProfileEditPage() {
               Activity & Schedule
             </h2>
             <div className="grid gap-6 md:grid-cols-2">
-              <FormField label="Activity Level">
+              <FormField
+                label="Activity Level"
+                error={validationErrors.activityLevel}
+              >
                 <div className="relative">
                   <select
                     value={activityLevel}
-                    onChange={(e) => setActivityLevel(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                    onChange={(e) => {
+                      setActivityLevel(e.target.value);
+                      if (validationErrors.activityLevel) {
+                        setValidationErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.activityLevel;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full appearance-none rounded-xl border bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                      validationErrors.activityLevel
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-200 focus:border-[#34A853]"
+                    }`}
                   >
                     <option value="">Select activity level</option>
                     {ACTIVITY_LEVELS.map((opt) => (
@@ -383,12 +544,28 @@ export function ProfileEditPage() {
                   </svg>
                 </div>
               </FormField>
-              <FormField label="Workout Days per Week">
+              <FormField
+                label="Workout Days per Week"
+                error={validationErrors.workoutDays}
+              >
                 <div className="relative">
                   <select
                     value={workoutDays}
-                    onChange={(e) => setWorkoutDays(e.target.value)}
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                    onChange={(e) => {
+                      setWorkoutDays(e.target.value);
+                      if (validationErrors.workoutDays) {
+                        setValidationErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.workoutDays;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full appearance-none rounded-xl border bg-white px-4 py-2.5 pr-10 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                      validationErrors.workoutDays
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-200 focus:border-[#34A853]"
+                    }`}
                   >
                     <option value="">Select days</option>
                     {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
@@ -417,13 +594,29 @@ export function ProfileEditPage() {
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-6 text-lg font-semibold text-gray-900">Goals</h2>
-            <FormField label="What's your primary goal?">
+            <FormField
+              label="What's your primary goal?"
+              error={validationErrors.goals}
+            >
               <input
                 type="text"
                 value={goals}
-                onChange={(e) => setGoals(e.target.value)}
+                onChange={(e) => {
+                  setGoals(e.target.value);
+                  if (validationErrors.goals) {
+                    setValidationErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.goals;
+                      return next;
+                    });
+                  }
+                }}
                 placeholder="e.g., Weight Loss, Muscle Gain, Improve Fitness"
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                className={`w-full rounded-xl border px-4 py-3 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                  validationErrors.goals
+                    ? "border-red-300 focus:border-red-500"
+                    : "border-gray-200 focus:border-[#34A853]"
+                }`}
               />
             </FormField>
           </section>
@@ -433,21 +626,49 @@ export function ProfileEditPage() {
               Diet & Preferences
             </h2>
             <div className="space-y-6">
-              <FormField label="Diet Preferences (select all that apply)">
+              <FormField
+                label="Diet Preferences (select all that apply)"
+                error={validationErrors.dietTypes}
+              >
                 <MultiSelectChips
                   selected={dietTypes}
                   options={DIET_TYPES}
-                  onChange={setDietTypes}
+                  onChange={(selected) => {
+                    setDietTypes(selected);
+                    if (validationErrors.dietTypes) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.dietTypes;
+                        return next;
+                      });
+                    }
+                  }}
                   variant="green"
                 />
               </FormField>
-              <FormField label="Allergies (comma-separated)">
+              <FormField
+                label="Allergies (comma-separated)"
+                error={validationErrors.allergies}
+              >
                 <input
                   type="text"
                   value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
+                  onChange={(e) => {
+                    setAllergies(e.target.value);
+                    if (validationErrors.allergies) {
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.allergies;
+                        return next;
+                      });
+                    }
+                  }}
                   placeholder="e.g., Nuts, Dairy, Gluten (or 'None' if no allergies)"
-                  className="w-full rounded-xl border border-gray-200 px-4 py-2.5 text-gray-900 outline-none transition focus:border-[#34A853] focus:ring-2 focus:ring-[#34A853]/20"
+                  className={`w-full rounded-xl border px-4 py-2.5 text-gray-900 outline-none transition focus:ring-2 focus:ring-[#34A853]/20 ${
+                    validationErrors.allergies
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-200 focus:border-[#34A853]"
+                  }`}
                 />
               </FormField>
             </div>
@@ -463,7 +684,7 @@ export function ProfileEditPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="rounded-xl bg-[#1A381D] px-6 py-2 text-sm font-medium text-white transition hover:bg-[#0F2310] disabled:opacity-50 cursor-pointer"
+              className="rounded-xl bg-[#1A381D] px-6 py-2 text-sm font-medium text-white transition hover:bg-[#0F2310] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {saving ? "Saving..." : "Save Changes"}
             </button>
