@@ -38,13 +38,13 @@ async function recommendWorkouts(user_id, supabase) {
           userGoal = await extractUserGoal(userProfile?.goals);
 
           if (userGoal === "Unknown") {
-              const { data: userProfile } = await supabase
-              .from("user_profiles")
-              .select("goals")
-              .eq("user_id", user_id)
-              .single();
+            const { data: userProfile } = await supabase
+            .from("user_profiles")
+            .select("goals")
+            .eq("user_id", user_id)
+            .single();
 
-              userGoal = await extractUserGoal(userProfile?.goals);
+            userGoal = await extractUserGoal(userProfile?.goals);
           }
       }
 

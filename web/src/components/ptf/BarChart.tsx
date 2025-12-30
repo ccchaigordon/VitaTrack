@@ -4,6 +4,30 @@ interface ChartData {
   val2: number; // Burned
 }
 
+function getScale(maxValue: number) {
+  if (maxValue === 0) return { maxVal: 100, ticks: [0, 25, 50, 75, 100] };
+  const targetMax = maxValue * 1.1;
+  const targetTicks = 4;
+  const roughStep = targetMax / targetTicks;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+  const normalizedStep = roughStep / magnitude;
+
+  let niceStep;
+  if (normalizedStep <= 1) niceStep = 1;
+  else if (normalizedStep <= 2) niceStep = 2;
+  else if (normalizedStep <= 5) niceStep = 5;
+  else niceStep = 10;
+  const step = niceStep * magnitude;
+  const maxVal = Math.ceil(targetMax / step) * step;
+
+  const ticks = [];
+  const numTicks = Math.round(maxVal / step);
+  for (let i = 0; i <= numTicks; i++) {
+    ticks.push(i * step);
+  }
+  return { maxVal, ticks };
+}
+
 export function BarChart ({ data }: { data: ChartData[] }) {
   const height = 180;
   const barWidth = 18; 
@@ -21,10 +45,7 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   });
   const values = normalised.flatMap(d => [d.val1, d.val2]);
   const rawMax = values.length ? Math.max(...values) : 0;
-  const ceiling = rawMax > 0 ? rawMax * 1.1 : 100;
-  const magnitude = Math.pow(10, Math.floor(Math.log10(ceiling)));
-  const step = magnitude / 2; 
-  const maxVal = Math.ceil(ceiling / step) * step;
+  const { maxVal, ticks } = getScale(rawMax);
   const yAxisOffset = 30;
   
   return (
@@ -36,12 +57,11 @@ export function BarChart ({ data }: { data: ChartData[] }) {
       >
 
         {/* Y-Axis Grid Lines */}
-        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-        const y = height - (height * tick);
-        const value = Math.round(maxVal * tick);
+        {ticks.map((value) => {
+        const y = height - (value / maxVal * height);
 
         return (
-          <g key={tick}>
+          <g key={value}>
             <line
               x1={yAxisOffset}
               y1={y}

@@ -2,6 +2,7 @@ const express = require('express');
 const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
 const recommendWorkouts = require('../utils/PTF/recommendWorkouts');
+const recommendRecipes = require('../utils/PTF/recommendRecipes');
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -22,10 +23,59 @@ async function fetchMetricsData(userId, startDate, endDate, supabase) {
   return data;
 }
 
+async function extractUserGoal(userId, supabase) {
+  try {
+    const { data: userProfile, error } = await supabase
+      .from("user_profiles")
+      .select("goals")
+      .eq("user_id", userId)
+      .single();
+  
+    if (error || !userProfile || !userProfile.goals) {
+      console.log("Error fetching user profile for goal extraction:", error);
+      return null;
+    } 
+
+    const goalText = userProfile.goals;
+
+    const prompt = `
+      Analyze this user's fitness goal text: "${goalText}".
+      Determine if the user explicitly specified a numeric goal for "calories to be burned" or "active calories" (e.g., "burn 500 kcal daily", "burn 300 calories").
+      
+      Rules:
+      1. Ignore "calorie intake" or "eat". Focus only on BURNING/OUTPUT.
+      2. Normalize the value to a WEEKLY goal (integer).
+         - If user says "burn 500 daily", return 3500 (500 * 7).
+         - If user says "burn 2000 per week", return 2000.
+         - If no time range specified, assume weekly.
+      3. Return ONLY a JSON object.
+      4. Format: { "burn_goal": <number> } if found, or { "burn_goal": null } if not mentioned.
+    `;
+
+    const gResponse = await queryGemini(prompt);
+
+    function extractJson(text) {
+      const match = String(text).match(/\{[\s\S]*\}/);
+      return match ? match[0] : null;
+    }
+
+    const match = extractJson(gResponse);
+    if (match) {
+      const json = JSON.parse(match);
+      return typeof json.burn_goal === 'number' ? json.burn_goal : null;
+    }
+    return null;
+
+  } catch (err) {
+    console.error("Error in extractUserGoal:", err);
+    return null;
+  }
+}
+
 // ENDPOINT 1: MACROS
 router.get('/ptf/macros', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
   const days = req.query.days || 7;
 
   // const { user_id, days = 7 } = req.query;
@@ -84,11 +134,10 @@ router.get('/ptf/macros', async (req, res) => {
 // ENDPOINT 2: CALORIES
 router.get('/ptf/calories', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
   const days = req.query.days || 7;
   console.log("user_id:", user_id, typeof user_id);
   console.log("days:", days, typeof days);
-  // const { user_id, days = 7 } = req.query;
 
   // 1. CONVERT INPUT TO WEEK OFFSET
   const weekOffset = (Number(days) / 7) - 1;
@@ -112,7 +161,11 @@ router.get('/ptf/calories', async (req, res) => {
   endSunday.setHours(23, 59, 59, 999); 
 
   try {
-    const currentPeriod = await fetchMetricsData(user_id, startMonday, endSunday, supabase);
+    const [currentPeriod, burnGoal] = await Promise.all([
+      fetchMetricsData(user_id, startMonday, endSunday, supabase),
+      extractUserGoal(user_id, supabase)
+    ]);
+    console.log("Extracted Burn Goal:", burnGoal);
     console.log("Current Period Data:", currentPeriod);
     const weekOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -135,7 +188,8 @@ router.get('/ptf/calories', async (req, res) => {
       caloriesBurned: dayMap[day]?.caloriesBurned || 0,
     }));
 
-    return res.json(caloriesActivity);
+    return res.json(
+      { history: caloriesActivity, goal: burnGoal } );
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
@@ -144,7 +198,7 @@ router.get('/ptf/calories', async (req, res) => {
 // ENDPOINT 3: WORKOUT
 router.get('/ptf/workout', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
   const days = 14;
   const today = new Date();
   const pastDate = new Date(today);
@@ -185,7 +239,7 @@ router.get('/ptf/workout', async (req, res) => {
   // ENDPOINT 4: STREAK DAYS
 router.get('/ptf/streak', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
   const today = new Date();
   const pastDate = new Date(today);
 
@@ -247,7 +301,7 @@ router.get('/ptf/streak', async (req, res) => {
 // ENDPOINT 5: WEEKLY INSIGHTS
 router.get('/ptf/insights', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
 
   const today = new Date();
   const currentDay = today.getDay();   // 0=Sun, 1=Mon, ..., 6=Sat
@@ -335,20 +389,6 @@ router.get('/ptf/insights', async (req, res) => {
       },
     ];
 
-    // const negativeDeltas = macroDeltas.filter(m => m.delta < 0);
-
-    // if (negativeDeltas.length > 0) {
-    //   // Rule 1: If negative deltas exist -> pick the most negative (smallest delta)
-    //   selectedMacro = negativeDeltas.reduce((min, m) =>
-    //     m.delta < min.delta ? m : min
-    //   );
-    // } else {
-    //   // Rule 2: If no negative delta -> pick the most positive (largest delta)
-    //   selectedMacro = macroDeltas.reduce((max, m) =>
-    //     m.delta > max.delta ? m : max
-    //   );
-    // }
-
     let selectedMacro = macroDeltas.find(m => m.delta < -10) || 
                         macroDeltas.reduce((max, m) => Math.abs(m.delta) > Math.abs(max.delta) ? m : max);
 
@@ -389,14 +429,14 @@ router.get('/ptf/insights', async (req, res) => {
     - Current Workout Streak: ${streak} days
     - Workout: ${thisWeekData.filter(d => d.workout_completed > 0).length} sessions
     Tasks:
-    Generate exactly 4 short, punchy bullet points. Each item must be plain text + emojis if necessary (no *, quotes, markdown) Return ONLY a JSON object with 2 keys: 
+    Generate exactly 4 short, punchy bullet points. Each item must be plain text + emojis if necessary (no *, quotes, markdown) Return ONLY a raw JSON object with 2 keys: 
     1. "summary": Exactly 4 short bullet points (Activity, Nutrition, Streak, Tip).
-    2. "nextFocus": ONE single, motivating sentence telling the user exactly what to focus on next week.
+    2. "nextFocus": ONE single, motivating sentence telling the user exactly what to focus.
     
     JSON FORMAT:
     { 
       "summary": ["Point 1", "Point 2", "Point 3", "Point 4"],
-      "nextFocus": "Your focus sentence here."
+      "nextFocus": "Sentence here."
     }
 
     Guidelines:
@@ -408,36 +448,32 @@ router.get('/ptf/insights', async (req, res) => {
     let gResponse;
 
     // to save our gemini token :D
-    // gResponse = await queryGemini(prompt);
+    gResponse = await queryGemini(prompt);
+    console.log("Gemini Raw Response:", gResponse);
+    gResponse = typeof gResponse === 'object' ? JSON.stringify(gResponse) : gResponse;
 
     // dummy data for testing :P
-    gResponse = JSON.stringify({
-       summary: [
-         `Calories burned ${deltaBurned >= 0 ? 'up' : 'down'} by ${Math.abs(deltaBurned)}% this week! 🔥`,
-         `${selectedMacro.name} intake shifted by ${selectedMacro.delta}%.`,
-         `Current streak is ${streak} days. Keep it rolling! 🚀`,
-         "Tip: Try adding 10 mins of cardio after lifting."
-       ],
-       nextFocus: "Focus on maintaining your protein intake consistency next week."
-    });
+    // gResponse = JSON.stringify({
+    //    summary: [
+    //      `Calories burned ${deltaBurned >= 0 ? 'up' : 'down'} by ${Math.abs(deltaBurned)}% this week! 🔥`,
+    //      `${selectedMacro.name} intake shifted by ${selectedMacro.delta}%.`,
+    //      `Current streak is ${streak} days. Keep it rolling! 🚀`,
+    //      "Tip: Try adding 10 mins of cardio after lifting."
+    //    ],
+    //    nextFocus: "Focus on maintaining your protein intake consistency next week."
+    // });
 
-    function extractJson(text) {
-      const match = String(text).match(/\{[\s\S]*\}/);
-      return match ? match[0] : null;
-    }
+    function parseGeminiResponse(text) {
+      if (typeof text !== 'string') {
+        text = JSON.stringify(text);
+      }
 
-    function parseGeminiResponse(gResponse) {
-      const jsonStr = extractJson(gResponse);
-      if (!jsonStr) throw new Error("No JSON found");
-
-      const obj = JSON.parse(jsonStr);
+      const cleanText = text.replace(/```json\s*|\s*```/g, '');
+      const match = cleanText.match(/\{[\s\S]*\}/);
+      if (!match) 
+        throw new Error("No JSON structure found in response");
       
-      const summary = Array.isArray(obj.summary) ? obj.summary : [];
-      summary = summary.map(b => String(b).trim()).filter(Boolean).slice(0, 4);
-      while (summary.length < 4) summary.push("No sufficient data to generate insights.");
-
-      const nextFocus = (typeof obj.nextFocus === 'string' && obj.nextFocus.length > 0) ? obj.nextFocus : "Maintain your momentum!";
-      return { summary, nextFocus };
+      return JSON.parse(match[0]);
     }
 
     let result = {};
@@ -445,7 +481,20 @@ router.get('/ptf/insights', async (req, res) => {
 
     // Parse Gemini Response
     try {
-      result = parseGeminiResponse(gResponse);
+      const obj = parseGeminiResponse(gResponse);
+      
+      // Validate structure
+      const summary = Array.isArray(obj.summary) ? obj.summary : [];
+      // Padding if < 4 points returned
+      while (summary.length < 4) summary.push("Keep moving to see more insights!");
+      
+      const nextFocus = obj.nextFocus || "Maintain your momentum!";
+      
+      result = { 
+        summary: summary.slice(0, 4),
+        nextFocus 
+      };
+      
     } catch (err) { 
       // Fallback
       isFallback = true;
@@ -487,9 +536,46 @@ router.get('/ptf/insights', async (req, res) => {
   }
 });
 
+// ENDPOINT 6: RECOMMEND RECIPES
+router.get('/ptf/recommendationRecipes', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id;
+
+  try {
+    const result = await recommendRecipes(user_id, supabase);
+    // console.log("Recipe Recommendations Result:", result);
+    const formattedRecipes = result.recommendations.map(item => {
+      const r = item.meal;
+      return{
+        id: r.recipe_id || r.id,
+        title: r.title,
+        summary: r.summary || (r.procedure ? r.procedure.substring(0, 100) + "..." : "Delicious recipe"),
+        badge: "Recipe",
+        link: r.source_url,
+        calories: r.calories,
+        protein: r.protein,
+        carbs: r.carbs,
+        fat: r.fat,
+        category: r.dietary_tags ? r.dietary_tags.join(", ") : "Recipe",
+        content: r.procedure,
+        cooking_time: r.cooking_time,
+        ingredients: r.ingredients,
+        isRecipe: true,
+        image_url: r.image_url,
+        dietary_tags: r.dietary_tags || []
+      };
+    });
+
+    return res.json({ recommendations: formattedRecipes });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ENDPOINT 7: RECOMMEND WORKOUTS
 router.get('/ptf/recommendationWorkouts', async (req, res) => {
   const supabase = getRlsClient(req);
-  const user_id = req.user?.id || req.user?.user_id || 1;
+  const user_id = req.user?.id || req.user?.user_id;
 
   try {
     const result = await recommendWorkouts(user_id, supabase);
