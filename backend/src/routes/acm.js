@@ -1,7 +1,7 @@
 const express = require('express');
 const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
-const detectIntent = require('../utils/ACM/detectIntent');
+const detectGoal = require('../utils/ACM/detectGoal');
 const multer = require('multer');
 const upload = multer();
 
@@ -10,7 +10,13 @@ const logWorkoutHandler = require('../utils/ACM/handlers/logWorkoutHandler');
 const recommendationHandlerForMeal = require('../utils/ACM/handlers/recommendationHandlerForMeal');
 const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommendationHandlerForWorkout');
 
+const processUploadedFilesHandler = require('../utils/ACM/handlers/processUploadedFilesHandler');
+
 let conversationState = new Map();
+
+function hasRecommendations(state) {
+  return Array.isArray(state?.recommended) && state.recommended.length > 0;
+}
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -25,12 +31,13 @@ router.post("/chat", upload.any(), async (req, res) => {
   // Access the user ID
   const user = req.user; // from auth middleware
 
-  const { message, chat_id } = req.body;
+  const { message, chat_id, choice } = req.body;
 
   console.log("Active chat id received:", chat_id);
 
   let finalChatId = chat_id;
   let finalMsgId = " ";
+  let multimodalContext = null;
 
   console.log("final chat id at start:", finalChatId);
 
@@ -97,7 +104,11 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   console.log("Final msg id:", finalMsgId);
 
-  const files = req.files;
+  const files = req.files
+    ? req.files
+    : req.file
+      ? [req.file]
+      : [];
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   console.log("Received message:", message);
@@ -163,9 +174,15 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   const state = conversationState.get(user.id);
 
-  // Pass conversation context to intent detection for better accuracy
-  const { intent, goal } = await detectIntent(message, state, conversationContext);
-  console.log("Intent, goal:", intent, goal);
+  if(files && files.length > 0) {
+    multimodalContext = await processUploadedFilesHandler( message, files );
+    conversationState.set(user.id, { ...state, multimodalContext } );
+  }
+
+  console.log("Multimodal context extracted:", multimodalContext);
+
+  const goal = await detectGoal(message, state, conversationContext);
+  console.log("Goal:", goal);
 
   // if goal is not equal to empty string, replace the existing goal in user profile
   if (goal) {
@@ -181,9 +198,37 @@ router.post("/chat", upload.any(), async (req, res) => {
       console.log("Updated user goal in profile to:", goal);
     }
   }
-  
+
+  switch (choice) {
+    case 'Log meal':
+      intent = 'log_meal';
+      break;
+    case 'Log workout':
+      intent = 'log_workout';
+      break;
+    case 'Meal recommendation':
+      intent = 'recommendation_meal';
+      break;
+    case 'Workout recommendation':
+      intent = 'recommendation_workout';
+      break;
+    case 'More recommendation':
+      intent = 'more_recommendation';
+      break;
+    case 'Previous recommendation':
+      intent = 'previous_recommendation';
+      break;
+    case 'Select recommendation':
+      intent = 'select_recommendation';
+      break;    
+    default:
+      intent = 'chat';
+  }
+
+  console.log("Final intent after choice handling:", intent);
+
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files, conversationState, user.id, supabase);
+    const response = await logMealHandler(message, multimodalContext?.meals, conversationState, user.id, supabase);
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
@@ -194,14 +239,16 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(responseWithChatId);
   }
 
   if (intent === "log_workout") {
-    const response = await logWorkoutHandler(message, files, conversationState, user.id, supabase);
+    const response = await logWorkoutHandler(message, multimodalContext?.workouts, conversationState, user.id, supabase);
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
@@ -212,8 +259,10 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(responseWithChatId);
   }
@@ -230,8 +279,10 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Workout recommendation"];
+
     // append response with chat id
-    response = { ...response, chat_id: finalChatId };
+    response = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(response);    
   }
@@ -248,14 +299,24 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Meal recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
     
     return res.json(responseWithChatId);    
   }
 
   if (intent === "more_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
+
+      return res.json({ reply: "There is no recommendation to show more of. Please ask for a recommendation first.", choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const nextIndex = currentIndex + 1;
 
@@ -339,14 +400,24 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     console.log('Gemini response for more recommendation:', gResponse);
 
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
   if (intent === "previous_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
+      return res.json({ reply: "There is no recommendation to show previous of. Please ask for a recommendation first.", choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const prevIndex = currentIndex - 1;
 
@@ -424,14 +495,24 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     console.log('Gemini response for more recommendation:', gResponse);
 
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
   if (intent === "select_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
+      return res.json({ reply: "There is no recommendation to select. Please ask for a recommendation first.", choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const item = state.recommended[currentIndex];
     let prompt = "";
@@ -502,9 +583,12 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),
     });
 
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
@@ -520,8 +604,20 @@ router.post("/chat", upload.any(), async (req, res) => {
     - Use emojis naturally
     - Be conversational and engaging
     - If you don't know something, admit it politely
+    - If previous conversation context is available, just continue from there. Not need to do any introductions/greetings.
 
     ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+    ${
+      conversationState.get(user.id)?.multimodalContext
+        ? `Context extracted from uploaded files (images / documents):
+      ${JSON.stringify(conversationState.get(user.id).multimodalContext, null, 2)}\n\n`
+        : ''
+    }
+
+    User message:
+    "${message}"
+
+    If contextual data from uploaded files is provided, use it as the primary source of truth for nutrition or workout analysis. Do NOT guess nutrition or workout details beyond the provided context. MENTION based on the uploaded files.
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
 
@@ -535,13 +631,15 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
-    return res.json({ chat_id: finalChatId, reply: gResponse });
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
+    return res.json({ chat_id: finalChatId, reply: gResponse, choices: choices });
   }
 
   // Default fallback - if intent doesn't match, treat as general chat
   console.log('Intent did not match any handler, defaulting to chat. Intent was:', intent);
   
-  const prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
+  let prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
 
     Your role:
     - Help users with fitness, nutrition, and wellness questions
@@ -551,6 +649,17 @@ router.post("/chat", upload.any(), async (req, res) => {
     - If you don't know something, admit it politely
 
     ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+    ${
+      multimodalContext
+        ? `Context extracted from uploaded files (images / documents):
+      ${JSON.stringify(multimodalContext, null, 2)}\n\n`
+        : ''
+    }
+
+    User message:
+    "${message}"
+
+    If contextual data from uploaded files is provided, use it as the primary source of truth. Do NOT guess nutrition or workout details beyond the provided context.
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
 
@@ -752,7 +861,5 @@ router.delete("/clearAllChats", async (req, res) => {
     res.status(500).json({ error: "Failed to clear all chats" });
   } 
 });
-
-
 
 module.exports = router;
