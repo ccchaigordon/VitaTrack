@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { getErrorMessage } from "../utils/errors";
 import NavLogo from "../assets/NavLogo.png";
+import DIET_TYPES_DATA from "../data/dietTypes.json";
 
 type MeResponse = {
   user: { username: string | null; full_name: string | null } | null;
@@ -26,7 +27,7 @@ function toNumberOrNull(v: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
+const GENDER_OPTIONS = ["Male", "Female"];
 
 const COUNTRY_OPTIONS = [
   "Malaysia",
@@ -54,19 +55,7 @@ const ACTIVITY_LEVELS = [
   "Extremely Active",
 ];
 
-const DIET_TYPES = [
-  "Gluten free",
-  "Ketogenic",
-  "Vegetarian",
-  "Lacto-Vegetarian",
-  "Ovo-Vegetarian",
-  "Vegan",
-  "Pescetarian",
-  "Paleo",
-  "Primal",
-  "Low FODMAP",
-  "Whole30"
-];
+const DIET_TYPES = DIET_TYPES_DATA;
 
 const WORKOUT_DAYS = ["0", "1", "2", "3", "4", "5", "6", "7"];
 
@@ -122,6 +111,7 @@ export function OnboardingPage() {
   const [allergies, setAllergies] = useState("");
   const [goals, setGoals] = useState("");
   const [workoutDaysPerWeek, setWorkoutDaysPerWeek] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let mounted = true;
@@ -166,26 +156,75 @@ export function OnboardingPage() {
   }, [nav]);
 
   function validateStep(current: 1 | 2 | 3 | 4): string | null {
+    const errors: Record<string, string> = {};
+
     if (current === 1) {
-      if (!usernameExists && !username.trim()) return "Username is required";
-      if (!fullName.trim()) return "Full Name is required";
-      if (!age.trim()) return "Age is required";
-      if (!gender) return "Gender is required";
+      if (!usernameExists && !username.trim()) {
+        errors.username = "Username is required";
+      }
+      if (!fullName.trim()) {
+        errors.fullName = "Full Name is required";
+      }
+      if (!age.trim()) {
+        errors.age = "Age is required";
+      } else {
+        const ageNum = parseInt(age, 10);
+        if (isNaN(ageNum) || ageNum < 13 || ageNum > 120) {
+          errors.age = "Age must be between 13 and 120";
+        }
+      }
+      if (!gender) {
+        errors.gender = "Gender is required";
+      }
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) {
+        return "Please fill in all required fields correctly";
+      }
       return null;
     }
     if (current === 2) {
-      if (!heightCm.trim()) return "Body Height is required";
-      if (!weightKg.trim()) return "Body Weight is required";
-      if (!activityLevel) return "Activity Level is required";
+      if (!heightCm.trim()) {
+        errors.heightCm = "Body Height is required";
+      } else {
+        const heightNum = parseFloat(heightCm);
+        if (isNaN(heightNum) || heightNum < 50 || heightNum > 300) {
+          errors.heightCm = "Height must be between 50 and 300 cm";
+        }
+      }
+      if (!weightKg.trim()) {
+        errors.weightKg = "Body Weight is required";
+      } else {
+        const weightNum = parseFloat(weightKg);
+        if (isNaN(weightNum) || weightNum < 20 || weightNum > 500) {
+          errors.weightKg = "Weight must be between 20 and 500 kg";
+        }
+      }
+      if (!activityLevel) {
+        errors.activityLevel = "Activity Level is required";
+      }
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) {
+        return "Please fill in all required fields correctly";
+      }
       return null;
     }
     if (current === 3) {
-      if (!dietType) return "Diet Type is required";
-      if (!allergies.trim())
-        return 'Allergies is required (enter "None" if none)';
-      if (!goals.trim()) return "Goal(s) is required";
+      if (!dietType) {
+        errors.dietType = "Diet Type is required";
+      }
+      if (!allergies.trim()) {
+        errors.allergies = 'Allergies is required (enter "None" if none)';
+      }
+      if (!goals.trim()) {
+        errors.goals = "Goal(s) is required";
+      }
+      setFieldErrors(errors);
+      if (Object.keys(errors).length > 0) {
+        return "Please fill in all required fields correctly";
+      }
       return null;
     }
+    setFieldErrors({});
     return null;
   }
 
@@ -278,6 +317,7 @@ export function OnboardingPage() {
 
   function back() {
     setErrorMsg(null);
+    setFieldErrors({});
     if (step === 3) animateToStep(2, "right");
     else if (step === 2) animateToStep(1, "right");
   }
@@ -354,16 +394,34 @@ export function OnboardingPage() {
                 <input
                   type="text"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (fieldErrors.username) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.username;
+                        return next;
+                      });
+                    }
+                  }}
                   disabled={usernameExists}
                   placeholder={usernameExists ? "" : "Choose a unique username"}
-                  className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5 ${
-                    usernameExists ? "bg-gray-100 text-gray-500" : ""
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    usernameExists
+                      ? "bg-gray-100 text-gray-500 border-gray-300"
+                      : fieldErrors.username
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
                   }`}
                 />
                 {usernameExists && (
                   <p className="mt-1 text-xs text-gray-500">
                     Username cannot be changed once set
+                  </p>
+                )}
+                {fieldErrors.username && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.username}
                   </p>
                 )}
               </div>
@@ -375,9 +433,27 @@ export function OnboardingPage() {
                 <input
                   type="text"
                   value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setFullName(e.target.value);
+                    if (fieldErrors.fullName) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.fullName;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.fullName
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.fullName && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.fullName}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -388,9 +464,25 @@ export function OnboardingPage() {
                   type="text"
                   inputMode="numeric"
                   value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setAge(e.target.value);
+                    if (fieldErrors.age) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.age;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.age
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.age && (
+                  <p className="mt-1 text-xs text-red-500">{fieldErrors.age}</p>
+                )}
               </div>
 
               <div>
@@ -400,8 +492,21 @@ export function OnboardingPage() {
                 <div className="relative">
                   <select
                     value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                    onChange={(e) => {
+                      setGender(e.target.value);
+                      if (fieldErrors.gender) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.gender;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                      fieldErrors.gender
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-300 focus:border-gray-900"
+                    }`}
                   >
                     <option value="" disabled>
                       Select Gender
@@ -428,6 +533,11 @@ export function OnboardingPage() {
                     </svg>
                   </div>
                 </div>
+                {fieldErrors.gender && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.gender}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -477,9 +587,27 @@ export function OnboardingPage() {
                   type="text"
                   inputMode="decimal"
                   value={heightCm}
-                  onChange={(e) => setHeightCm(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setHeightCm(e.target.value);
+                    if (fieldErrors.heightCm) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.heightCm;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.heightCm
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.heightCm && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.heightCm}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -490,9 +618,27 @@ export function OnboardingPage() {
                   type="text"
                   inputMode="decimal"
                   value={weightKg}
-                  onChange={(e) => setWeightKg(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setWeightKg(e.target.value);
+                    if (fieldErrors.weightKg) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.weightKg;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.weightKg
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.weightKg && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.weightKg}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -502,8 +648,21 @@ export function OnboardingPage() {
                 <div className="relative">
                   <select
                     value={activityLevel}
-                    onChange={(e) => setActivityLevel(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                    onChange={(e) => {
+                      setActivityLevel(e.target.value);
+                      if (fieldErrors.activityLevel) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.activityLevel;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                      fieldErrors.activityLevel
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-300 focus:border-gray-900"
+                    }`}
                   >
                     <option value="" disabled>
                       Select Activity Level
@@ -530,6 +689,11 @@ export function OnboardingPage() {
                     </svg>
                   </div>
                 </div>
+                {fieldErrors.activityLevel && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.activityLevel}
+                  </p>
+                )}
               </div>
             </div>
           )}
@@ -543,8 +707,21 @@ export function OnboardingPage() {
                 <div className="relative">
                   <select
                     value={dietType}
-                    onChange={(e) => setDietType(e.target.value)}
-                    className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                    onChange={(e) => {
+                      setDietType(e.target.value);
+                      if (fieldErrors.dietType) {
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.dietType;
+                          return next;
+                        });
+                      }
+                    }}
+                    className={`w-full appearance-none rounded-lg border bg-white px-3 py-2 pr-10 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                      fieldErrors.dietType
+                        ? "border-red-300 focus:border-red-500"
+                        : "border-gray-300 focus:border-gray-900"
+                    }`}
                   >
                     <option value="" disabled>
                       Select Diet Type
@@ -571,6 +748,11 @@ export function OnboardingPage() {
                     </svg>
                   </div>
                 </div>
+                {fieldErrors.dietType && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.dietType}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -580,9 +762,27 @@ export function OnboardingPage() {
                 <input
                   type="text"
                   value={allergies}
-                  onChange={(e) => setAllergies(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setAllergies(e.target.value);
+                    if (fieldErrors.allergies) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.allergies;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.allergies
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.allergies && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.allergies}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -592,9 +792,27 @@ export function OnboardingPage() {
                 <input
                   type="text"
                   value={goals}
-                  onChange={(e) => setGoals(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gray-900 sm:px-4 sm:py-2.5"
+                  onChange={(e) => {
+                    setGoals(e.target.value);
+                    if (fieldErrors.goals) {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.goals;
+                        return next;
+                      });
+                    }
+                  }}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm text-gray-900 outline-none transition-colors sm:px-4 sm:py-2.5 ${
+                    fieldErrors.goals
+                      ? "border-red-300 focus:border-red-500"
+                      : "border-gray-300 focus:border-gray-900"
+                  }`}
                 />
+                {fieldErrors.goals && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.goals}
+                  </p>
+                )}
               </div>
 
               <div>

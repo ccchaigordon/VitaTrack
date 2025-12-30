@@ -1,4 +1,5 @@
 const supabaseServer = require("./supabaseClient");
+const DIET_TYPES = require("../data/dietTypes.json");
 
 // Utility to project recipe fields from current schema
 function mapRecipeRow(row) {
@@ -153,7 +154,10 @@ async function getPersonalizedFeed(
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
-      if (userProfile.diet_type && userProfile.diet_type !== "Balanced") {
+      const isBalanced = userProfile.diet_type && 
+        userProfile.diet_type.toLowerCase().trim() === "balanced";
+      
+      if (userProfile.diet_type && !isBalanced) {
         const dietArray = userProfile.diet_type
           .split(",")
           .map((item) => item.trim());
