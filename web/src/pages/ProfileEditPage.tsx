@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { getErrorMessage } from "../utils/errors";
 import { useUser } from "../contexts/UserContext";
+import DIET_TYPES_DATA from "../data/dietTypes.json";
 
 const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 
@@ -22,19 +23,7 @@ function normalizeActivityLevel(value: string | null | undefined): string {
   return match || lower;
 }
 
-const DIET_TYPES = [
-  "Gluten free",
-  "Ketogenic",
-  "Vegetarian",
-  "Lacto-Vegetarian",
-  "Ovo-Vegetarian",
-  "Vegan",
-  "Pescetarian",
-  "Paleo",
-  "Primal",
-  "Low FODMAP",
-  "Whole30"
-];
+const DIET_TYPES = DIET_TYPES_DATA;
 
 const COUNTRIES = [
   "Malaysia",

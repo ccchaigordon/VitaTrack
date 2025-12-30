@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { getErrorMessage } from "../utils/errors";
 import NavLogo from "../assets/NavLogo.png";
+import DIET_TYPES_DATA from "../data/dietTypes.json";
 
 type MeResponse = {
   user: { username: string | null; full_name: string | null } | null;
@@ -54,19 +55,7 @@ const ACTIVITY_LEVELS = [
   "Extremely Active",
 ];
 
-const DIET_TYPES = [
-  "Gluten free",
-  "Ketogenic",
-  "Vegetarian",
-  "Lacto-Vegetarian",
-  "Ovo-Vegetarian",
-  "Vegan",
-  "Pescetarian",
-  "Paleo",
-  "Primal",
-  "Low FODMAP",
-  "Whole30"
-];
+const DIET_TYPES = DIET_TYPES_DATA;
 
 const WORKOUT_DAYS = ["0", "1", "2", "3", "4", "5", "6", "7"];
 
