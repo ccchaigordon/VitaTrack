@@ -132,6 +132,15 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
 
     console.log("User profile preferences:", userPreferences);
 
+    function normalizeMealTime(value) {
+      if (!value) return "";
+
+      return value
+        .toLowerCase()
+        .trim()
+        .replace(/s$/, ""); // remove trailing 's' (snacks → snack)
+    }
+
     function normalizeAllergies(allergies) {
       if (!allergies) return [];
 
@@ -225,8 +234,10 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     function filterMealsByTime(meals, mealTime) {
       if (!mealTime) return meals;
 
+      const target = normalizeMealTime(mealTime);
+
       return meals.filter(m =>
-        m.meal_time === mealTime
+        normalizeMealTime(m.meal_time) === target
       );
     }
 
