@@ -673,6 +673,34 @@
       navigate(`/chatbot/${data.chat_id}`, { replace: true });
 
       setMessages(messages);
+
+      const typingMessageId = Date.now().toString() + "-typing"; 
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "...",
+          msg_id: typingMessageId,
+          isTyping: true,
+        },
+      ]);
+
+        setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? {
+                  ...msg,
+                  text: "Hi! How can I help you today?",
+                  choices: ["Log meal", "Log workout", "Meal Recommendation", "Workout Recommendation", "Other"],
+                  isTyping: true,
+                }
+              : msg
+          )
+        );
+      }, 1000);
+      
+      
     };
 
     const newChat = async () => {

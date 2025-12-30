@@ -13,6 +13,7 @@ const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommend
 const processUploadedFilesHandler = require('../utils/ACM/handlers/processUploadedFilesHandler');
 
 let conversationState = new Map();
+let multimodalContext = null;
 
 function hasRecommendations(state) {
   return Array.isArray(state?.recommended) && state.recommended.length > 0;
@@ -36,8 +37,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   console.log("Active chat id received:", chat_id);
 
   let finalChatId = chat_id;
-  let finalMsgId = " ";
-  let multimodalContext = null;
+  let finalMsgId = " ";  
 
   console.log("final chat id at start:", finalChatId);
 
@@ -312,9 +312,16 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     if (!hasRecommendations(state)) {
       const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to show more of. Please ask for a recommendation first.";
 
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
 
-      return res.json({ reply: "There is no recommendation to show more of. Please ask for a recommendation first.", choices: choices });
+      return res.json({ reply: responseMessage, choices: choices });
     }
 
     const currentIndex = state.selectedIndex || 0;
@@ -414,8 +421,16 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     if (!hasRecommendations(state)) {
       const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to show previous of. Please ask for a recommendation first.";
 
-      return res.json({ reply: "There is no recommendation to show previous of. Please ask for a recommendation first.", choices: choices });
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
+
+      return res.json({ reply: responseMessage, choices: choices });
     }
 
     const currentIndex = state.selectedIndex || 0;
@@ -509,8 +524,16 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     if (!hasRecommendations(state)) {
       const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to select. Please ask for a recommendation first.";
 
-      return res.json({ reply: "There is no recommendation to select. Please ask for a recommendation first.", choices: choices });
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
+
+      return res.json({ reply: responseMessage, choices: choices });
     }
 
     const currentIndex = state.selectedIndex || 0;
