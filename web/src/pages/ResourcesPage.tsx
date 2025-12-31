@@ -2,212 +2,34 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getPersonalizedFeed } from "../services/healthApi";
 import { useUser } from "../contexts/UserContext";
+import type { ResourceItem, RecipeResponse, WellnessResourceResponse } from "../services/resources";
 
 type Category = "Articles" | "Recipes" | "Tutorials";
 
-type ResourceItem = {
-  id: string;
-  title: string;
-  summary: string;
-  badge: string;
-  link?: string;
-  calories?: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  category?: string;
-  content?: string;
-  cooking_time?: number;
-  ingredients?: string[];
-  isRecipe?: boolean;
-  image_url?: string;
-  dietary_tags?: string[];
-  category_tags?: string[];
-};
+// Component to handle image rendering and fallbacks safely
+function RecipeImage({ imageUrl, title }: { imageUrl: string; title: string }) {
+  const [imageError, setImageError] = useState(false);
 
-type RecipeResponse = {
-  recipe_id: string;
-  title: string;
-  procedure?: string;
-  image_url?: string;
-  calories?: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  dietary_tags?: string[];
-  cooking_time?: number;
-  ingredients?: string[];
-};
-
-type WellnessResourceResponse = {
-  resource_id: string;
-  title: string;
-  description?: string;
-  source_url: string;
-  type?: string;
-};
-
-export default function ResourcesPage() {
-  const { category } = useParams<{ category?: string }>();
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [recipes, setRecipes] = useState<ResourceItem[]>([]);
-  const [articles, setArticles] = useState<ResourceItem[]>([]);
-  const [tutorials, setTutorials] = useState<ResourceItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const { me } = useUser();
-  const userId = me?.user?.user_id || "";
-
-  // Map URL category to Category type
-  const getCategoryFromUrl = (urlCategory?: string): Category => {
-    const normalized = urlCategory?.toLowerCase();
-    if (normalized === "recipes") return "Recipes";
-    if (normalized === "tutorials") return "Tutorials";
-    return "Articles"; // default
-  };
-
-  const activeTab = getCategoryFromUrl(category);
-
-  // Update URL if no category is specified (default to Articles)
-  useEffect(() => {
-    if (!category) {
-      navigate("/resources/articles", { replace: true });
-    }
-  }, [category, navigate]);
-
-  // Fetch data from API
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (!userId) {
-          setLoading(false);
-          return;
-        }
-
-        // Fetch personalized feed (recipes + wellness resources)
-        const feed = await getPersonalizedFeed(userId, "all");
-        const feedResources = (feed.resources as any[]) || [];
-
-        const recipeItems: ResourceItem[] = feedResources
-          .filter((item) => "recipe_id" in item)
-          .map((recipe: RecipeResponse) => ({
-            id: recipe.recipe_id,
-            title: recipe.title,
-            summary:
-              recipe.procedure?.substring(0, 100) + "..." || "Delicious recipe",
-            badge: "Recipe",
-            calories: recipe.calories,
-            protein: recipe.protein,
-            carbs: recipe.carbs,
-            fat: recipe.fat,
-            category: recipe.dietary_tags?.join(", ") || "Recipe",
-            content: recipe.procedure,
-            cooking_time: recipe.cooking_time,
-            ingredients: recipe.ingredients,
-            image_url: recipe.image_url,
-            dietary_tags: recipe.dietary_tags || [],
-            isRecipe: true,
-          }));
-
-        const wellnessItems = feedResources.filter(
-          (item) => "resource_id" in item || (item as any).type
-        ) as WellnessResourceResponse[];
-
-        const articlesData: ResourceItem[] = wellnessItems
-          .filter((resource) =>
-            (resource.type || "").toLowerCase().includes("article")
-          )
-          .map((resource) => ({
-            id: resource.resource_id,
-            title: resource.title,
-            summary: resource.description || "Read this article to learn more",
-            badge: "Article",
-            link: resource.source_url,
-            content: resource.description,
-            isRecipe: false,
-            category_tags: (resource as any).category_tags || [],
-          }));
-
-        const tutorialsData: ResourceItem[] = wellnessItems
-          .filter((resource) => {
-            const type = (resource.type || "").toLowerCase();
-            return type.includes("video");
-          })
-          .map((resource) => ({
-            id: resource.resource_id,
-            title: resource.title,
-            summary:
-              resource.description || "Watch this tutorial to learn more",
-            badge: "Tutorial",
-            link: resource.source_url,
-            content: resource.description,
-            isRecipe: false,
-            category_tags: (resource as any).category_tags || [],
-          }));
-
-        setRecipes(recipeItems);
-        setArticles(articlesData);
-        setTutorials(tutorialsData);
-      } catch (err) {
-        console.error("Failed to fetch resources:", err);
-        setError("Failed to load resources. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [userId]);
-
-  // Update URL when category changes
-  const handleCategoryChange = (newCategory: Category) => {
-    const categoryPath = newCategory.toLowerCase();
-    navigate(`/resources/${categoryPath}`, { replace: true });
-  };
-
-  const RESOURCES = useMemo<Record<Category, ResourceItem[]>>(
-    () => ({
-      Articles: articles,
-      Recipes: recipes,
-      Tutorials: tutorials,
-    }),
-    [articles, recipes, tutorials]
-  );
-
-  function RecipeImage({
-    imageUrl,
-    title,
-  }: {
-    imageUrl: string;
-    title: string;
-  }) {
-    const [imageError, setImageError] = useState(false);
-
-    if (imageError) {
-      return (
-        <div className="w-16 h-16 rounded-md bg-[#DDF3D8] flex items-center justify-center shrink-0 border border-gray-200">
-          <span className="text-xs font-medium text-[#1A381D]">Recipe</span>
-        </div>
-      );
-    }
-
+  if (imageError || !imageUrl) {
     return (
-      <img
-        src={imageUrl}
-        alt={title}
-        className="w-16 h-16 rounded-md object-cover shrink-0 border border-gray-200"
-        onError={() => setImageError(true)}
-      />
+      <div className="w-16 h-16 rounded-md bg-[#DDF3D8] flex items-center justify-center shrink-0 border border-gray-200">
+        <span className="text-xs font-medium text-[#1A381D]">Recipe</span>
+      </div>
     );
   }
 
-  function ResourceCard({
+  return (
+    <img
+      src={imageUrl}
+      alt={title}
+      className="w-16 h-16 rounded-md object-cover shrink-0 border border-gray-200"
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
+// Card component to display individual items
+function ResourceCard({
     item,
     navigate,
   }: {
@@ -247,30 +69,10 @@ export default function ResourcesPage() {
         {/* Recipe Card: Show Macros */}
         {item.isRecipe && (
           <div className="mb-4 grid grid-cols-4 gap-2">
-            <div className="bg-[#DDF3D8] rounded-md p-2.5 text-center">
-              <div className="text-sm font-semibold text-[#1A381D]">
-                {item.calories || 0}
-              </div>
-              <div className="text-xs text-gray-600 mt-0.5">Cal</div>
-            </div>
-            <div className="bg-[#E8F5E3] rounded-md p-2.5 text-center">
-              <div className="text-sm font-semibold text-[#2A4A2D]">
-                {item.carbs || 0}g
-              </div>
-              <div className="text-xs text-gray-600 mt-0.5">Carbs</div>
-            </div>
-            <div className="bg-[#DDF3D8] rounded-md p-2.5 text-center">
-              <div className="text-sm font-semibold text-[#1A381D]">
-                {item.protein || 0}g
-              </div>
-              <div className="text-xs text-gray-600 mt-0.5">Protein</div>
-            </div>
-            <div className="bg-[#E8F5E3] rounded-md p-2.5 text-center">
-              <div className="text-sm font-semibold text-[#2A4A2D]">
-                {item.fat || 0}g
-              </div>
-              <div className="text-xs text-gray-600 mt-0.5">Fat</div>
-            </div>
+            <MacroBox label="Cal" value={item.calories} />
+            <MacroBox label="Carbs" value={item.carbs} suffix="g" color="bg-[#E8F5E3] text-[#2A4A2D]" />
+            <MacroBox label="Protein" value={item.protein} suffix="g" />
+            <MacroBox label="Fat" value={item.fat} suffix="g" color="bg-[#E8F5E3] text-[#2A4A2D]" />
           </div>
         )}
 
@@ -315,6 +117,148 @@ export default function ResourcesPage() {
     );
   }
 
+// Helper for macros display in recipe cards
+const MacroBox = ({ label, value, suffix = "", color = "bg-[#DDF3D8] text-[#1A381D]" }: any) => (
+  <div className={`${color} rounded-md p-2.5 text-center`}>
+    <div className={`text-sm font-semibold`}>
+      {value || 0}{suffix}
+    </div>
+    <div className="text-xs text-gray-600 mt-0.5">{label}</div>
+  </div>
+);
+
+// Main Resources Page Component
+export default function ResourcesPage() {
+  const { category } = useParams<{ category?: string }>();
+  const navigate = useNavigate();
+  const { me } = useUser();
+  const userId = me?.user?.user_id || "";
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [recipes, setRecipes] = useState<ResourceItem[]>([]);
+  const [articles, setArticles] = useState<ResourceItem[]>([]);
+  const [tutorials, setTutorials] = useState<ResourceItem[]>([]);
+
+  // Map URL category to Category type (articles, recipes, tutorials)
+  const getCategoryFromUrl = (urlCategory?: string): Category => {
+    const normalized = urlCategory?.toLowerCase();
+    if (normalized === "recipes") return "Recipes";
+    if (normalized === "tutorials") return "Tutorials";
+    return "Articles"; // default
+  };
+  const activeTab = getCategoryFromUrl(category);
+
+  // Redirect if url is empty (default to Articles)
+  useEffect(() => {
+    if (!category) {
+      navigate("/resources/articles", { replace: true });
+    }
+  }, [category, navigate]);
+
+  // Fetch data from API
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        // Fetch personalized feed (recipes + wellness resources)
+        const feed = await getPersonalizedFeed(userId, "all");
+        const feedResources = (feed.resources as any[]) || [];
+
+        const recipeItems: ResourceItem[] = feedResources
+          .filter((item) => "recipe_id" in item)
+          .map((recipe: RecipeResponse) => ({
+            id: recipe.recipe_id,
+            title: recipe.title,
+            summary:
+              recipe.procedure?.substring(0, 100) + "..." || "Delicious recipe",
+            badge: "Recipe",
+            calories: recipe.calories,
+            protein: recipe.protein,
+            carbs: recipe.carbs,
+            fat: recipe.fat,
+            category: recipe.dietary_tags?.join(", ") || "Recipe",
+            content: recipe.procedure,
+            cooking_time: recipe.cooking_time,
+            ingredients: recipe.ingredients,
+            image_url: recipe.image_url,
+            dietary_tags: recipe.dietary_tags || [],
+            isRecipe: true,
+          }));
+
+        const wellnessItems = feedResources.filter(
+          (item: any) => "resource_id" in item || (item).type
+        ) as WellnessResourceResponse[];
+
+        const articlesData: ResourceItem[] = wellnessItems
+          .filter((resource) =>
+            (resource.type || "").toLowerCase().includes("article")
+          )
+          .map((resource) => ({
+            id: resource.resource_id,
+            title: resource.title,
+            summary: resource.description || "Read this article to learn more",
+            badge: "Article",
+            link: resource.source_url,
+            content: resource.description,
+            isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
+          }));
+
+        const tutorialsData: ResourceItem[] = wellnessItems
+          .filter((resource) => {
+            const type = (resource.type || "").toLowerCase();
+            return type.includes("video");
+          })
+          .map((resource) => ({
+            id: resource.resource_id,
+            title: resource.title,
+            summary: resource.description || "Watch this tutorial to learn more",
+            badge: "Tutorial",
+            link: resource.source_url,
+            content: resource.description,
+            isRecipe: false,
+            category_tags: (resource as any).category_tags || [],
+          }));
+
+        setRecipes(recipeItems);
+        setArticles(articlesData);
+        setTutorials(tutorialsData);
+      } catch (err) {
+        console.error("Failed to fetch resources:", err);
+        setError("Failed to load resources. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [userId]);
+
+  // Update URL when category changes
+  const handleCategoryChange = (newCategory: Category) => {
+    const categoryPath = newCategory.toLowerCase();
+    navigate(`/resources/${categoryPath}`, { replace: true });
+  };
+
+  const RESOURCES = useMemo<Record<Category, ResourceItem[]>>(
+    () => ({
+      Articles: articles,
+      Recipes: recipes,
+      Tutorials: tutorials,
+    }),
+    [articles, recipes, tutorials]
+  );
+
   // Get all unique tags (category_tags + dietary_tags) for the active tab
   const allTags = useMemo(() => {
     const normalizedToOriginal = new Map<string, string>();
@@ -322,6 +266,7 @@ export default function ResourcesPage() {
       const tags = [...(item.category_tags || []), ...(item.dietary_tags || [])];
       tags.forEach((tag) => {
         const normalized = tag.toLowerCase();
+        // Ensure consistent capitalization for tags differing only by case
         if (!normalizedToOriginal.has(normalized)) {
           normalizedToOriginal.set(normalized, tag);
         } else {
@@ -338,6 +283,7 @@ export default function ResourcesPage() {
     return Array.from(normalizedToOriginal.values()).sort();
   }, [RESOURCES, activeTab]);
 
+  // Filter items based on search query and selected tags
   const filteredItems = useMemo(() => {
     let items = RESOURCES[activeTab];
 
@@ -367,9 +313,9 @@ export default function ResourcesPage() {
     }
 
     return items;
-  }, [activeTab, searchQuery, selectedTags, RESOURCES]);
+  }, [RESOURCES, activeTab, searchQuery, selectedTags]);
 
-  // Pagination: 3 rows per page
+  // Pagination 
   const itemsPerPage = 9;
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -386,6 +332,7 @@ export default function ResourcesPage() {
     setSelectedTags([]);
   }, [activeTab]);
 
+  // Render
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="mx-auto max-w-screen sm:max-w-[95vw] xl:max-w-[85vw] px-4 sm:px-6 lg:px-8 py-8">
