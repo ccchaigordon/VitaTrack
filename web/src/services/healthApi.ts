@@ -1,14 +1,6 @@
-/**
- * API Service for CRM - Content & Recipes Module
- * Provides wellness content (recipes, articles, tutorials) based on user's fitness profile
- */
-
 import { apiFetch } from './api';
 
-/**
- * PERSONALIZED FEED - Wellness content tailored to user's fitness profile
- */
-
+// PERSONALIZED FEED - Recipes and wellness resources based on user profile
 export async function getPersonalizedFeed(userId: string, contentType: string = "all") {
   const params = new URLSearchParams({ userId });
   if (contentType !== "all") params.append("contentType", contentType);
@@ -21,10 +13,7 @@ export async function getPersonalizedFeed(userId: string, contentType: string = 
   }>(`/feed?${params}`);
 }
 
-/**
- * RECIPES (CRM) - Healthy food recipes
- */
-
+// RECIPE APIs - Fetch all recipes and details
 export async function getRecipes(
   search: string | null = null,
   category: string | null = null,
@@ -41,6 +30,7 @@ export async function getRecipes(
   }>(`/recipes?${params}`);
 }
 
+// Fetch detailed info for a specific recipe by ID
 export async function getRecipeDetails(recipeId: string) {
   return apiFetch<{
     success: boolean;
@@ -48,10 +38,7 @@ export async function getRecipeDetails(recipeId: string) {
   }>(`/recipes/${recipeId}`);
 }
 
-/**
- * WELLNESS RESOURCES (CRM) - Articles, tutorials, guides
- */
-
+// WELLNESS RESOURCES APIs - Fetch all resources and details
 export async function getResources(
   search: string | null = null,
   category: string | null = null,
@@ -68,6 +55,7 @@ export async function getResources(
   }>(`/resources?${params}`);
 }
 
+// Fetch detailed info for a specific resource by ID
 export async function getResourceDetails(resourceId: string) {
   return apiFetch<{
     success: boolean;
@@ -75,9 +63,9 @@ export async function getResourceDetails(resourceId: string) {
   }>(`/resources/${resourceId}`);
 }
 
-export async function getResourcesByCategory(category: string) {
-  return apiFetch<{
-    success: boolean;
-    resources?: unknown[];
-  }>(`/resources/category/${category}`);
-}
+// export async function getResourcesByCategory(category: string) {
+//   return apiFetch<{
+//     success: boolean;
+//     resources?: unknown[];
+//   }>(`/resources/category/${category}`);
+// }

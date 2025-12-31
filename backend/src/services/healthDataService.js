@@ -1,7 +1,7 @@
 const supabaseServer = require("./supabaseClient");
 const DIET_TYPES = require("../data/dietTypes.json");
 
-// Utility to project recipe fields from current schema
+// Map database row to recipe object
 function mapRecipeRow(row) {
   const nutrition = row.nutrition_info || {};
   return {
@@ -20,9 +20,7 @@ function mapRecipeRow(row) {
   };
 }
 
-/**
- * Get recipes from database (current schema fields: title, nutrition_info, procedure)
- */
+// Get recipes from database (current schema fields: title, nutrition_info, procedure)
 async function getRecipes(filters = {}, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -48,9 +46,8 @@ async function getRecipes(filters = {}, userAccessToken = null) {
   }
 }
 
-/**
- * Get single recipe by ID
- */
+
+// Get single recipe by ID
 async function getRecipeById(recipeId, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -71,9 +68,7 @@ async function getRecipeById(recipeId, userAccessToken = null) {
   }
 }
 
-/**
- * Get wellness resources from database
- */
+// Get wellness resources from database
 async function getWellnessResources(filters = {}, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -102,9 +97,7 @@ async function getWellnessResources(filters = {}, userAccessToken = null) {
   }
 }
 
-/**
- * Get single wellness resource by ID
- */
+// Get single wellness resource by ID
 async function getResourceById(resourceId, userAccessToken = null) {
   try {
     const client = userAccessToken
@@ -125,9 +118,7 @@ async function getResourceById(resourceId, userAccessToken = null) {
   }
 }
 
-/**
- * Get personalized content feed based on user's fitness profile
- */
+// Get personalized content feed based on user's fitness profile
 async function getPersonalizedFeed(
   userId,
   contentType = "all",
@@ -138,6 +129,7 @@ async function getPersonalizedFeed(
       ? supabaseServer.createUserSupabaseClient(userAccessToken)
       : supabaseServer;
 
+    // Fetch user profile to get diet type, goals, allergies
     const { data: userProfile, error: profileError } = await client
       .from("user_profiles")
       .select("*")
@@ -147,10 +139,49 @@ async function getPersonalizedFeed(
     if (profileError) throw profileError;
 
     let finalResources = [];
-    // Normalize type for consistent checking
-    const type = contentType.toLowerCase();
+    const type = contentType.toLowerCase(); // Normalize type for consistent checking
 
-    // --- 1. RECIPES BLOCK ---
+    // Check user allergies to exclude certain recipes
+    // 1. Map allergies to dietary tags to exclude
+    const allergies = userProfile.allergies
+      ? userProfile.allergies.split(",")
+      : [];
+    const essentialTags = [];
+    if (allergies.includes("Gluten")) essentialTags.push("Gluten Free");
+    if (allergies.includes("Dairy")) essentialTags.push("Dairy Free");
+
+    // 2. Map allergies to ingredient keywords to exclude
+    let keywordsToExclude = [];
+    allergies.forEach((a) => {
+      const allergy = a.trim().toLowerCase();
+
+      // Map Categories to actual ingredient names
+      if (allergy === "shellfish") {
+        keywordsToExclude.push(
+          "shrimp",
+          "prawn",
+          "crab",
+          "lobster",
+          "clam",
+          "mussel",
+          "oyster"
+        );
+      } else if (allergy === "tree nuts") {
+        keywordsToExclude.push(
+          "almond",
+          "cashew",
+          "walnut",
+          "pecan",
+          "pistachio"
+        );
+      } else if (allergy === "peanuts") {
+        keywordsToExclude.push("peanut", "pb2");
+      } else if (allergy !== "gluten" && allergy !== "dairy") {
+        keywordsToExclude.push(allergy); // Unknown allergies, direct text search ingredients
+      }
+    });
+
+    // RECIPES
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
@@ -163,12 +194,30 @@ async function getPersonalizedFeed(
           .map((item) => item.trim());
         query = query.overlaps("dietary_tags", dietArray);
       } else {
-        query = query.contains("dietary_tags", ["Popular"]);
+        query = query.contains("dietary_tags", ["Popular"]); // if diet tags is Balanced, show popular recipes
+      }
+
+      // 2. Apply allergy filters (essential dietary tags)
+      if (essentialTags.length > 0) {
+        query = query.contains("dietary_tags", essentialTags);
       }
 
       let { data: recipeData, error: recipeError } = await query;
       if (recipeError) throw recipeError;
 
+      // 3. Apply ingredient keyword exclusion
+      if (recipeData && keywordsToExclude.length > 0) {
+        recipeData = recipeData.filter((r) => {
+          const ingText = JSON.stringify(r.ingredients).toLowerCase(); // Normalization for easy searching
+          // Check if keyword exists in this recipe
+          const hasAllergyWord = keywordsToExclude.some((word) =>
+            ingText.includes(word)
+          );
+          return !hasAllergyWord;
+        });
+      }
+
+      // fallback if no recipes found
       if (!recipeData || recipeData.length === 0) {
         const { data: fallback } = await client
           .from("recipes")
@@ -181,22 +230,24 @@ async function getPersonalizedFeed(
       finalResources = [...finalResources, ...mappedRecipes];
     }
 
-    // --- 2. WELLNESS BLOCK ---
+    // WELLNESS RESOURCES, if the type is not recipes
     if (type !== "recipes") {
       let query = client.from("wellness_resources").select("*");
 
+      // 1. Apply type filter, search by type if specified: Article, Video
       if (type !== "all") {
         const singleType = type.replace(/s$/, "");
         const capType =
           singleType.charAt(0).toUpperCase() + singleType.slice(1);
-        query = query.eq("type", capType);
+        query = query.eq("type", capType);  // Article or Video
       }
 
+      // 2. Apply goal-based filtering
       if (userProfile.goals) {
         const formattedGoal = userProfile.goals
           .split(" ")
           .map(
-            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()  // Capitalize first letter, category tags are capitalized
           )
           .join(" ");
         query = query.contains("category_tags", [formattedGoal]);
@@ -205,6 +256,7 @@ async function getPersonalizedFeed(
       let { data: wellnessData, error: wellnessError } = await query;
       if (wellnessError) throw wellnessError;
 
+      // Fallback if no wellness resources found
       if (!wellnessData || wellnessData.length === 0) {
         const { data: fallbackW } = await client
           .from("wellness_resources")
@@ -216,7 +268,7 @@ async function getPersonalizedFeed(
       finalResources = [...finalResources, ...wellnessData];
     }
 
-    // --- 3. RETURN BLOCK (Outside the IFs) ---
+    // Return user profile summary along with resources
     return {
       success: true,
       data: {
@@ -225,7 +277,7 @@ async function getPersonalizedFeed(
           diet_type: userProfile.diet_type,
         },
         contentCount: finalResources.length,
-        resources: finalResources, // Changed from 'resources' to 'finalResources'
+        resources: finalResources,
       },
     };
   } catch (err) {

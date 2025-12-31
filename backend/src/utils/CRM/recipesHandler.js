@@ -11,6 +11,7 @@ const recipesData = require("./recipes_data.json");
 const ketogenicData = require("./keto_data.json");
 const paleoPaleo30Data = require("./paleo_whole30_data.json");
 const plantBasedAllergenFreeData = require("./plantBased_allergenFree_data.json");
+const highProteinData = require("./high_protein_data.json");
 
 // Combine all data into one array
 const rawData = {
@@ -19,6 +20,7 @@ const rawData = {
     ...ketogenicData.results,
     ...paleoPaleo30Data.results,
     ...plantBasedAllergenFreeData.results,
+    ...highProteinData.results,
   ],
 };
 
@@ -39,18 +41,18 @@ function cleanText(str) {
 function cleanProcedure(str) {
   if (!str) return "";
   return str
-    .replace(/<[^>]*>?/gm, "") 
-    .replace(/\p{Extended_Pictographic}/gu, "") 
+    .replace(/<[^>]*>?/gm, "")
+    .replace(/\p{Extended_Pictographic}/gu, "")
     .trim();
 }
 
-
- /*-------------------------------------------------------------
+/*-------------------------------------------------------------
     MAIN LOGIC: transform Spoonacular recipe to supabase schema
  -------------------------------------------------------------*/
 
 function transformRecipe(r) {
   // Extract macronutrients only
+  const tags = r.diets ? [...r.diets] : [];
   const nutrition = {};
   if (r.nutrition?.nutrients) {
     const targets = {
@@ -66,15 +68,30 @@ function transformRecipe(r) {
     });
   }
 
+  /* Manual Calculation for dietary tags */
+  // Check for high protein
+  if (nutrition.protein > 25) {
+    tags.push("high protein");
+  }
+  // Check for low carb
+  if (nutrition.carbs < 20) {
+    tags.push("low carb");
+  }
+  // Check for low sodium
+  const sodium = r.nutrition.nutrients.find((n) => n.name === "Sodium");
+  if (sodium && sodium.amount < 300) {
+    tags.push("low sodium");
+  }
+
   // Combine flags into dietary_tags
   /* Spoonacular splits diet info between the 'diets' array and boolean flags.
      We manually check flags (e.g., r.vegetarian = true) to ensure no tags are missed.*/
-  const tags = r.diets ? [...r.diets] : [];
   if (r.vegetarian) tags.push("vegetarian");
   if (r.vegan) tags.push("vegan");
   if (r.glutenFree) tags.push("gluten free");
   if (r.dairyFree) tags.push("dairy free");
-  if (r.veryPopular) tags.push("popular");  
+  if (r.veryPopular) tags.push("popular");
+  if (r.lowFodmap) tags.push("low FODMAP");
   // Remove duplicates and capitalize first letter to match diet_type format (e.g. 'vegan' -> 'Vegan')
   const uniqueTags = [...new Set(tags)].map(
     (t) => t.charAt(0).toUpperCase() + t.slice(1)
@@ -82,10 +99,13 @@ function transformRecipe(r) {
 
   // Procedure logic
   let procedureText = "";
-  if (r.analyzedInstructions?.length > 0 && r.analyzedInstructions[0].steps?.length > 0) {
+  if (
+    r.analyzedInstructions?.length > 0 &&
+    r.analyzedInstructions[0].steps?.length > 0
+  ) {
     procedureText = r.analyzedInstructions[0].steps
       .map((s) => `${s.number}. ${s.step}`)
-      .join("\n\n"); 
+      .join("\n\n");  // Format with spacing between steps
   } else if (r.instructions) {
     // Format numbered lists with spacing
     procedureText = r.instructions.replace(/(\d+\.\s)/g, "\n\n$1");
@@ -94,6 +114,7 @@ function transformRecipe(r) {
       r.summary || "Instructions for this recipe are currently unavailable.";
   }
 
+  // Final return object matching Supabase schema
   return {
     title: cleanText(r.title),
     image_url: r.image,
@@ -108,6 +129,7 @@ function transformRecipe(r) {
   };
 }
 
+// Insert transformed recipes into Supabase
 async function insertRecipes() {
   if (!spoonacularData || spoonacularData.length === 0) {
     console.log("No data found to migrate.");
@@ -132,28 +154,33 @@ async function insertRecipes() {
       }
     }
 
-    console.log(`Deduplicated: ${transformed.length} → ${deduplicated.length} recipes.`);
+    console.log(
+      `Deduplicated: ${transformed.length} → ${deduplicated.length} recipes.`
+    );
 
     // Check for existing source_urls in database to avoid duplicates
     const { data: existingRecipes } = await supabaseServer
       .from("recipes")
       .select("source_url");
-    
+
     const existingSourceUrls = new Set(
-      existingRecipes?.map(r => r.source_url).filter(Boolean) || []
+      existingRecipes?.map((r) => r.source_url).filter(Boolean) || []
     );
 
     // Filter out recipes that already exist
     const newRecipes = deduplicated.filter(
-      recipe => !recipe.source_url || !existingSourceUrls.has(recipe.source_url)
+      (recipe) =>
+        !recipe.source_url || !existingSourceUrls.has(recipe.source_url)
     );
 
-    console.log(`After filtering existing: ${deduplicated.length} → ${newRecipes.length} new recipes.`);
+    console.log(
+      `After filtering existing: ${deduplicated.length} → ${newRecipes.length} new recipes.`
+    );
 
     const { data, error } = await supabaseServer
       .from("recipes")
       .insert(newRecipes)
-      .select('title');
+      .select("title");
 
     if (error) {
       console.error("Database error:", error.message);

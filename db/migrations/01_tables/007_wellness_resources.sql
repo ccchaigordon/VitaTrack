@@ -3,7 +3,7 @@ create table if not exists public.wellness_resources (
   user_id uuid,
 
   title text not null,
-  type text, -- e.g., 'Article', 'Video'
+  type text,
   source_url text not null,
   description text,
   category_tags text[] default '{}', 

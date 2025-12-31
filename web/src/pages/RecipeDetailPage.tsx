@@ -1,26 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getRecipeDetails } from "../services/healthApi";
-
-interface RecipeDetail {
-  recipe_id: string;
-  title: string;
-  image_url?: string;
-  procedure: string;
-  source_url?: string;
-  ingredients: string[];
-  calories?: number;
-  protein?: number;
-  carbs?: number;
-  fat?: number;
-  dietary_tags: string[];
-  cooking_time?: number;
-}
+import type { RecipeResponse } from "../services/resources";
 
 export default function RecipeDetailPage() {
   const { recipeId } = useParams<{ recipeId: string }>();
   const navigate = useNavigate();
-  const [recipe, setRecipe] = useState<RecipeDetail | null>(null);
+  const [recipe, setRecipe] = useState<RecipeResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +22,7 @@ export default function RecipeDetailPage() {
         setLoading(true);
         const response = await getRecipeDetails(recipeId);
         if (response.recipe && typeof response.recipe === "object") {
-          setRecipe(response.recipe as RecipeDetail);
+          setRecipe(response.recipe as RecipeResponse);
         } else {
           setError("Recipe not found");
         }
