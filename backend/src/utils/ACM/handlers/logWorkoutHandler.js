@@ -14,6 +14,16 @@ function isGeminiFallback(text) {
   );
 }
 
+function isEmptyWorkout(workout) {
+  if (!workout || typeof workout !== "object") return true;
+
+  const requiredFields = ["exercise_name", "duration", "sets", "reps","calories_burned"];
+
+  return requiredFields.every(
+    key => workout[key] === null || workout[key] === undefined || workout[key] === ""
+  );
+}
+
 async function logWorkoutHandler(message, multimodalContext, conversationState, user_id, supabase) {
   try {
     let messageToReturn;
@@ -27,6 +37,22 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
     if (isGeminiFallback(workoutData)) {
       return {           
         reply: workoutData
+      };
+    }
+
+    if (isEmptyWorkout(workoutData)) {
+      const prompt = `
+        You are a friendly fitness assistant chatbot.
+        Context:
+        The user is trying to log a workout.
+        Task:
+        Politely inform the user that no valid workout information was found in their message.
+        Ask them to provide details like exercise name, duration, sets, reps, and calories burned.
+        If calories burned is not known, they can provide an estimate by using this link: https://www.calculator.net/calories-burned-calculator.html
+      `;      
+      const gResponse = await queryGemini(prompt);
+      return {           
+        reply: gResponse
       };
     }
 
@@ -87,7 +113,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       reply: messageToReturn
     };
 
-    
+
   } catch (err) {
     console.error("Unexpected error in logWorkoutHandler:", err);
     return {

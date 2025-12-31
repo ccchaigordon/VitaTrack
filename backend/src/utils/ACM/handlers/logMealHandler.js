@@ -14,6 +14,16 @@ function isGeminiFallback(text) {
   );
 }
 
+function isEmptyMeal(meal) {
+  if (!meal || typeof meal !== "object") return true;
+
+  const requiredFields = ["meal_name", "calories"];
+
+  return requiredFields.every(
+    key => meal[key] === null || meal[key] === undefined || meal[key] === ""
+  );
+}
+
 async function logMealHandler(message, multimodalContext, conversationState, user_id, supabase) {
   try {
       let messageToReturn;
@@ -28,7 +38,23 @@ async function logMealHandler(message, multimodalContext, conversationState, use
         return {           
           reply: mealData
         };
-      }      
+      } 
+      
+      if (isEmptyMeal(mealData)) {
+        const prompt = `
+          You are a friendly fitness assistant chatbot.
+          Context:
+          The user is trying to log a meal.
+          Task:
+          Politely inform the user that no valid meal information was found in their message.
+          Ask them to provide details like meal name and calories.
+        `;
+        const gResponse = await queryGemini(prompt);       
+        
+        return {           
+          reply: gResponse
+        };
+      }
 
       for (const mealDataItem of mealData) {
         const { data, error } = await supabase

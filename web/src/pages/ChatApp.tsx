@@ -15,6 +15,7 @@
     msg_id?: string;
     isTyping?: boolean;
     choices?: string[];
+    data?: any[];
   };
 
   type TimelineItem = {
@@ -23,6 +24,7 @@
     file_url: string | null;  
     message: string | null;
     msg_id: string;
+    log_data: any[] | null;
     role: "user" | "ai";
   };
 
@@ -73,6 +75,32 @@
     return "";
   };
 
+  function downloadCSV(filename: string, rows: any[]) {
+    if (!rows.length) return;
+
+    const headers = Object.keys(rows[0]);
+
+    const csv = [
+      headers.join(","), // header row
+      ...rows.map(row =>
+        headers.map(h =>
+          `"${String(row[h] ?? "").replace(/"/g, '""')}"`
+        ).join(",")
+      )
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+
+    URL.revokeObjectURL(url);
+}
+
+
   function ChatBubble({
     role,
     text,
@@ -80,7 +108,8 @@
     isTyping,
     onTypingEnd,
     choices,
-    onChoiceClick
+    onChoiceClick,
+    data
   }: {
     role: "user" | "assistant";
     text: string;
@@ -89,6 +118,7 @@
     onTypingEnd?: () => void;
     choices?: string[];
     onChoiceClick?: (choice: string) => void;
+    data?: any[];
   }) {
     const isUser = role === "user";
     const { me } = useUser();
@@ -109,6 +139,8 @@
     }
 
     const avatarLetter = firstChar(displayName);
+
+    console.log("CSV data:", data, Array.isArray(data));
 
     return (
       <div className={`w-full flex ${isUser ? "justify-end" : "justify-start"}`}>
@@ -294,7 +326,18 @@
                     }}
                   >
                     {text}
+                    
                   </ReactMarkdown>
+
+                  
+                  {Array.isArray(data) && data.length > 0 && (
+                    <button
+                      onClick={() => downloadCSV("data.csv", data)}
+                      className="mt-2 bg-gray-200 hover:bg-gray-300 text-gray-800 px-3 py-1.5 rounded-lg text-xs"
+                    >
+                      ⬇ Download CSV
+                    </button>
+                  )}
 
                   {choices && choices.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
@@ -394,7 +437,7 @@
                 ? {
                     ...msg,
                     text: "Hi! How can I help you today?",
-                    choices: ["Log meal", "Log workout", "Meal Recommendation", "Workout Recommendation", "Other"],
+                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal Recommendation", "Workout Recommendation", "Other"],
                     isTyping: true,
                   }
                 : msg
@@ -446,12 +489,16 @@
             role: "user" | "assistant";
             text: string;
             files: FileItem[];
+            data?: any[];
           }>,
           item: TimelineItem
         ) => {
           const existingMsg = acc.find((m) => m.msg_id === item.msg_id);
 
+          console.log("existingMsg:", existingMsg);
+
           if (existingMsg) {
+
             // Append file info if exists
             if (item.file_url && item.file_name) {
               existingMsg.files.push({
@@ -467,6 +514,13 @@
                 existingMsg.text = normalized;
               }
             }
+
+            console.log("Existing message before adding log_data:", existingMsg);
+
+            if (!existingMsg.data && item.log_data) {
+              existingMsg.data = item.log_data;
+              console.log("Item log data added to existing message:", item.log_data);
+            }
           } else {
             acc.push({
               msg_id: item.msg_id,
@@ -481,8 +535,12 @@
                       },
                     ]
                   : [],
+              data: Array.isArray(item.log_data) ? item.log_data : undefined
+              
             });
           }
+
+          console.log("Item log_data:", item.log_data);
 
           return acc;
         },
@@ -560,7 +618,7 @@
       setUploads([]);
 
       try {
-        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[] }>("/chat", {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
           method: "POST",
           json: formData,
         });
@@ -592,7 +650,7 @@
         setMessages((prev) =>
           prev.map((msg) =>
             msg.msg_id === typingMessageId
-              ? { ...msg, text: data.reply, isTyping: true, choices: data.choices ? data.choices : [] }
+              ? { ...msg, text: data.reply, data: data.data ?? [], isTyping: true, choices: data.choices ? data.choices : [] }
               : msg
           )
         );
@@ -616,7 +674,6 @@
       console.log("Loaded chat data:", data);
 
       // group data based on msg_id
-      // group data based on msg_id
       const messages = data.messages.reduce(
         (
           acc: Array<{
@@ -624,12 +681,16 @@
             role: "user" | "assistant";
             text: string;
             files: FileItem[];
+            data?: any[];
           }>,
           item: TimelineItem
         ) => {
           const existingMsg = acc.find((m) => m.msg_id === item.msg_id);
 
+          console.log("existingMsg:", existingMsg);
+
           if (existingMsg) {
+
             // Append file info if exists
             if (item.file_url && item.file_name) {
               existingMsg.files.push({
@@ -645,6 +706,13 @@
                 existingMsg.text = normalized;
               }
             }
+
+            console.log("Existing message before adding log_data:", existingMsg);
+
+            if (!existingMsg.data && item.log_data) {
+              existingMsg.data = item.log_data;
+              console.log("Item log data added to existing message:", item.log_data);
+            }
           } else {
             acc.push({
               msg_id: item.msg_id,
@@ -659,8 +727,12 @@
                       },
                     ]
                   : [],
+              data: Array.isArray(item.log_data) ? item.log_data : undefined
+              
             });
           }
+
+          console.log("Item log_data:", item.log_data);
 
           return acc;
         },
@@ -692,7 +764,7 @@
               ? {
                   ...msg,
                   text: "Hi! How can I help you today?",
-                  choices: ["Log meal", "Log workout", "Meal Recommendation", "Workout Recommendation", "Other"],
+                  choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal Recommendation", "Workout Recommendation", "Other"],
                   isTyping: true,
                 }
               : msg
@@ -738,7 +810,7 @@
                 ? {
                     ...msg,
                     text: "Hi! How can I help you today?",
-                    choices: ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"],
+                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"],
                     isTyping: true,
                   }
                 : msg
@@ -783,7 +855,7 @@
                 ? {
                     ...msg,
                     text: "Hi! How can I help you today?",
-                    choices: ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"],
+                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"],
                     isTyping: true,
                   }
                 : msg
@@ -823,7 +895,7 @@
                 ? {
                     ...msg,
                     text: "Hi! How can I help you today?",
-                    choices: ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"],
+                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"],
                     isTyping: true,
                   }
                 : msg
@@ -929,6 +1001,7 @@
                     key={index}
                     role={msg.role}
                     text={msg.text}
+                    data={msg.data}
                     files={[
                       ...(msg.files || []), // loaded files
                       ...(msg.file?.map((f) => ({
@@ -947,7 +1020,9 @@
                       );
                     }}
                     choices={msg.choices}
-                    onChoiceClick={handleChoiceClick}
+                    onChoiceClick={(choice) => {                      
+                        handleChoiceClick(choice);                      
+                    }}
                   />
                 ))}
                 <div ref={messagesEndRef} />
