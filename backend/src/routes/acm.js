@@ -16,7 +16,11 @@ let conversationState = new Map();
 let multimodalContext = null;
 
 function hasRecommendations(state) {
-  return Array.isArray(state?.recommended) && state.recommended.length > 0;
+  return (
+    state instanceof Map &&
+    Array.isArray(state.get("recommended")) &&
+    state.get("recommended").length > 0
+  );
 }
 
 function getRlsClient(req) {
@@ -169,8 +173,16 @@ router.post("/chat", upload.any(), async (req, res) => {
   }
 
   if (savedContext?.conversation_state) {
-    const stateObj = JSON.parse(savedContext.conversation_state);
-    conversationState.set(user.id, new Map(Object.entries(stateObj)));
+    let stateObj = savedContext?.conversation_state;
+
+    if (typeof stateObj === "string") {
+      stateObj = JSON.parse(stateObj);
+    }
+
+    conversationState.set(
+      user.id,
+      new Map(Object.entries(stateObj || {}))
+    );
   }
 
   // Load conversation history for context (last 20 messages, excluding current message)
@@ -214,6 +226,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       console.log("Updated user goal in profile to:", goal);
     }
   }
+
+  const { data: p } = await supabase
+        .from("user_profiles")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+    
+  userProfile = p;
 
   switch (choice) {
     case 'Log meal':
@@ -306,16 +326,18 @@ router.post("/chat", upload.any(), async (req, res) => {
     const supabase = getRlsClient(req);
     const user = req.user;
 
-    const { data, error } = await supabase
+    const { data: userMealData, error: userMealDataError } = await supabase
       .from("meal_logs")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30);
 
-    if (error) {
-      return res.status(500).json({ error });
+    if (userMealDataError) {
+      return res.status(500).json({ error: userMealDataError });
     }
+
+    console.log("userMealData:", userMealData);
 
     const response = "This is you recent meal logs. You can download it as a CSV file for your records.";
 
@@ -325,13 +347,46 @@ router.post("/chat", upload.any(), async (req, res) => {
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      log_data: data,
+      log_data: userMealData,
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
     const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
-    return res.json({reply: response, chat_id: finalChatId, data: data, choices: choices});
+    return res.json({reply: response, chat_id: finalChatId, data: userMealData, choices: choices});
   }
 
   if (intent === "log_workout") {
@@ -391,14 +446,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     const supabase = getRlsClient(req);
     const user = req.user;
 
-    const { data, error } = await supabase
+    const { data: userWorkoutData, error: userWorkoutDataError } = await supabase
       .from("workout_logs")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30);
-    if (error) {
-      return res.status(500).json({ error });
+    if (userWorkoutDataError) {
+      return res.status(500).json({ error: userWorkoutDataError });
     }
 
     const response = "This is you recent workout logs. You can download it as a CSV file for your records.";
@@ -409,13 +464,46 @@ router.post("/chat", upload.any(), async (req, res) => {
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      log_data: data,
+      log_data: userWorkoutData,
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
     const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
-    return res.json({reply: response, chat_id: finalChatId, data: data, choices: choices});
+    return res.json({reply: response, chat_id: finalChatId, data: userWorkoutData, choices: choices});
   }
 
   if (intent === "recommendation_meal") {
@@ -541,22 +629,22 @@ router.post("/chat", upload.any(), async (req, res) => {
       return res.json({ reply: responseMessage, choices: choices });
     }
 
-    const currentIndex = state.selectedIndex || 0;
+    const currentIndex = state.get("selectedIndex") ?? 0;
     const nextIndex = currentIndex + 1;
 
-    if (!state || !state.recommended[nextIndex]) {
+    if (!state || !state.get("recommended")[nextIndex]) {
       const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
       const gResponse = await queryGemini(prompt);
       return res.json({ reply: gResponse });
     }
 
-    state.selectedIndex = nextIndex;
+    state.set("selectedIndex", nextIndex);
     conversationState.set(user.id, state);
 
-    const item = state.recommended[nextIndex];
+    const item = state.get("recommended")[nextIndex];
     let prompt = "";
 
-    if (state.type === "MEAL") {
+    if (state.get("type") === "MEAL") {
       const meal = item.meal;
 
       prompt = `
@@ -588,7 +676,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     }
 
-    if (state.type === "WORKOUT") {
+    if (state.get("type") === "WORKOUT") {
 
       prompt = `
         You are a friendly fitness assistant chatbot.
@@ -682,22 +770,23 @@ router.post("/chat", upload.any(), async (req, res) => {
       return res.json({ reply: responseMessage, choices: choices });
     }
 
-    const currentIndex = state.selectedIndex || 0;
+    const currentIndex = state.get("selectedIndex") ?? 0;
+    const recommendedList = state.get("recommended") ?? [];
     const prevIndex = currentIndex - 1;
 
-    if (!state || !state.recommended[prevIndex]) {
+    if (!state || !state.get("recommended")[prevIndex]) {
       const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
       const gResponse = await queryGemini(prompt);
       return res.json({ reply: gResponse });
     }
 
-    state.selectedIndex = prevIndex;
+    state.set("selectedIndex", prevIndex);
     conversationState.set(user.id, state);
 
-    const item = state.recommended[prevIndex];
+    const item = state.get("recommended")[prevIndex];
     let prompt = "";
 
-    if (state.type === "MEAL") {
+    if (state.get("type") === "MEAL") {
       const meal = item.meal;
 
       prompt = `
@@ -802,6 +891,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   if (intent === "select_recommendation") {
     const state = conversationState.get(user.id);
+    console.log("State at select recommendation:", state);
 
     if (!hasRecommendations(state)) {
       const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
@@ -849,14 +939,15 @@ router.post("/chat", upload.any(), async (req, res) => {
       return res.json({ reply: responseMessage, choices: choices });
     }
 
-    const currentIndex = state.selectedIndex || 0;
-    const item = state.recommended[currentIndex];
+    const currentIndex = state.get("selectedIndex") ?? 0;
+    const recommendedList = state.get("recommended") ?? [];
+    const item = recommendedList[currentIndex];
     let prompt = "";
     let recipe_id = null;
     let resource_id = null;
-    let type = state.type;
+    let type = state.get("type");
     
-    if (state.type === "MEAL") {
+    if (type === "MEAL") {
       const meal = item.meal;
       recipe_id = meal.recipe_id;
 
@@ -953,7 +1044,27 @@ router.post("/chat", upload.any(), async (req, res) => {
     User message:
     "${message}"
 
+    User goal:
+    "${goal || 'Not specified'}"
+
     If contextual data from uploaded files is provided, use it as the primary source of truth for nutrition or workout analysis. Do NOT guess nutrition or workout details beyond the provided context. MENTION based on the uploaded files.
+
+    Important:
+    - If user ask for meal or workout recommendations, please tell them to use the dedicated buttons for better experience.
+    - If user ask to log meal or workout, please tell them to use the dedicated buttons for better experience.
+    - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience.
+    - If user ask for viewing meal or workout logs, please use the dedicated buttons for better experience.
+    - Other than above, you can answer normally. 
+    - If user ask for goal, analyze their goals based on ${userProfile?.goals || 'not specified'} and provide further insights.
+    - If user ask anything about their profile (age, weight, height, etc), use the following details:
+      - Age: ${userProfile?.age || 'Not specified'}
+      - Weight: ${userProfile?.weight || 'Not specified'}
+      - Height: ${userProfile?.height || 'Not specified'}
+      - Activity Level: ${userProfile?.activity_level || 'Not specified'}
+      - Dietary Preferences: ${userProfile?.dietary_preferences || 'Not specified'}
+      - Allergies: ${userProfile?.allergies || 'Not specified'}
+      - Medical Conditions: ${userProfile?.medical_conditions || 'Not specified'}
+      - Goals: ${userProfile?.goals || 'Not specified'}
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
 
@@ -966,6 +1077,39 @@ router.post("/chat", upload.any(), async (req, res) => {
       message: gResponse,
       created_at: new Date(),  
     });
+
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
 
     const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 

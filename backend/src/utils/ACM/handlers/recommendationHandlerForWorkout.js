@@ -102,9 +102,13 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
                 `You are a friendly fitness assistant chatbot.
 
                 Context:
-                The user requested a workout/exercise recommendation, but no suitable workout/exercise match the criteria. Ask the user what their workout goal is (e.g. strength, cardio, fat loss).
+                The user requested a workout/exercise recommendation.
 
-                Workout/exercise goal: ${userGoal || "any"}`;
+                Workout/exercise goal: ${userGoal || "any"}
+                
+                Inform the user that you know their goal but there are no suitable workout/exercise in the library.
+                Suggest the user to change their goal or log more workouts/exercises to get better recommendations.
+                Keep it friendly.`;               
 
             gResponse = await queryGemini(prompt);
 
@@ -154,7 +158,8 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
 
             Task:
             Write a short, friendly response:
-            - Suggest the recommended workout details
+            - Tell the user that you know their goals.
+            - Suggest the recommended workout details based on their goals.
             - Mention the workout description, source url and category
             - Can add any extra explanation if needed
             - Ask if the user wants more recommendation

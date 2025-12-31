@@ -1,6 +1,5 @@
 const { queryGemini } = require("../../../services/geminiClient");
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
-const recommendationHandlerForWorkout = require("./recommendationHandlerForWorkout");
 const explainErrorWithGemini = require("../explainErrorWithGemini");
 
 function isGeminiFallback(text) {
@@ -14,13 +13,14 @@ function isGeminiFallback(text) {
   );
 }
 
-function isEmptyWorkout(workout) {
-  if (!workout || typeof workout !== "object") return true;
+function isEmptyWorkout(workouts) {
+  if (!Array.isArray(workouts) || workouts.length === 0) return true;
 
-  const requiredFields = ["exercise_name", "duration", "sets", "reps","calories_burned"];
-
-  return requiredFields.every(
-    key => workout[key] === null || workout[key] === undefined || workout[key] === ""
+  return workouts.every(w =>
+    !w?.exercise_name ||
+    Number(w.duration) <= 0 ||
+    (Number(w.sets) <= 0 && Number(w.reps) <= 0) ||
+    Number(w.calories_burned) <= 0
   );
 }
 
@@ -80,15 +80,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
           })
         };
       } 
-    }
-
-    // Fetch user goal from user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("goals")
-      .eq("user_id", user_id)
-      .single();
-    
+    }    
 
     const prompt = `
       You are a friendly fitness assistant chatbot.

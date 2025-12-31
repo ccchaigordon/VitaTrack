@@ -1,3 +1,0 @@
-function logMessageHandler (message, files) {
-
-}
