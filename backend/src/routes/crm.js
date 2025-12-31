@@ -175,33 +175,4 @@ router.get("/resources/:resourceId", async (req, res) => {
   }
 });
 
-
-// GET /api/resources/category/:category
-// Fetch resources filtered by category name
-// router.get("/resources/category/:category", async (req, res) => {
-//   try {
-//     const { category } = req.params;
-//     const userAccessToken = req.user?.accessToken;
-
-//     // Fetch wellness resources by category from healthDataService
-//     const result = await healthDataService.getWellnessResources(
-//       { category },
-//       userAccessToken
-//     );
-
-//     // Check for failure
-//     if (!result.success) {
-//       return res.status(500).json({
-//         error: result.error || "Failed to fetch resources by category"
-//       });
-//     }
-    
-//     // Return success response with filtered resources
-//     res.json({ success: true, resources: result.data });
-//   } catch (err) {
-//     console.error("Get resources by category error:", err);
-//     res.status(500).json({ error: "Failed to fetch resources by category" });
-//   }
-// });
-
 module.exports = router;
