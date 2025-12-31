@@ -1,10 +1,9 @@
 const tf = require('@tensorflow/tfjs');
-const extractMealTime = require('../Extraction/extractMealTime');
-const { queryGemini } = require('../../../services/geminiClient');
-const detectUserGoalRuleBased = require('../Extraction/extractGoalRuleBased');
-const extractUserGoal = require('../Extraction/extractUserGoal');
+const detectUserGoalRuleBased = require('../ACM/Extraction/extractGoalRuleBased');
+const extractUserGoal = require('../ACM/Extraction/extractUserGoal');
 
-async function recommendationHandlerForMeal(message, user_id, conversationState, supabase) {
+async function recommendRecipes(user_id, supabase) {
+  try {
     let mealTime = "";
     let userGoal = "";
     const allergenAliases = {
@@ -62,33 +61,27 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       diet_type,
       allergies
     };    
+      
+    const { data: userProfile } = await supabase
+        .from("user_profiles")
+        .select("goals")
+        .eq("user_id", user_id)
+        .single();
 
-    // Try rule-based detection from message
-    userGoal = detectUserGoalRuleBased(message);
-
-    // If still unknown, try user profile
-    if (!userGoal || userGoal === "Unknown") {
-        const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();
+    userGoal = detectUserGoalRuleBased(userProfile?.goals);
     
-        userGoal = detectUserGoalRuleBased(userProfile?.goals);
-    }
-
     // LAST RESORT: Gemini
     if (!userGoal || userGoal === "Unknown") {
-        userGoal = await extractUserGoal(message);
+        userGoal = await extractUserGoal(userProfile?.goals);
 
         if (userGoal === "Unknown") {
-            const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();  
+          const { data: userProfile } = await supabase
+          .from("user_profiles")
+          .select("goals")
+          .eq("user_id", user_id)
+          .single();
 
-            userGoal = await extractUserGoal(userProfile?.goals);
+          userGoal = await extractUserGoal(userProfile?.goals);
         }
     }
 
@@ -97,11 +90,22 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         userGoal = "General Health";
     }
 
+    function inferMealTimeByClock() {
+      const hour = new Date().getHours();
+
+      if (hour >= 5 && hour < 11) return "breakfast";
+      if (hour >= 11 && hour < 16) return "lunch";
+      if (hour >= 16 && hour < 18) return "snacks";
+      if (hour >= 18 && hour < 5) return "dinner";
+
+      return null;
+    }
+
     // append inferred goal to preferences
     userPreferences.goal = userGoal;
     console.log("Inferred user goal for recommendation:", userGoal);
 
-    mealTime = extractMealTime(message);
+    mealTime = inferMealTimeByClock();
     console.log("Inferred meal time for recommendation:", mealTime);
 
     console.log("User id: ", user_id);
@@ -111,35 +115,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       .select("*")
       .eq("user_id", user_id);
 
-    if (error || !meals.length) {
-      conversationState.set(user_id, {
-          state: "IDLE",
-          type: "MEAL",
-      });
-
-      const prompt = `You are a friendly fitness assistant chatbot.
-            Context:
-            The user asked for a meal recommendation, but there is not enough past meal data.
-
-            Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
-            Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
-
-      const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
-    }
-
     console.log("User profile preferences:", userPreferences);
-
-    function normalizeMealTime(value) {
-      if (!value) return "";
-
-      return value
-        .toLowerCase()
-        .trim()
-        .replace(/s$/, ""); // remove trailing 's' (snacks → snack)
-    }
 
     function normalizeAllergies(allergies) {
       if (!allergies) return [];
@@ -234,34 +210,13 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     function filterMealsByTime(meals, mealTime) {
       if (!mealTime) return meals;
 
-      const target = normalizeMealTime(mealTime);
-
       return meals.filter(m =>
-        normalizeMealTime(m.meal_time) === target
+        m.meal_time === mealTime
       );
     }
 
     const filteredMealsFromMealLogs = filterMealsByTime(meals, mealTime);
-
-    if (!filteredMealsFromMealLogs.length) {
-
-      conversationState.set(user_id, {
-          state: "IDLE",
-          type: "MEAL",
-      });
-
-      const prompt = `You are a friendly fitness assistant chatbot.
-            Context:
-            The user asked for a meal recommendation, but there is not enough past meal data.
-
-            Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
-            Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
-
-      const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
-    }
+    console.log("Filtered Meals from Logs:", filteredMealsFromMealLogs);
 
     const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
       m.calories,
@@ -270,28 +225,9 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       m.fat
     ]);
 
-    const { data: mealLibrary, error: libError } = await supabase
+    const { data: mealLibrary } = await supabase
       .from("recipes")
       .select("*");
-
-    if (libError || !mealLibrary.length) {
-      
-      conversationState.set(user_id, {
-          state: "IDLE",
-          type: "MEAL",
-      });
-
-      const prompt = `You are a friendly fitness assistant chatbot.
-            Context:
-            The user asked for a meal recommendation, but there is not enough library meal data.
-
-            Task:
-            Politely explain that you do not have enough library meal data to give accurate recommendations.
-            Keep it friendly and under 2 sentences.`;
-
-      const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
-    }
 
     function parseNutritionJSON(nutrition) {
       return {
@@ -313,6 +249,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         procedure: meal.procedure,
         cooking_time: meal.cooking_time,
         source_url: meal.source_url,
+        image_url: meal.image_url,
         ...nutrition
       };
     });
@@ -328,22 +265,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       // goals
       .filter(meal => matchesGoals(meal, goalsArray));
 
-      if (!filteredMealsFromMealLibrary.length) {
-        conversationState.set(user_id, {
-            state: "IDLE",
-            type: "MEAL",
-        });
-
-        const prompt = `You are a friendly fitness assistant chatbot.
-          Context:
-          The user requested a meal recommendation, but no suitable meals match the criteria.
-
-          Meal time: ${mealTime || "any"}`;
-
-        const gResponse = await queryGemini(prompt);
-        return { reply: gResponse };
-      }     
-
     console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
@@ -352,8 +273,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       m.carbs,
       m.fat
     ]);
-
-    //console.log(vectorsFromMealLibrary);
 
     function normalizeVector(v) {
       const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
@@ -379,85 +298,21 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     const refTensor = tf.tensor1d(referenceVector); 
 
     // Cosine similarity = dot product of normalized vectors
-    const similarity = tf
-      .matMul(mealTensor, refTensor.expandDims(1))
-      .reshape([-1]);
+    const similarity = tf .matMul(mealTensor, refTensor.expandDims(1)).reshape([-1]); const similarityTensor = similarity; 
+    const K = Math.min(36, similarityTensor.shape[0]); 
+    const { values, indices } = tf.topk(similarityTensor, K); 
+    const topIndices = indices.arraySync(); 
+    const topScores = values.arraySync(); 
+    const recommendations = topIndices.map((idx, i) => ({ 
+      meal: filteredMealsFromMealLibrary[idx], 
+      similarity: topScores[i] })); 
+    tf.dispose([ mealTensor, refTensor, similarityTensor, values, indices ]);
 
-    const similarityTensor = similarity;
-
-    const K = Math.min(3, similarityTensor.shape[0]);
-
-    const { values, indices } = tf.topk(similarityTensor, K);
-
-    const topIndices = indices.arraySync();
-    const topScores = values.arraySync();
-
-    const recommendations = topIndices.map((idx, i) => ({
-      meal: filteredMealsFromMealLibrary[idx],       // original meal object from DB
-      similarity: topScores[i]
-    }));
-
-    //console.log("Recommendations:", recommendations);
-
-    tf.dispose([
-      mealTensor,
-      refTensor,
-      similarityTensor,
-      values,
-      indices
-    ]);
-
-    // Save to conversation state
-    conversationState.set(user_id, {
-        state: "SHOWING_RESULTS",
-        type: "MEAL",
-        recommended: recommendations,
-        selectedIndex: 0,
-        referenceVector
-    });
-
-    const top = recommendations[0];
-
-    if (!top) {
-        conversationState.set(user_id, {
-            state: "IDLE",
-            type: "MEAL",
-        });
-
-        return { reply: "Sorry, I couldn't find a suitable meal recommendation." };
-    }
-
-    const m = top.meal;
-
-    const prompt = `
-      You are a friendly fitness assistant chatbot.
-
-      Context:
-      The user is browsing meal recommendations.
-
-      Meal details:
-      - Name: ${m.title}
-      - Calories: ${m.calories} kcal
-      - Protein: ${m.protein} g
-      - Carbs: ${m.carbs} g
-      - Fat: ${m.fat} g
-      - Ingredients: ${m.ingredients}
-      - Procedure: ${m.procedure}
-      - Cooking time: ${m.cooking_time} minutes
-    
-      Tell the user that, for more information can browse the source link: ${m.source_url}
-
-      Task:
-      Write a short, friendly response:
-      - Suggest the recommended meal details
-      - Mention calories
-      - Ask if the user wants more recommendation
-      - Use emojis naturally
-      `;
-    
-    const gResponse = await queryGemini(prompt);
-
-    return { reply: gResponse };
+    return { recommendations };
+} catch (error) {
+      console.error("Error in recommendRecipes:", error);
+      throw error;
+  }
 }
 
-module.exports = recommendationHandlerForMeal;
+module.exports = recommendRecipes;

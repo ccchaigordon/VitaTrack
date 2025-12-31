@@ -21,8 +21,12 @@ export function DocumentTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    const title = routeTitles[pathname] || "VitaTrack";
-    document.title = title;
+    if (pathname.startsWith("/resources")) {
+      document.title = "Resources - VitaTrack";
+    } else {
+      const title = routeTitles[pathname] || "VitaTrack";
+      document.title = title;
+    }
   }, [pathname]);
 
   return null;

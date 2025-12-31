@@ -1,4 +1,5 @@
 const supabaseServer = require("./supabaseClient");
+const DIET_TYPES = require("../data/dietTypes.json");
 
 // Map database row to recipe object
 function mapRecipeRow(row) {
@@ -184,8 +185,10 @@ async function getPersonalizedFeed(
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
-      // 1. Apply diet filter
-      if (userProfile.diet_type && userProfile.diet_type !== "Balanced") {
+      const isBalanced = userProfile.diet_type && 
+        userProfile.diet_type.toLowerCase().trim() === "balanced";
+      
+      if (userProfile.diet_type && !isBalanced) {
         const dietArray = userProfile.diet_type
           .split(",")
           .map((item) => item.trim());

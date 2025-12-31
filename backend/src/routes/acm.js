@@ -1,7 +1,7 @@
 const express = require('express');
 const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
-const detectIntent = require('../utils/ACM/detectIntent');
+const detectGoal = require('../utils/ACM/detectGoal');
 const multer = require('multer');
 const upload = multer();
 
@@ -10,7 +10,14 @@ const logWorkoutHandler = require('../utils/ACM/handlers/logWorkoutHandler');
 const recommendationHandlerForMeal = require('../utils/ACM/handlers/recommendationHandlerForMeal');
 const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommendationHandlerForWorkout');
 
+const processUploadedFilesHandler = require('../utils/ACM/handlers/processUploadedFilesHandler');
+
 let conversationState = new Map();
+let multimodalContext = null;
+
+function hasRecommendations(state) {
+  return Array.isArray(state?.recommended) && state.recommended.length > 0;
+}
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -25,12 +32,12 @@ router.post("/chat", upload.any(), async (req, res) => {
   // Access the user ID
   const user = req.user; // from auth middleware
 
-  const { message, chat_id } = req.body;
+  const { message, chat_id, choice } = req.body;
 
   console.log("Active chat id received:", chat_id);
 
   let finalChatId = chat_id;
-  let finalMsgId = " ";
+  let finalMsgId = " ";  
 
   console.log("final chat id at start:", finalChatId);
 
@@ -97,7 +104,11 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   console.log("Final msg id:", finalMsgId);
 
-  const files = req.files;
+  const files = req.files
+    ? req.files
+    : req.file
+      ? [req.file]
+      : [];
   if (!message) return res.status(400).json({ error: "Message is required" });
 
   console.log("Received message:", message);
@@ -146,6 +157,22 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
   }
 
+   const { data: savedContext } = await supabase
+    .from("chat_context")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("chat_id", finalChatId)
+    .single();
+
+  if (savedContext) { 
+    multimodalContext = savedContext.multimodal_context;
+  }
+
+  if (savedContext?.conversation_state) {
+    const stateObj = JSON.parse(savedContext.conversation_state);
+    conversationState.set(user.id, new Map(Object.entries(stateObj)));
+  }
+
   // Load conversation history for context (last 20 messages, excluding current message)
   const { data: chatHistory } = await supabase
     .from("chat_history")
@@ -161,11 +188,17 @@ router.post("/chat", upload.any(), async (req, res) => {
     .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.message}`)
     .join('\n');
 
-  const state = conversationState.get(user.id);
+  let state = conversationState.get(user.id);
 
-  // Pass conversation context to intent detection for better accuracy
-  const { intent, goal } = await detectIntent(message, state, conversationContext);
-  console.log("Intent, goal:", intent, goal);
+  if(files && files.length > 0) {
+    multimodalContext = await processUploadedFilesHandler( message, files );
+    conversationState.set(user.id, { ...state, multimodalContext } );
+  }
+
+  console.log("Multimodal context extracted:", multimodalContext);
+
+  const goal = await detectGoal(message, state, conversationContext);
+  console.log("Goal:", goal);
 
   // if goal is not equal to empty string, replace the existing goal in user profile
   if (goal) {
@@ -181,9 +214,43 @@ router.post("/chat", upload.any(), async (req, res) => {
       console.log("Updated user goal in profile to:", goal);
     }
   }
-  
+
+  switch (choice) {
+    case 'Log meal':
+      intent = 'log_meal';
+      break;
+    case 'View meals log':
+      intent = 'view_meals_log';
+      break;
+    case 'Log workout':
+      intent = 'log_workout';
+      break;
+    case 'View workouts log':
+      intent = 'view_workouts_log';
+      break;
+    case 'Meal recommendation':
+      intent = 'recommendation_meal';
+      break;
+    case 'Workout recommendation':
+      intent = 'recommendation_workout';
+      break;
+    case 'More recommendation':
+      intent = 'more_recommendation';
+      break;
+    case 'Previous recommendation':
+      intent = 'previous_recommendation';
+      break;
+    case 'Select recommendation':
+      intent = 'select_recommendation';
+      break;    
+    default:
+      intent = 'chat';
+  }
+
+  console.log("Final intent after choice handling:", intent);
+
   if (intent === "log_meal") {
-    const response = await logMealHandler(message, files, conversationState, user.id, supabase);
+    const response = await logMealHandler(message, multimodalContext?.meals, conversationState, user.id, supabase);
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
@@ -194,14 +261,81 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
+    const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(responseWithChatId);
   }
 
+  if (intent === "view_meals_log") {
+    const supabase = getRlsClient(req);
+    const user = req.user;
+
+    const { data, error } = await supabase
+      .from("meal_logs")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) {
+      return res.status(500).json({ error });
+    }
+
+    const response = "This is you recent meal logs. You can download it as a CSV file for your records.";
+
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: responseMessage,
+      log_data: data,
+      created_at: new Date(),  
+    });
+
+    const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
+
+    return res.json({reply: response, chat_id: finalChatId, data: data, choices: choices});
+  }
+
   if (intent === "log_workout") {
-    const response = await logWorkoutHandler(message, files, conversationState, user.id, supabase);
+    const response = await logWorkoutHandler(message, multimodalContext?.workouts, conversationState, user.id, supabase);
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
@@ -212,10 +346,76 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
+    const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(responseWithChatId);
+  }
+
+  if (intent === "view_workouts_log") {
+    const supabase = getRlsClient(req);
+    const user = req.user;
+
+    const { data, error } = await supabase
+      .from("workout_logs")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) {
+      return res.status(500).json({ error });
+    }
+
+    const response = "This is you recent workout logs. You can download it as a CSV file for your records.";
+
+    const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: responseMessage,
+      log_data: data,
+      created_at: new Date(),  
+    });
+
+    const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
+
+    return res.json({reply: response, chat_id: finalChatId, data: data, choices: choices});
   }
 
   if (intent === "recommendation_meal") {
@@ -230,8 +430,43 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
+    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Workout recommendation"];
+
     // append response with chat id
-    response = { ...response, chat_id: finalChatId };
+    response = { ...response, chat_id: finalChatId, choices: choices };
 
     return res.json(response);    
   }
@@ -248,14 +483,64 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
+    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Meal recommendation"];
+
     // append response with chat id
-    const responseWithChatId = { ...response, chat_id: finalChatId };
+    const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
     
     return res.json(responseWithChatId);    
   }
 
   if (intent === "more_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to show more of. Please ask for a recommendation first.";
+
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
+
+      return res.json({ reply: responseMessage, choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const nextIndex = currentIndex + 1;
 
@@ -337,16 +622,66 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
     console.log('Gemini response for more recommendation:', gResponse);
+
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
   if (intent === "previous_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to show previous of. Please ask for a recommendation first.";
+
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
+
+      return res.json({ reply: responseMessage, choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const prevIndex = currentIndex - 1;
 
@@ -422,16 +757,98 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
+    let stateObj = {};
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+
     console.log('Gemini response for more recommendation:', gResponse);
+
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
   if (intent === "select_recommendation") {
     const state = conversationState.get(user.id);
+
+    if (!hasRecommendations(state)) {
+      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const responseMessage = "There is no recommendation to select. Please ask for a recommendation first.";
+
+      await supabase.from("chat_history").insert({
+        chat_id: finalChatId,
+        role: "ai",
+        message: responseMessage,
+        created_at: new Date(),  
+      });
+
+      let stateObj = {};
+    let state = conversationState.get(user.id);
+
+    if (state instanceof Map) {
+      // Map → Object
+      stateObj = Object.fromEntries(state);
+    } else if (state && typeof state === "object") {
+      // Already an object
+      stateObj = state;
+    }
+
+    console.log("State object to save:", stateObj);
+
+    const { data, error, count } = await supabase
+      .from("chat_context")
+      .update({
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj,
+        updated_at: new Date()
+      })
+      .eq("user_id", user.id)
+      .eq("chat_id", finalChatId)
+      .select();
+    
+    if (!data || data.length === 0) {
+      await supabase.from("chat_context").insert({
+        user_id: user.id,
+        chat_id: finalChatId,
+        multimodal_context: multimodalContext,
+        conversation_state: stateObj
+      });
+    }
+      return res.json({ reply: responseMessage, choices: choices });
+    }
+
     const currentIndex = state.selectedIndex || 0;
     const item = state.recommended[currentIndex];
     let prompt = "";
@@ -502,9 +919,12 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),
     });
 
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
     return res.json({
       chat_id: finalChatId,
       reply: gResponse,
+      choices: choices
     });
   }
 
@@ -520,8 +940,20 @@ router.post("/chat", upload.any(), async (req, res) => {
     - Use emojis naturally
     - Be conversational and engaging
     - If you don't know something, admit it politely
+    - If previous conversation context is available, just continue from there. Not need to do any introductions/greetings.
 
     ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+    ${
+      conversationState.get(user.id)?.multimodalContext
+        ? `Context extracted from uploaded files (images / documents):
+      ${JSON.stringify(conversationState.get(user.id).multimodalContext, null, 2)}\n\n`
+        : ''
+    }
+
+    User message:
+    "${message}"
+
+    If contextual data from uploaded files is provided, use it as the primary source of truth for nutrition or workout analysis. Do NOT guess nutrition or workout details beyond the provided context. MENTION based on the uploaded files.
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
 
@@ -535,13 +967,15 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),  
     });
 
-    return res.json({ chat_id: finalChatId, reply: gResponse });
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+
+    return res.json({ chat_id: finalChatId, reply: gResponse, choices: choices });
   }
 
   // Default fallback - if intent doesn't match, treat as general chat
   console.log('Intent did not match any handler, defaulting to chat. Intent was:', intent);
   
-  const prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
+  let prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
 
     Your role:
     - Help users with fitness, nutrition, and wellness questions
@@ -551,6 +985,17 @@ router.post("/chat", upload.any(), async (req, res) => {
     - If you don't know something, admit it politely
 
     ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
+    ${
+      multimodalContext
+        ? `Context extracted from uploaded files (images / documents):
+      ${JSON.stringify(multimodalContext, null, 2)}\n\n`
+        : ''
+    }
+
+    User message:
+    "${message}"
+
+    If contextual data from uploaded files is provided, use it as the primary source of truth. Do NOT guess nutrition or workout details beyond the provided context.
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
 
@@ -627,7 +1072,7 @@ router.get("/loadchat", async (req, res) => {
     // 1. Fetch messages for this chat
     const { data: messages } = await supabase
       .from("chat_history")
-      .select("msg_id, role, message, created_at")
+      .select("msg_id, role, message, log_data, created_at")
       .eq("chat_id", chat_id);
 
     const msgIds = (messages || []).map(m => m.msg_id);
@@ -672,6 +1117,7 @@ router.get("/loadchat", async (req, res) => {
         message: m.message,
         created_at: m.created_at,
         msg_id: m.msg_id,
+        log_data: m.log_data ?? null,
         file_url: null,
         file_name: null
       })),
@@ -679,6 +1125,8 @@ router.get("/loadchat", async (req, res) => {
     ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
     console.log("Loaded chat timeline:", timeline);
+    console.log("messages msg_ids:", messages.map(m => m.msg_id));
+    console.log("filesWithUrls msg_ids:", filesWithUrls.map(f => f.msg_id));
 
     res.json({ chat_id, messages: timeline });
 
@@ -706,6 +1154,17 @@ router.delete("/deletechat", async (req, res) => {
     if (deleteHistoryError) {
       console.error("Error deleting chat history:", deleteHistoryError);
       return res.status(500).json({ error: "Failed to delete chat history" });
+    }
+
+    // Delete chat context
+    const { error: deleteContextError } = await supabase
+      .from("chat_context")
+      .delete()
+      .eq("chat_id", chat_id);
+    
+    if (deleteContextError) {
+      console.error("Error deleting chat context:", deleteContextError);
+      return res.status(500).json({ error: "Failed to delete chat context" });
     }
 
     // Delete chat
@@ -752,7 +1211,5 @@ router.delete("/clearAllChats", async (req, res) => {
     res.status(500).json({ error: "Failed to clear all chats" });
   } 
 });
-
-
 
 module.exports = router;

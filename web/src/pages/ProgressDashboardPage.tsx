@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CaloriesCard } from '../components/ptf/CaloriesCard';
 import { MacroCard } from '../components/ptf/MacroCard';
 import { InsightsCard } from '../components/ptf/InsightsCard';
-import { LineChart } from '../components/ptf/LineChart';  
-import { GoalBadge } from '../components/ptf/GoalBadge';
+import { LineChart } from '../components/ptf/LineChart'; 
 import { apiFetch } from "../services/api";
 
 interface CaloriesActivity {
@@ -41,8 +40,6 @@ interface WorkoutData {
   count: number; 
 }
 
-type GoalStatus = 'on_track' | 'slightly_behind' | 'off_track' | null;
-
 type ResourceItem = {
   id: string;
   title: string;
@@ -68,24 +65,39 @@ interface MetricsResponse {
   macros: MacroData;
   workouts: WorkoutData[];
   goals: {
-    hasGoals: boolean;
-    calorieGoal: number;
-    workoutGoalPerWeek: number;
-  };
-  status: {
-    calories: GoalStatus;
-    workouts: GoalStatus;
+    hasGoal: boolean;
+    calorieGoal: number | null;
   };
 }
 
 interface InsightResponse {
   summary: string[];
   nextFocus: string;
-  isFallback: boolean; // True if Gemini failed or no data
+  isFallback: boolean;
 }
 
-const ErrorCardPlaceholder = ({ title, message }: { title: string, message: string }) => (
-  <div className="bg-white rounded-2xl p-4 shadow-sm border border-red-100 h-full flex flex-col items-center justify-center text-center min-h-[300px]">
+interface CaloriesResponse {
+  history: CaloriesActivity[];
+  goal: number | null;
+}
+
+interface NotificationItem {
+  id: string;
+  message: string;
+  created_at: string;
+  is_read: boolean;
+  action_link?: string;
+  type: 'alert' | 'info' | 'success' | 'reminder';
+}
+
+const LoadingPlaceholder = ({ text = "Loading data...", height = "h-full", minHeight = "min-h-[200px]" }: { text?: string, height?: string, minHeight?: string }) => (
+  <div className={`flex items-center justify-center ${height} ${minHeight} bg-white rounded-2xl border border-gray-200`}>
+    <span className="text-gray-500 font-medium">{text}</span>
+  </div>
+);
+
+const FallbackCard = ({ title, message }: { title: string, message: string }) => (
+  <div className="bg-white rounded-2xl p-6 border border-gray-200 h-full flex flex-col items-center justify-center text-center min-h-[40px]">
     <div className="w-12 h-12 bg-red-50 rounded-full flex items-center justify-center mb-3">
       <svg className="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -93,15 +105,6 @@ const ErrorCardPlaceholder = ({ title, message }: { title: string, message: stri
     </div>
     <h3 className="text-gray-800 font-bold mb-1">{title}</h3>
     <p className="text-xs text-gray-400 max-w-[200px]">{message}</p>
-  </div>
-);
-
-const RecommendationPlaceholder = ({ title, type }: { title: string; type: 'recipe' | 'workout' | 'general' }) => (
-  <div className="flex flex-col items-center justify-center h-full min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 text-center">
-    <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
-    <p className="text-gray-500 max-w-md">
-      Check back soon for personalized {type} recommendations!
-    </p>
   </div>
 );
 
@@ -114,8 +117,8 @@ interface NavContentProps {
 }
 
 const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildClick }: NavContentProps) => {
-  const activeBtn = "bg-[#CDEE6E] text-black shadow-sm";
-  const inactiveBtn = "text-gray-400 hover:bg-lime-50";
+  const activeBtn = "bg-[#2A4A2D] text-white shadow-sm";
+  const inactiveBtn = "text-black hover:bg-gray-50";
   const recSectionActive = activeTab === "recommendation" || activeTab === "recipe" || activeTab === "workout";
   const recParentSelected = activeTab === "recommendation";
 
@@ -126,8 +129,8 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
           activeTab === 'progress' ? activeBtn : inactiveBtn
         }`}>
-        <img src={activeTab === "progress" ? "src/assets/Progress/Progress.svg" : 
-          "src/assets/Progress/Progress_inactive.svg"} className="w-5 h-5" alt="Progress" />
+        <img src={activeTab === "progress" ? "src/assets/Progress/Progress_active.svg" : 
+          "src/assets/Progress/Progress.svg"} className="w-5 h-5" alt="Progress" />
         Progress
       </button>
 
@@ -139,7 +142,7 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
         <div className="flex items-center gap-3">
           <img
             src={recSectionActive ? "src/assets/Progress/Recommendation.svg" :
-              "src/assets/Progress/Recommendation_inactive.svg"}
+              "src/assets/Progress/Recommendation.svg"}
             className="w-5 h-5" alt="Recommendation" />
           Recommendation
         </div>
@@ -169,107 +172,168 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
   );
 };
 
-function RecipeImage({ imageUrl, title }: { imageUrl?: string; title: string }) {
-  const [imageError, setImageError] = useState(false);
-  
-  // Fallback if no image or error
-  if (!imageUrl || imageError) {
+function RecipeImage({
+    imageUrl,
+    title,
+  }: {
+    imageUrl: string;
+    title: string;
+  }) {
+    const [imageError, setImageError] = useState(false);
+
+    if (imageError) {
+      return (
+        <div className="w-16 h-16 rounded-md bg-[#DDF3D8] flex items-center justify-center shrink-0 border border-gray-200">
+          <span className="text-xs font-medium text-[#1A381D]">Recipe</span>
+        </div>
+      );
+    }
+
     return (
-      <div className="w-16 h-16 rounded-md bg-[#DDF3D8] flex items-center justify-center shrink-0 border border-gray-200">
-        <span className="text-xs font-medium text-[#1A381D]">Img</span>
-      </div>
+      <img
+        src={imageUrl}
+        alt={title}
+        className="w-16 h-16 rounded-md object-cover shrink-0 border border-gray-200"
+        onError={() => setImageError(true)}
+      />
     );
   }
 
-  return (
-    <img
-      src={imageUrl}
-      alt={title}
-      className="w-16 h-16 rounded-md object-cover shrink-0 border border-gray-200"
-      onError={() => setImageError(true)}
-    />
-  );
-}
+  function ResourceCard({
+    item,
+    navigate,
+  }: {
+    item: ResourceItem;
+    navigate: (path: string) => void;
+  }) {
+    const handleCardClick = () => {
+      if (item.isRecipe) {
+        navigate(`/resources/recipes/${item.id}`);
+      } else if (item.link) {
+        window.open(item.link, "_blank");
+      }
+    };
 
-function ResourceCard({ item, navigate }: { item: ResourceItem; navigate: (path: string) => void }) {
-  const handleCardClick = () => {
-    if (item.isRecipe) {
-      navigate(`/resources/recipes/${item.id}`);
-    } else if (item.link) {
-      window.open(item.link, "_blank");
-    }
-  };
+    return (
+      <div
+        onClick={handleCardClick}
+        className={`flex flex-col rounded-lg border border-gray-200 bg-white p-6 h-full ${
+          item.isRecipe || item.link
+            ? "cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm"
+            : ""
+        }`}
+      >
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 leading-tight flex-1">
+            {item.title}
+          </h3>
+          {item.isRecipe && item.image_url ? (
+            <RecipeImage imageUrl={item.image_url} title={item.title} />
+          ) : (
+            <span className="rounded-md bg-[#DDF3D8] px-2.5 py-1 text-xs font-medium text-[#1A381D] whitespace-nowrap shrink-0">
+              {item.badge}
+            </span>
+          )}
+        </div>
 
-  return (
-    <div
-      onClick={handleCardClick}
-      className={`flex flex-col rounded-lg border border-gray-200 bg-white p-6 h-full transition-all ${
-        item.isRecipe || item.link ? "cursor-pointer hover:border-[#2A4A2D] hover:shadow-md" : ""
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3 mb-4">
-        <h3 className="text-lg font-semibold text-gray-900 leading-tight flex-1">
-          {item.title}
-        </h3>
-        {item.isRecipe ? (
-          <RecipeImage imageUrl={item.image_url} title={item.title} />
-        ) : (
-          <span className="rounded-md bg-[#DDF3D8] px-2.5 py-1 text-xs font-medium text-[#1A381D] whitespace-nowrap shrink-0">
-            {item.badge}
-          </span>
+        {/* Recipe Card: Show Macros */}
+        {item.isRecipe && (
+          <div className="mb-4 grid grid-cols-4 gap-2">
+            <div className="bg-[#DDF3D8] rounded-md p-2.5 text-center">
+              <div className="text-sm font-semibold text-[#1A381D]">
+                {item.calories || 0}
+              </div>
+              <div className="text-xs text-gray-600 mt-0.5">Cal</div>
+            </div>
+            <div className="bg-[#E8F5E3] rounded-md p-2.5 text-center">
+              <div className="text-sm font-semibold text-[#2A4A2D]">
+                {item.carbs || 0}g
+              </div>
+              <div className="text-xs text-gray-600 mt-0.5">Carbs</div>
+            </div>
+            <div className="bg-[#DDF3D8] rounded-md p-2.5 text-center">
+              <div className="text-sm font-semibold text-[#1A381D]">
+                {item.protein || 0}g
+              </div>
+              <div className="text-xs text-gray-600 mt-0.5">Protein</div>
+            </div>
+            <div className="bg-[#E8F5E3] rounded-md p-2.5 text-center">
+              <div className="text-sm font-semibold text-[#2A4A2D]">
+                {item.fat || 0}g
+              </div>
+              <div className="text-xs text-gray-600 mt-0.5">Fat</div>
+            </div>
+          </div>
         )}
-      </div>
 
-      {item.isRecipe && (
-        <div className="mb-4 grid grid-cols-4 gap-2">
-           <div className="bg-[#DDF3D8] rounded-md p-2 text-center">
-             <div className="text-xs font-bold text-[#1A381D]">{item.calories || 0}</div>
-             <div className="text-[10px] text-gray-600">Cal</div>
-           </div>
-           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
-             <div className="text-xs font-bold text-[#2A4A2D]">{item.protein || 0}g</div>
-             <div className="text-[10px] text-gray-600">Prot</div>
-           </div>
-           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
-             <div className="text-xs font-bold text-[#2A4A2D]">{item.carbs || 0}g</div>
-             <div className="text-[10px] text-gray-600">Carb</div>
-           </div>
-           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
-             <div className="text-xs font-bold text-[#2A4A2D]">{item.fat || 0}g</div>
-             <div className="text-[10px] text-gray-600">Fat</div>
-           </div>
-        </div>
-      )}
+        {/* Recipe Card: Show Ingredients and Cooking Time */}
+        {item.isRecipe && (
+          <div className="mb-4 space-y-1.5">
+            {item.cooking_time && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="text-gray-400">Time:</span>
+                <span>{item.cooking_time} min</span>
+              </div>
+            )}
+            {item.ingredients && item.ingredients.length > 0 && (
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span className="text-gray-400">Ingredients:</span>
+                <span>{item.ingredients.length}</span>
+              </div>
+            )}
+          </div>
+        )}
 
-      <div className="flex-1 flex flex-col">
-        <p className="text-sm text-gray-600 mb-4 leading-relaxed line-clamp-3 flex-1">
-          {item.summary}
-        </p>
-        <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
-          {item.isRecipe ? "View Full Recipe →" : "View More →"}
+        <div className="flex-1 flex flex-col">
+          <p className="text-sm text-gray-600 mb-4 leading-relaxed line-clamp-3 flex-1">
+            {item.summary}
+          </p>
+
+          {/* External Link for Articles/Tutorials */}
+          {!item.isRecipe && item.link && (
+            <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
+              View More →
+            </div>
+          )}
+
+          {/* Recipe Card: Click to View Full Recipe */}
+          {item.isRecipe && (
+            <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
+              View Full Recipe →
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
 export function ProgressDashboardPage() {
   const navigate = useNavigate();
   const [macroRange, setMacroRange] = useState<number>(7);
   const [caloriesRange, setCaloriesRange] = useState<number>(7);
   const [streak, setStreak] = useState<number>(0);
-  const [metrics, setMetrics] = useState<MetricsResponse>(MOCK_METRICS);
+  const [metrics, setMetrics] = useState<MetricsResponse>(INITIAL_METRICS);
+  const [insight, setInsight] = useState<InsightResponse | null>(null);
+  const [recRecipes, setRecRecipes] = useState<ResourceItem[]>([]);
+  const [recWorkouts, setRecWorkouts] = useState<ResourceItem[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+
+  // Pagination States
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // Error States
   const [macroError, setMacroError] = useState(false);
   const [caloriesError, setCaloriesError] = useState(false);
-  const [insight, setInsight] = useState<InsightResponse | null>(null);
 
   // Navigation States
   const [activeTab, setActiveTab] = useState('progress');
   const [recOpen, setRecOpen] = useState(false);
-  const [recRecipes, setRecRecipes] = useState<ResourceItem[]>([]);
-  const [recWorkouts, setRecWorkouts] = useState<ResourceItem[]>([]);
+
+  // Loading States
+  const [loadingMacros, setLoadingMacros] = useState(true);
+  const [loadingCalories, setLoadingCalories] = useState(true);
+  const [loadingInsights, setLoadingInsights] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(false);
 
   // Mobile Menu States
@@ -308,15 +372,19 @@ export function ProgressDashboardPage() {
   };
 
   // Data Fetching  
-
   // Fetch 1: Macronutrients
   useEffect(() => {
     const fetchMacros = async () => {
+      setLoadingMacros(true);
       setMacroError(false);
       try {
         const macroData = await apiFetch<MacroData>(`/ptf/macros?days=${macroRange}`);
         setMetrics(prev => ({ ...prev, macros: macroData }));
-      } catch (err) { console.error(err); setMacroError(true); }
+      } catch (err) {
+        console.error(err); setMacroError(true); 
+      } finally {
+        setLoadingMacros(false);
+      }
     };
     fetchMacros();
   }, [macroRange]);
@@ -324,23 +392,40 @@ export function ProgressDashboardPage() {
   // Fetch 2: Calories Activity
   useEffect(() => {
     const fetchCalories = async () => {
+      setLoadingCalories(true);
+      setCaloriesError(false);
       try {
-        const activityData = await apiFetch<CaloriesActivity[]>(`/ptf/calories?days=${caloriesRange}`);
-        setMetrics(prev => ({ ...prev, caloriesActivity: activityData }));
-      } catch (err) { console.error(err); setCaloriesError(true); }
+        const caloriesData = await apiFetch<CaloriesResponse>(`/ptf/calories?days=${caloriesRange}`);
+        setMetrics(prev => ({ 
+          ...prev, 
+          caloriesActivity: caloriesData.history,
+          goals: { ...prev.goals, calorieGoal: caloriesData.goal }
+        }));
+      } catch (err) { 
+        console.error(err); 
+        setCaloriesError(true); 
+      } finally {
+        setLoadingCalories(false);
+      }
     };
     fetchCalories();
   }, [caloriesRange]);
 
   // Fetch 3: Weekly Insights
+  const hasFetchedInsights = useRef(false);
+
   useEffect(() => {
+    if (hasFetchedInsights.current) return;
     const fetchInsights = async () => {
+      setLoadingInsights(true);
       try {
+        hasFetchedInsights.current = true; 
         const response = await apiFetch<InsightResponse>(`/ptf/insights`);
         setInsight(response);
       } catch (err) {
         console.error(err);
-        setInsight(MOCK_INSIGHTS);
+      } finally {
+        setLoadingInsights(false);
       }
     };
     fetchInsights();
@@ -374,7 +459,7 @@ export function ProgressDashboardPage() {
       if (activeTab === 'recipe' && recRecipes.length === 0) {
         setLoadingRecs(true);
         try {
-          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendRecipes');
+          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendationRecipes');
           setRecRecipes(res.recommendations);
         } catch (e) { console.error(e); } finally { setLoadingRecs(false); }
       }
@@ -390,47 +475,57 @@ export function ProgressDashboardPage() {
     fetchRecommendations();
   }, [activeTab]);
 
+  const currentItems = activeTab === 'recipe' ? recRecipes : recWorkouts;
+  const totalPages = Math.ceil(currentItems.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedItems = currentItems.slice(startIndex, startIndex + itemsPerPage);
+
   // Main content
   const renderContent = () => {
     if (activeTab === 'progress') {
       return (
         <>
           <section className="mb-6">
-            <InsightsCard insight={insight} />
+            {loadingInsights ? (
+               <LoadingPlaceholder text="Generating insights..." minHeight="min-h-[150px]" />
+            ) : (
+               <InsightsCard insight={insight} />
+            )}
           </section>
 
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
             <div className="min-w-0 h-full">
-              {caloriesError ? (
-                <ErrorCardPlaceholder title="Calories Unavailable" message="Could not load activity data. Check connection." />
+              {loadingCalories ? (
+                <LoadingPlaceholder text="Loading calories..." />
+              ) : caloriesError ? (
+                <FallbackCard title="Calories Unavailable" message="Could not load activity data." />
               ) : (
                 <CaloriesCard
                   data={metrics.caloriesActivity}
                   goal={metrics.goals.calorieGoal}
-                  status={metrics.status.calories}
                   rangeValue={caloriesRange}
                   onRangeChange={setCaloriesRange}
                 />
               )}
             </div>
+
             <div className="flex flex-col gap-6 h-full">
               <div className="w-full">
-                {macroError ? (
-                  <ErrorCardPlaceholder title="Macros Unavailable" message="Could not load macronutrient data. Check connection." />
+                {loadingMacros ? (
+                   <LoadingPlaceholder text="Loading macros..." />
+                ) : macroError ? (
+                  <FallbackCard title="Macros Unavailable" message="Could not load macronutrient data." />
                 ) : (
-                  <MacroCard data={metrics.macros} rangeDays={macroRange} onRangeChange={setMacroRange} />
+                  <MacroCard 
+                    data={metrics.macros} 
+                    rangeDays={macroRange} 
+                    onRangeChange={setMacroRange} 
+                  />
                 )}
               </div>
               <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-200 flex flex-col items-center justify-center">
                 <span className="text-4xl font-black text-gray-800">{streak}</span>
                 <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Days Streak</span>
-                <div className="mt-2">
-                  {streak > 3 ? (
-                    <GoalBadge status={'on_track'} />
-                  ) : (
-                    <GoalBadge status={'slightly_behind'} />
-                  )}
-                </div>
               </div>
             </div>
           </section>
@@ -444,33 +539,104 @@ export function ProgressDashboardPage() {
     }
 
     if (activeTab === 'recipe' || activeTab === 'workout') {
-      const items = activeTab === 'recipe' ? recRecipes : recWorkouts;
-      const title = activeTab === 'recipe' ? 'Recipes Recommendations' : 'Workouts Recommendations';
+      const currentItems = activeTab === 'recipe' ? recRecipes : recWorkouts;
       
       return (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+        <div>
+          {/* Header & Pagination Count */}
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+             <div>
+               <h2 className="text-2xl font-bold text-gray-900 capitalize">{activeTab} Recommendations</h2>
+               <p className="mt-1 text-sm text-gray-600">
+                  {loadingRecs ? "Loading..." : `${currentItems.length} items available`}
+               </p>
+             </div>
+
+           {/* Top Pagination Controls */}
+           {!loadingRecs && currentItems.length > 0 && totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }
+                  disabled={currentPage === 1}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Previous
+                </button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => {
+                      const showPage =
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1);
+
+                      if (!showPage) {
+                        if (
+                          page === currentPage - 2 ||
+                          page === currentPage + 2
+                        ) {
+                          return (
+                            <span key={page} className="px-2 text-gray-500">
+                              ...
+                            </span>
+                          );
+                        }
+                        return null;
+                      }
+
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCurrentPage(page)}
+                          className={`px-3 py-2 text-sm font-medium rounded-md cursor-pointer ${
+                            currentPage === page
+                              ? "bg-[#2A4A2D] text-white"
+                              : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    }
+                  )}
+                </div>
+                <button
+                  onClick={() =>
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
+           )}
           </div>
           
-          {loadingRecs ? (
-             <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200">
-                <span className="text-gray-500">Loading recommendations...</span>
-             </div>
-          ) : items.length === 0 ? (
-             <RecommendationPlaceholder title={`No ${activeTab}s found`} type={activeTab as 'recipe' | 'workout'} />
-          ) : (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {items.map((item) => (
-                <ResourceCard key={item.id} item={item} navigate={navigate} />
-              ))}
-            </div>
-          )}
+          <div className="mt-6">
+            {loadingRecs ? (
+               <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200">
+                  <span className="text-gray-500">Loading recommendations...</span>
+               </div>
+            ) : currentItems.length === 0 ? (
+               <FallbackCard title="No Recommendations Available" message="Check back later for new recommendations." />
+            ) : (
+              <>
+                {/* Grid of Items */}
+                <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                  {paginatedItems.map((item) => (
+                    <ResourceCard key={item.id} item={item} navigate={navigate} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       );
     }
   };
-
 
   return (
     <div className="min-h-screen w-full p-4 lg:p-3 bg-cover bg-[#F5F7FA] flex justify-center">
@@ -496,7 +662,7 @@ export function ProgressDashboardPage() {
         </div>
 
         {/* Desktop Sidebar */}
-        <aside className="hidden lg:block w-64 bg-white rounded-2xl p-4 border border-gray-200 h-fit sticky top-4 z-10">
+        <aside className="hidden lg:block w-64 bg-white rounded-2xl p-4 border border-gray-200 h-fit sticky top-4 z-10 ">
           <div>
             <SidebarContent
               activeTab={activeTab}
@@ -556,40 +722,19 @@ export function ProgressDashboardPage() {
       </div>
     </div>
   );
-};
+}
 
-// DUMMY DATA
-const MOCK_METRICS: MetricsResponse = {
-  rangeDays: 7,
-  caloriesActivity: [
-    { date: '2025-10-20', dayName: 'Mon', caloriesConsumed: 1800, caloriesBurned: 450 },
-    { date: '2025-10-21', dayName: 'Tue', caloriesConsumed: 1650, caloriesBurned: 300 },
-    { date: '2025-10-22', dayName: 'Wed', caloriesConsumed: 2100, caloriesBurned: 500 },
-    { date: '2025-10-23', dayName: 'Thu', caloriesConsumed: 1950, caloriesBurned: 400 },
-    { date: '2025-10-24', dayName: 'Fri', caloriesConsumed: 1750, caloriesBurned: 350 },
-    { date: '2025-10-25', dayName: 'Sat', caloriesConsumed: 2200, caloriesBurned: 600 },
-    { date: '2025-10-26', dayName: 'Sun', caloriesConsumed: 1850, caloriesBurned: 300 },
-  ],
-  macros: {
-    current: { totalCalories: 7500, carbs: 210, protein: 498, fat: 285 },
-    previous: { totalCalories: 7200, carbs: 200, protein: 480, fat: 260 },
-    deltaPercent: { calories: 1.45, carbs: 0.78, protein: -2.84, fat: 4.16 },
-  },
-  workouts: Array.from({ length: 14 }).map((_, i) => ({
-    date: new Date(Date.now() - (13 - i) * 86400000).toISOString().slice(0, 10),
-    label: new Date(Date.now() - (13 - i) * 86400000).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
-    count: Math.random() > 0.5 ? 1 : 0
-  })),
-  goals: { hasGoals: true, calorieGoal: 2000, workoutGoalPerWeek: 4 },
-  status: { calories: 'on_track', workouts: 'slightly_behind' }
-};
-
-const MOCK_INSIGHTS: InsightResponse = {
-  summary: [
-    "Your protein intake is slightly lower than last week (-2.84%).",
-    "Great job maintaining a 2-day workout streak!",
-    "Calorie consumption is stable and within 10% of your goal."
-  ],
-  nextFocus: "Try adding a protein shake after your Thursday workout.",
-  isFallback: false
-};
+const INITIAL_METRICS: MetricsResponse = {
+    rangeDays: 7,
+    caloriesActivity: [],
+    macros: {
+      current: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
+      previous: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
+      deltaPercent: { calories: 0, carbs: 0, protein: 0, fat: 0 },
+    },
+    workouts: [],
+    goals: { 
+      hasGoal: false, 
+      calorieGoal: null,
+    },
+  };
