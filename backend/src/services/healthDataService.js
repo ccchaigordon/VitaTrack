@@ -46,7 +46,6 @@ async function getRecipes(filters = {}, userAccessToken = null) {
   }
 }
 
-
 // Get single recipe by ID
 async function getRecipeById(recipeId, userAccessToken = null) {
   try {
@@ -185,9 +184,10 @@ async function getPersonalizedFeed(
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
-      const isBalanced = userProfile.diet_type && 
+      const isBalanced =
+        userProfile.diet_type &&
         userProfile.diet_type.toLowerCase().trim() === "balanced";
-      
+
       if (userProfile.diet_type && !isBalanced) {
         const dietArray = userProfile.diet_type
           .split(",")
@@ -239,29 +239,40 @@ async function getPersonalizedFeed(
         const singleType = type.replace(/s$/, "");
         const capType =
           singleType.charAt(0).toUpperCase() + singleType.slice(1);
-        query = query.eq("type", capType);  // Article or Video
+        query = query.eq("type", capType); // Article or Video
       }
 
       // 2. Apply goal-based filtering
-      if (userProfile.goals) {
-        const formattedGoal = userProfile.goals
-          .split(" ")
-          .map(
-            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()  // Capitalize first letter, category tags are capitalized
+      if (userProfile.goals && userProfile.goals.trim().length > 0) {
+        const goalsArray = userProfile.goals
+          .split(/,|;|\/|\band\b|&/i) // Regex to split by comma, semicolon, slash, "and" (case-insensitive), or &
+          .map((goal) =>
+            goal
+              .trim()
+              .split(" ")
+              .map(
+                (word) =>
+                  word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+              )
+              .join(" ")
           )
-          .join(" ");
-        query = query.contains("category_tags", [formattedGoal]);
+          .filter((goal) => goal.length > 0); // Remove empty strings
+
+        // Use overlaps to match any of the user's goals (if match category tags)
+        if (goalsArray.length > 0) {
+          query = query.overlaps("category_tags", goalsArray);
+        }
       }
 
       let { data: wellnessData, error: wellnessError } = await query;
       if (wellnessError) throw wellnessError;
 
-      // Fallback if no wellness resources found
+      // Fallback if match in category tags found
       if (!wellnessData || wellnessData.length === 0) {
         const { data: fallbackW } = await client
           .from("wellness_resources")
           .select("*")
-          .limit(20);
+          .limit(100);
         wellnessData = fallbackW || [];
       }
 
