@@ -2,6 +2,7 @@ const { queryGemini } = require("../../../services/geminiClient");
 const extractMealInfoFromMsg = require("../Extraction/extractMealInfoFromMsg");
 const recommendationHandlerForMeal = require("./recommendationHandlerForMeal");
 const explainErrorWithGemini = require("../explainErrorWithGemini");
+const { sendNotification } = require('../../../services/notificationClient');
 
 function isGeminiFallback(text) {
   return (
@@ -81,6 +82,56 @@ async function logMealHandler(message, multimodalContext, conversationState, use
               })
             };
           }      
+      }
+
+      try {
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        const { data: dailyMetric, error: metricError } = await supabase
+          .from('daily_metrics')
+          .select('calories_in, protein, carbs, fat')
+          .eq('user_id', user_id)
+          .eq('created_at', todayStr)
+          .single();
+
+          console.log("Fetched daily metrics:", todayStr, {dailyMetric, metricError});
+
+        if (!metricError && dailyMetric && dailyMetric.calories_in > 0) {
+           const { calories_in, protein, carbs, fat } = dailyMetric;
+
+           const carbCals = carbs * 4;
+           const proteinCals = protein * 4;
+           const fatCals = fat * 9;
+           const totalCals = calories_in; 
+
+           const carbRatio = carbCals / totalCals;
+           const fatRatio = fatCals / totalCals;
+           const proteinRatio = proteinCals / totalCals;
+
+           if (carbRatio > 0.70) {
+               await sendNotification(
+                user_id, 
+                'alert',
+                "High Carb Alert: Carbs intake is over 70% of today’s calories. Consider adding protein/fats to your next meal.", 
+                '/progress');
+           } 
+           if (fatRatio > 0.40) {
+               await sendNotification(
+                user_id, 
+                'alert',
+                "High Fat Alert: Fat intake is over 40% of today's calories. Watch your intake for the rest of the day.", 
+                '/progress');
+           } 
+           if (proteinRatio > 0.35) {
+               await sendNotification(
+                user_id,
+                'alert',
+                "High Protein Alert: Protein intake is over 35% of today's calories. Very high protein day!",
+                '/progress');
+           }
+        }
+      } catch (notifError) {
+        console.error("Failed to process nutrition notifications:", notifError);
       }
 
       const prompt = `

@@ -3,6 +3,8 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { getSupabase } from "../services/supabase";
 import { useUser } from "../contexts/UserContext";
 import NavLogo from "../assets/NavLogo.png";
+import { apiFetch } from "../services/api";
+import { NotificationPopup } from "./NotificationPopup";
 
 function firstChar(v: string) {
   const s = v.trim();
@@ -101,6 +103,8 @@ export default function Navbar() {
   const [mobileAnimating, setMobileAnimating] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Check active path
   const isActive = (path: string) => location.pathname.startsWith(path);
@@ -157,6 +161,26 @@ export default function Navbar() {
     setTimeout(() => setMobileOpen(false), 300);
   }
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchCount = async () => {
+    try {
+      const res = await apiFetch<{ unreadCount: number }>('/notifications?limit=1');
+      if (isMounted) setUnreadCount(res.unreadCount);
+    } catch (error) {
+      console.error("Notification polling failed", error);
+    }
+  };
+    
+    fetchCount();
+    const interval = setInterval(fetchCount, 60000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <>
       <nav className="sticky top-0 z-100 flex items-center justify-between bg-white px-4 xl:px-10 py-3 shadow-[0px_4px_6px_-2px_rgba(0,0,0,0.1)] rounded-b-xl">
@@ -184,7 +208,8 @@ export default function Navbar() {
               />
             </svg>
           </button>
-          <button className="rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+          <button onClick={() => nav('/notifications')}
+          className="relative rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
             <svg
               className="h-6 w-6"
               fill="none"
@@ -198,6 +223,11 @@ export default function Navbar() {
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#EA4335] text-[10px] font-bold text-white ring-1 ring-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -255,8 +285,9 @@ export default function Navbar() {
           </li>
         </ul>
 
-        <div className="hidden lg:flex flex-row gap-1 xl:gap-2">
-          <button className="rounded-full px-3 text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
+        <div className="hidden lg:flex flex-row gap-1 xl:gap-2 items-center">
+          <div className="relative">
+          <button onClick={() => setNotifOpen(!notifOpen)}className="relative rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600 cursor-pointer">
             <svg
               className="h-6 w-6"
               fill="none"
@@ -270,7 +301,19 @@ export default function Navbar() {
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
               />
             </svg>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#EA4335] text-[10px] font-bold text-white ring-1 ring-white">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+            )}
           </button>
+          {notifOpen && (
+            <NotificationPopup 
+              onClose={() => setNotifOpen(false)} 
+              onRead={() => setUnreadCount(prev => Math.max(0, prev - 1))}
+            />
+          )}
+          </div>
           <div className="relative" ref={profileRef}>
             <button
               type="button"

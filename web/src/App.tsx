@@ -22,6 +22,7 @@ import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import { LandingPage } from "./pages/LandingPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 
 function AuthenticatedLayout({
   children,
@@ -162,7 +163,7 @@ export function App() {
           path="/progress"
           element={
             <RequireAuth>
-              <AuthenticatedLayout>
+              <AuthenticatedLayout showFooter>
                 <ProgressDashboardPage />
               </AuthenticatedLayout>
             </RequireAuth>
@@ -195,6 +196,16 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout showFooter>
                 <PrivacyPolicyPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <NotificationsPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }
