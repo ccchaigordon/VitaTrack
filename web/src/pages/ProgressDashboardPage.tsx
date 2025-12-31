@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CaloriesCard } from '../components/ptf/CaloriesCard';
 import { MacroCard } from '../components/ptf/MacroCard';
 import { InsightsCard } from '../components/ptf/InsightsCard';
@@ -42,6 +43,25 @@ interface WorkoutData {
 
 type GoalStatus = 'on_track' | 'slightly_behind' | 'off_track' | null;
 
+type ResourceItem = {
+  id: string;
+  title: string;
+  summary: string;
+  badge: string;
+  link?: string;
+  calories?: number;
+  protein?: number;
+  carbs?: number;
+  fat?: number;
+  category?: string;
+  content?: string;
+  cooking_time?: number;
+  ingredients?: string[];
+  isRecipe?: boolean;
+  image_url?: string;
+  dietary_tags?: string[];
+};
+
 interface MetricsResponse {
   rangeDays: number;
   caloriesActivity: CaloriesActivity[];
@@ -73,6 +93,15 @@ const ErrorCardPlaceholder = ({ title, message }: { title: string, message: stri
     </div>
     <h3 className="text-gray-800 font-bold mb-1">{title}</h3>
     <p className="text-xs text-gray-400 max-w-[200px]">{message}</p>
+  </div>
+);
+
+const RecommendationPlaceholder = ({ title, type }: { title: string; type: 'recipe' | 'workout' | 'general' }) => (
+  <div className="flex flex-col items-center justify-center h-full min-h-[500px] bg-white rounded-2xl border border-gray-200 p-8 text-center">
+    <h2 className="text-2xl font-bold text-gray-800 mb-2">{title}</h2>
+    <p className="text-gray-500 max-w-md">
+      Check back soon for personalized {type} recommendations!
+    </p>
   </div>
 );
 
@@ -109,9 +138,9 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
       >
         <div className="flex items-center gap-3">
           <img
-            src={recSectionActive ? "src/assets/Progress/Recommendation.svg" : 
+            src={recSectionActive ? "src/assets/Progress/Recommendation.svg" :
               "src/assets/Progress/Recommendation_inactive.svg"}
-            className="w-5 h-5" alt="Recommendation"/>
+            className="w-5 h-5" alt="Recommendation" />
           Recommendation
         </div>
         <span className={`text-xl transition-transform ${recOpen ? "rotate-90" : ""}`}>
@@ -124,14 +153,14 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
           <button
             onClick={() => onChildClick("recipe")}
             className={`w-full flex items-center gap-2 font-medium rounded-lg px-3 py-2 cursor-pointer
-              ${activeTab === "recipe" ? activeBtn : inactiveBtn }`}
+              ${activeTab === "recipe" ? activeBtn : inactiveBtn}`}
           >Recipe
           </button>
 
           <button
             onClick={() => onChildClick("workout")}
             className={`w-full flex items-center gap-2 font-medium rounded-lg px-3 py-2 cursor-pointer 
-              ${activeTab === "workout" ? activeBtn : inactiveBtn }`}
+              ${activeTab === "workout" ? activeBtn : inactiveBtn}`}
           >Workout
           </button>
         </div>
@@ -140,7 +169,92 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
   );
 };
 
+function RecipeImage({ imageUrl, title }: { imageUrl?: string; title: string }) {
+  const [imageError, setImageError] = useState(false);
+  
+  // Fallback if no image or error
+  if (!imageUrl || imageError) {
+    return (
+      <div className="w-16 h-16 rounded-md bg-[#DDF3D8] flex items-center justify-center shrink-0 border border-gray-200">
+        <span className="text-xs font-medium text-[#1A381D]">Img</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={imageUrl}
+      alt={title}
+      className="w-16 h-16 rounded-md object-cover shrink-0 border border-gray-200"
+      onError={() => setImageError(true)}
+    />
+  );
+}
+
+function ResourceCard({ item, navigate }: { item: ResourceItem; navigate: (path: string) => void }) {
+  const handleCardClick = () => {
+    if (item.isRecipe) {
+      navigate(`/resources/recipes/${item.id}`);
+    } else if (item.link) {
+      window.open(item.link, "_blank");
+    }
+  };
+
+  return (
+    <div
+      onClick={handleCardClick}
+      className={`flex flex-col rounded-lg border border-gray-200 bg-white p-6 h-full transition-all ${
+        item.isRecipe || item.link ? "cursor-pointer hover:border-[#2A4A2D] hover:shadow-md" : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 leading-tight flex-1">
+          {item.title}
+        </h3>
+        {item.isRecipe ? (
+          <RecipeImage imageUrl={item.image_url} title={item.title} />
+        ) : (
+          <span className="rounded-md bg-[#DDF3D8] px-2.5 py-1 text-xs font-medium text-[#1A381D] whitespace-nowrap shrink-0">
+            {item.badge}
+          </span>
+        )}
+      </div>
+
+      {item.isRecipe && (
+        <div className="mb-4 grid grid-cols-4 gap-2">
+           <div className="bg-[#DDF3D8] rounded-md p-2 text-center">
+             <div className="text-xs font-bold text-[#1A381D]">{item.calories || 0}</div>
+             <div className="text-[10px] text-gray-600">Cal</div>
+           </div>
+           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
+             <div className="text-xs font-bold text-[#2A4A2D]">{item.protein || 0}g</div>
+             <div className="text-[10px] text-gray-600">Prot</div>
+           </div>
+           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
+             <div className="text-xs font-bold text-[#2A4A2D]">{item.carbs || 0}g</div>
+             <div className="text-[10px] text-gray-600">Carb</div>
+           </div>
+           <div className="bg-[#E8F5E3] rounded-md p-2 text-center">
+             <div className="text-xs font-bold text-[#2A4A2D]">{item.fat || 0}g</div>
+             <div className="text-[10px] text-gray-600">Fat</div>
+           </div>
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col">
+        <p className="text-sm text-gray-600 mb-4 leading-relaxed line-clamp-3 flex-1">
+          {item.summary}
+        </p>
+        <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
+          {item.isRecipe ? "View Full Recipe →" : "View More →"}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ProgressDashboardPage() {
+  const navigate = useNavigate();
   const [macroRange, setMacroRange] = useState<number>(7);
   const [caloriesRange, setCaloriesRange] = useState<number>(7);
   const [streak, setStreak] = useState<number>(0);
@@ -150,10 +264,13 @@ export function ProgressDashboardPage() {
   const [macroError, setMacroError] = useState(false);
   const [caloriesError, setCaloriesError] = useState(false);
   const [insight, setInsight] = useState<InsightResponse | null>(null);
-  
+
   // Navigation States
   const [activeTab, setActiveTab] = useState('progress');
   const [recOpen, setRecOpen] = useState(false);
+  const [recRecipes, setRecRecipes] = useState<ResourceItem[]>([]);
+  const [recWorkouts, setRecWorkouts] = useState<ResourceItem[]>([]);
+  const [loadingRecs, setLoadingRecs] = useState(false);
 
   // Mobile Menu States
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -181,7 +298,7 @@ export function ProgressDashboardPage() {
 
   const handleRecommendation = () => {
     setRecOpen((prev) => !prev);
-    setActiveTab("recommendation");
+    if (!recOpen) setActiveTab("progress");
   };
 
   const handleChild = (tab: "recipe" | "workout") => {
@@ -244,90 +361,40 @@ export function ProgressDashboardPage() {
   useEffect(() => {
     const fetchStreak = async () => {
       try {
-        const res = await apiFetch<{ streakDays: number }>('/ptf/streak'); 
+        const res = await apiFetch<{ streakDays: number }>('/ptf/streak');
         setStreak(res.streakDays);
       } catch (err) { console.error(err); }
     };
     fetchStreak();
   }, []);
 
-  return (
-    <div className="min-h-screen w-full p-4 lg:p-3 bg-cover bg-[#F5F7FA] flex justify-center">
-      {/* Container */}
-      <div className="w-full max-w-[1800px] lg:m-4 flex flex-col lg:flex-row gap-5 relative">
-        
-        {/* Mobile Menu */}
-        <div className="lg:hidden flex items-center gap-4 mb-2">
-            <button
-                type="button"
-                onClick={openMobileMenu}
-                className="flex cursor-pointer items-center rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
-            >
-                <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-            </button>
-            <h1 className="text-2xl font-bold text-gray-800">Progress Dashboard</h1>
-        </div>
+  // Fetch 6: Recommendations
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      if (activeTab === 'recipe' && recRecipes.length === 0) {
+        setLoadingRecs(true);
+        try {
+          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendRecipes');
+          setRecRecipes(res.recommendations);
+        } catch (e) { console.error(e); } finally { setLoadingRecs(false); }
+      }
+      
+      if (activeTab === 'workout' && recWorkouts.length === 0) {
+        setLoadingRecs(true);
+        try {
+          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendationWorkouts');
+          setRecWorkouts(res.recommendations);
+        } catch (e) { console.error(e); } finally { setLoadingRecs(false); }
+      }
+    };
+    fetchRecommendations();
+  }, [activeTab]);
 
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:block w-64 bg-white rounded-2xl p-4 border border-gray-200 top-25">
-          <div className="sticky top-25">
-           <SidebarContent 
-             activeTab={activeTab}
-             recOpen={recOpen}
-             onProgress={handleProgress}
-             onRecToggle={handleRecommendation}
-             onChildClick={handleChild}
-           />
-           </div>
-        </aside>
-
-        {/* Mobile Sidebar */}
-        {mobileOpen && (
-        <div className="fixed inset-0 z-[150] lg:hidden">
-          {/* Backdrop */}
-          <button
-            type="button"
-            onClick={closeMobileMenu}
-            className={`fixed inset-0 bg-black w-full h-full cursor-default transition-opacity duration-300 ${
-              mobileAnimating ? "opacity-25" : "opacity-0"
-            }`}
-            aria-label="Close menu"
-          />
-          
-          {/* Sidebar Panel */}
-          <nav
-            className={`fixed bottom-0 left-0 top-0 flex w-[280px] flex-col overflow-y-auto bg-white shadow-2xl rounded-r-2xl p-5 transition-transform duration-300 ease-out ${
-              mobileAnimating ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
-            <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
-              <span className="font-bold text-lg text-gray-800">Menu</span>
-              <button
-                type="button"
-                onClick={closeMobileMenu}
-                className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              >
-                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <SidebarContent 
-             activeTab={activeTab}
-             recOpen={recOpen}
-             onProgress={handleProgress}
-             onRecToggle={handleRecommendation}
-             onChildClick={handleChild}
-           />
-          </nav>
-        </div>
-      )}
-
-        {/* MAIN CONTAINER */}
-        <main className="flex-1 min-w-0">
+  // Main content
+  const renderContent = () => {
+    if (activeTab === 'progress') {
+      return (
+        <>
           <section className="mb-6">
             <InsightsCard insight={insight} />
           </section>
@@ -335,10 +402,10 @@ export function ProgressDashboardPage() {
           <section className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
             <div className="min-w-0 h-full">
               {caloriesError ? (
-                 <ErrorCardPlaceholder title="Calories Unavailable" message="Could not load activity data. Check connection." />
+                <ErrorCardPlaceholder title="Calories Unavailable" message="Could not load activity data. Check connection." />
               ) : (
-                <CaloriesCard 
-                  data={metrics.caloriesActivity} 
+                <CaloriesCard
+                  data={metrics.caloriesActivity}
                   goal={metrics.goals.calorieGoal}
                   status={metrics.status.calories}
                   rangeValue={caloriesRange}
@@ -347,24 +414,24 @@ export function ProgressDashboardPage() {
               )}
             </div>
             <div className="flex flex-col gap-6 h-full">
-            <div className="w-full">
-              {macroError ? (
-                 <ErrorCardPlaceholder title="Macros Unavailable" message="Could not load macronutrient data. Check connection." />
-              ) : (
-                <MacroCard data={metrics.macros} rangeDays={macroRange} onRangeChange={setMacroRange} />
-              )}
-            </div>
-            <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-200 flex flex-col items-center justify-center">
-              <span className="text-4xl font-black text-gray-800">{streak}</span>
-              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Days Streak</span>
-              <div className="mt-2">
-                {streak > 3 ? (
-                  <GoalBadge status={'on_track'} />
+              <div className="w-full">
+                {macroError ? (
+                  <ErrorCardPlaceholder title="Macros Unavailable" message="Could not load macronutrient data. Check connection." />
                 ) : (
-                  <GoalBadge status={'slightly_behind'} />
+                  <MacroCard data={metrics.macros} rangeDays={macroRange} onRangeChange={setMacroRange} />
                 )}
               </div>
-            </div>
+              <div className="flex-1 bg-white rounded-2xl p-4 border border-gray-200 flex flex-col items-center justify-center">
+                <span className="text-4xl font-black text-gray-800">{streak}</span>
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1">Days Streak</span>
+                <div className="mt-2">
+                  {streak > 3 ? (
+                    <GoalBadge status={'on_track'} />
+                  ) : (
+                    <GoalBadge status={'slightly_behind'} />
+                  )}
+                </div>
+              </div>
             </div>
           </section>
 
@@ -372,7 +439,119 @@ export function ProgressDashboardPage() {
             <h3 className="text-xl font-bold text-gray-800">Workout Progress</h3>
             <LineChart data={metrics.workouts} />
           </section>
+        </>
+      );
+    }
 
+    if (activeTab === 'recipe' || activeTab === 'workout') {
+      const items = activeTab === 'recipe' ? recRecipes : recWorkouts;
+      const title = activeTab === 'recipe' ? 'Recipes Recommendations' : 'Workouts Recommendations';
+      
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-gray-900">{title}</h2>
+          </div>
+          
+          {loadingRecs ? (
+             <div className="flex items-center justify-center h-64 bg-white rounded-xl border border-gray-200">
+                <span className="text-gray-500">Loading recommendations...</span>
+             </div>
+          ) : items.length === 0 ? (
+             <RecommendationPlaceholder title={`No ${activeTab}s found`} type={activeTab as 'recipe' | 'workout'} />
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {items.map((item) => (
+                <ResourceCard key={item.id} item={item} navigate={navigate} />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+  };
+
+
+  return (
+    <div className="min-h-screen w-full p-4 lg:p-3 bg-cover bg-[#F5F7FA] flex justify-center">
+      {/* Container */}
+      <div className="w-full max-w-[1800px] lg:m-4 flex flex-col lg:flex-row gap-5 relative">
+
+        {/* Mobile Menu */}
+        <div className="lg:hidden flex items-center gap-4 mb-2">
+          <button
+            type="button"
+            onClick={openMobileMenu}
+            className="flex cursor-pointer items-center rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
+          >
+            <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+          <h1 className="text-2xl font-bold text-gray-800">
+            {activeTab === 'progress' ? 'Progress Dashboard' :
+             activeTab === 'recipe' ? 'Recipe Recommendations' :
+             activeTab === 'workout' ? 'Workout Recommendations' : 'Dashboard'}
+          </h1>
+        </div>
+
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:block w-64 bg-white rounded-2xl p-4 border border-gray-200 h-fit sticky top-4 z-10">
+          <div>
+            <SidebarContent
+              activeTab={activeTab}
+              recOpen={recOpen}
+              onProgress={handleProgress}
+              onRecToggle={handleRecommendation}
+              onChildClick={handleChild}
+            />
+          </div>
+        </aside>
+
+        {/* Mobile Sidebar */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-[150] lg:hidden">
+            {/* Backdrop */}
+            <button
+              type="button"
+              onClick={closeMobileMenu}
+              className={`fixed inset-0 bg-black w-full h-full cursor-default transition-opacity duration-300 ${mobileAnimating ? "opacity-25" : "opacity-0"
+                }`}
+              aria-label="Close menu"
+            />
+
+            {/* Sidebar Panel */}
+            <nav
+              className={`fixed bottom-0 left-0 top-0 flex w-[280px] flex-col overflow-y-auto bg-white shadow-2xl rounded-r-2xl p-5 transition-transform duration-300 ease-out ${mobileAnimating ? "translate-x-0" : "-translate-x-full"
+                }`}
+            >
+              <div className="flex items-center justify-between border-b border-gray-100 pb-4 mb-4">
+                <span className="font-bold text-lg text-gray-800">Menu</span>
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <SidebarContent
+                activeTab={activeTab}
+                recOpen={recOpen}
+                onProgress={handleProgress}
+                onRecToggle={handleRecommendation}
+                onChildClick={handleChild}
+              />
+            </nav>
+          </div>
+        )}
+
+        {/* MAIN CONTAINER CSS */}
+        <main className="flex-1 min-w-0">
+          {renderContent()}
         </main>
       </div>
     </div>
@@ -383,13 +562,13 @@ export function ProgressDashboardPage() {
 const MOCK_METRICS: MetricsResponse = {
   rangeDays: 7,
   caloriesActivity: [
-    { date: '2025-10-20', dayName: 'Mon', caloriesConsumed: 1800, caloriesBurned: 450},
-    { date: '2025-10-21', dayName: 'Tue', caloriesConsumed: 1650, caloriesBurned: 300},
-    { date: '2025-10-22', dayName: 'Wed', caloriesConsumed: 2100, caloriesBurned: 500},
-    { date: '2025-10-23', dayName: 'Thu', caloriesConsumed: 1950, caloriesBurned: 400},
-    { date: '2025-10-24', dayName: 'Fri', caloriesConsumed: 1750, caloriesBurned: 350},
-    { date: '2025-10-25', dayName: 'Sat', caloriesConsumed: 2200, caloriesBurned: 600},
-    { date: '2025-10-26', dayName: 'Sun', caloriesConsumed: 1850, caloriesBurned: 300},
+    { date: '2025-10-20', dayName: 'Mon', caloriesConsumed: 1800, caloriesBurned: 450 },
+    { date: '2025-10-21', dayName: 'Tue', caloriesConsumed: 1650, caloriesBurned: 300 },
+    { date: '2025-10-22', dayName: 'Wed', caloriesConsumed: 2100, caloriesBurned: 500 },
+    { date: '2025-10-23', dayName: 'Thu', caloriesConsumed: 1950, caloriesBurned: 400 },
+    { date: '2025-10-24', dayName: 'Fri', caloriesConsumed: 1750, caloriesBurned: 350 },
+    { date: '2025-10-25', dayName: 'Sat', caloriesConsumed: 2200, caloriesBurned: 600 },
+    { date: '2025-10-26', dayName: 'Sun', caloriesConsumed: 1850, caloriesBurned: 300 },
   ],
   macros: {
     current: { totalCalories: 7500, carbs: 210, protein: 498, fat: 285 },

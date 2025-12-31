@@ -164,8 +164,23 @@ router.post("/chat", upload.any(), async (req, res) => {
   const state = conversationState.get(user.id);
 
   // Pass conversation context to intent detection for better accuracy
-  const intent = await detectIntent(message, state, conversationContext);
-  console.log("Intent:", intent);
+  const { intent, goal } = await detectIntent(message, state, conversationContext);
+  console.log("Intent, goal:", intent, goal);
+
+  // if goal is not equal to empty string, replace the existing goal in user profile
+  if (goal) {
+    const { data: userProfile, error: profileError } = await supabase
+      .from("user_profiles")
+      .update({ goals: goal })
+      .eq("user_id", user.id)
+      .select()
+      .single();
+    if (profileError) {
+      console.error("Error updating user goal in profile:", profileError);
+    } else {
+      console.log("Updated user goal in profile to:", goal);
+    }
+  }
   
   if (intent === "log_meal") {
     const response = await logMealHandler(message, files, conversationState, user.id, supabase);
@@ -263,8 +278,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         You are a friendly fitness assistant chatbot.
 
         Context:
-        The user is browsing meal recommendations.
-        They selected the next recommended meal.
+        The user is browsing for more meal recommendations and you have just provided one. Just act to suggest the next one. Don't start with "hey there", "hello" or similar greetings.
 
         Meal details:
         - Name: ${meal.title}
@@ -272,15 +286,21 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Protein: ${meal.protein} g
         - Carbs: ${meal.carbs} g
         - Fat: ${meal.fat} g
+        - Ingredients: ${meal.ingredients}
+        - Procedure: ${meal.procedure}
+        - Cooking time: ${meal.cooking_time} minutes
+      
+      Tell the user that, for more information can browse the source link: ${meal.source_url}
 
         Task:
         Write a short, friendly response:
         - Suggest the recommended meal details
         - Mention calories
-        - Ask if the user wants more recommendation or modify the meal
+        - Ask if the user wants more recommendation
         - Use emojis naturally
-        - Keep it under 2 sentences
         `;
+
+
     }
 
     if (state.type === "WORKOUT") {
@@ -289,13 +309,15 @@ router.post("/chat", upload.any(), async (req, res) => {
         You are a friendly fitness assistant chatbot.
 
         Context:
-        The user is browsing workout recommendations.
+        The user is browsing for more workout recommendations and you have just provided one. Just act to suggest the next one. Don't start with "hey there", "hello" or similar greetings.
 
        Wokrout details:
         - Name: ${item.title}
         - Description: ${item.description}
         - Source: ${item.source_url}
         - Category: ${item.category_tags}
+
+      Tell the user that, for more information can browse the source link: ${item.source_url}
 
         Task:
         Write a short, friendly response:
@@ -348,7 +370,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
         Context:
         The user is browsing meal recommendations.
-        They selected the next recommended meal.
+        They selected the previous recommended meal.
 
         Meal details:
         - Name: ${meal.title}
@@ -361,7 +383,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         Write a short, friendly response:
         - Acknowledge the choice
         - Mention calories
-        - Ask if the user wants more recommendation or modify the meal
+        - Ask if the user wants more recommendation
         - Use emojis naturally
         - Keep it under 2 sentences
         `;
@@ -374,6 +396,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
         Context:
         The user is browsing workout recommendations.
+        They selected the previous recommended exercise.
 
        Wokrout details:
         - Name: ${item.title}
@@ -391,11 +414,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
     
     const gResponse = await queryGemini(prompt);
-    // gResponse = gResponse = `Workout details:
-    //  - Name: ${item.title}
-    // - Description: ${item.description}
-    // - Source: ${item.source_url}
-    // - Category: ${item.category_tags.join(', ')}`
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
@@ -405,6 +423,84 @@ router.post("/chat", upload.any(), async (req, res) => {
     });
 
     console.log('Gemini response for more recommendation:', gResponse);
+
+    return res.json({
+      chat_id: finalChatId,
+      reply: gResponse,
+    });
+  }
+
+  if (intent === "select_recommendation") {
+    const state = conversationState.get(user.id);
+    const currentIndex = state.selectedIndex || 0;
+    const item = state.recommended[currentIndex];
+    let prompt = "";
+    let recipe_id = null;
+    let resource_id = null;
+    let type = state.type;
+    
+    if (state.type === "MEAL") {
+      const meal = item.meal;
+      recipe_id = meal.recipe_id;
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+        Context:
+        The user selected a meal recommendation.
+        Meal details: 
+        - Name: ${meal.title}
+        - Calories: ${meal.calories} kcal
+        - Protein: ${meal.protein} g
+        - Carbs: ${meal.carbs} g
+        - Fat: ${meal.fat} g
+        Task:
+        Write a short, friendly response:
+        - Acknowledge the selected meal
+        - Ask if is there anything else they would like to assist with
+        - Tell user that you have saved this meal to their recommendation list. User can view it anytime
+        - Use emojis naturally
+        `;
+    }
+
+    if (state.type === "WORKOUT") {
+      resource_id = item.resource_id;
+
+      prompt = `
+        You are a friendly fitness assistant chatbot.
+        Context:
+        The user selected a workout recommendation.
+        Workout details:
+        - Name: ${item.title} 
+        - Description: ${item.description}
+        - Source: ${item.source_url}
+        - Category: ${item.category_tags}
+        Task: 
+        Write a short, friendly response:
+        - Acknowledge the selected workout
+        - Ask if the user wants more recommendation
+        - Tell user that you have saved this workout to their recommendation list. User can view it anytime
+        - Use emojis naturally
+        `;
+    }
+    const gResponse = await queryGemini(prompt);
+
+    await supabase.from("chat_history").insert({
+      chat_id: finalChatId,
+      role: "ai",
+      message: gResponse,
+      created_at: new Date(),  
+    });
+    console.log('Gemini response for select recommendation:', gResponse);
+
+    // save recommendation to recommendation_history
+    await supabase.from("recommendation_history").insert({
+      user_id: user.id,
+      recipe_id: recipe_id,
+      resource_id: resource_id,
+      rec_text: gResponse,
+      type: type,
+      created_at: new Date(),
+    });
 
     return res.json({
       chat_id: finalChatId,
