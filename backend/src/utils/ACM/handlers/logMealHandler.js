@@ -14,13 +14,13 @@ function isGeminiFallback(text) {
   );
 }
 
-function isEmptyMeal(meal) {
-  if (!meal || typeof meal !== "object") return true;
+function isEmptyMeal(meals) {
+  if (!Array.isArray(meals) || meals.length === 0) return true;
 
-  const requiredFields = ["meal_name", "calories"];
-
-  return requiredFields.every(
-    key => meal[key] === null || meal[key] === undefined || meal[key] === ""
+  return meals.every(meal =>
+    !meal?.meal_name ||
+    Number.isNaN(Number(meal.calories)) ||
+    Number(meal.calories) <= 0
   );
 }
 

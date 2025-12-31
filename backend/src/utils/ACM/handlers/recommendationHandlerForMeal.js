@@ -118,13 +118,16 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough past meal data.
 
             Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
+            Politely tell the user that you know their preferences and explain that you need more logged meals to give accurate recommendations based on their preferences.
             Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
@@ -187,17 +190,28 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     }
 
     function matchesDietType(dietaryTags, dietTypeText) {
+      // If user did not specify diet preference, allow all
       if (!dietTypeText) return true;
-      if (!dietaryTags) return false;
 
-      // Split user input into individual diet types, trim and normalize
-      const userDietTypes = dietTypeText.split(",").map(d => d.trim().toLowerCase());
+      // If meal has no dietary tags, it cannot match
+      if (!Array.isArray(dietaryTags) || dietaryTags.length === 0) return false;
+
+      // Normalize user-selected diet types
+      const userDietTypes = dietTypeText
+        .split(",")
+        .map(d => d.trim().toLowerCase())
+        .filter(Boolean);
+
+      // If user only selected "balanced", allow all meals
+      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+        return true;
+      }
 
       // Normalize meal dietary tags
       const mealTags = dietaryTags.map(t => t.trim().toLowerCase());
 
-      // Return true if **all** user diet types are in the meal tags
-      return userDietTypes.every(tag => mealTags.includes(tag));
+      // UNION logic: match if ANY user diet type exists in meal tags
+      return userDietTypes.some(tag => mealTags.includes(tag));
     }
 
     function matchesGoals(meal, goals = []) {
@@ -251,13 +265,16 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough past meal data.
 
             Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
+            Politely tell the user that you know their preferences and explain that you need more logged meals to give accurate recommendations based on their preferences.
             Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
@@ -282,12 +299,15 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough library meal data.
 
             Task:
-            Politely explain that you do not have enough library meal data to give accurate recommendations.
-            Keep it friendly and under 2 sentences.`;
+            Politely tell the user that you know their preferences and explain that you do not have enough library meal data to give accurate recommendations based on their preferences.
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
@@ -335,8 +355,15 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         });
 
         const prompt = `You are a friendly fitness assistant chatbot.
+          User preferences:
+          ${JSON.stringify(userPreferences)}
+
           Context:
-          The user requested a meal recommendation, but no suitable meals match the criteria.
+          The user requested a meal recommendation, but no suitable meals match the criteria. Acknowledge user preferences.
+
+          Task:
+          Politely inform the user that you know their preferences but no meals could be found matching their dietary preferences, allergies, or goals.
+          Encourage them to adjust their preferences or log more meals.
 
           Meal time: ${mealTime || "any"}`;
 
@@ -450,6 +477,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       Task:
       Write a short, friendly response:
       - Suggest the recommended meal details
+      - Tell the user that you know their preferences
       - Mention calories
       - Ask if the user wants more recommendation
       - Use emojis naturally
