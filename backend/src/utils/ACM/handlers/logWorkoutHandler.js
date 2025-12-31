@@ -1,6 +1,8 @@
 const { queryGemini } = require("../../../services/geminiClient");
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
 const explainErrorWithGemini = require("../explainErrorWithGemini");
+const calculateStreak = require('../../PTF/calculateStreak'); 
+const { sendNotification } = require('../../../services/notificationClient');
 
 function isGeminiFallback(text) {
   return (
@@ -80,7 +82,23 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
           })
         };
       } 
-    }    
+    }   
+    
+    try {
+      const newStreak = await calculateStreak(user_id, supabase);
+      console.log(`User ${user_id} new workout streak: ${newStreak}`);
+
+      if ([1, 3, 7, 14, 21, 30].includes(newStreak)) {
+         await sendNotification(
+           user_id,
+           'success',
+           `On fire! You hit a ${newStreak}-day workout streak 🔥! Keep it up! 💪`,
+           '/progress'
+         );
+      }
+    } catch (streakError) {
+      console.error("Streak calculation failed:", streakError);
+    }
 
     const prompt = `
       You are a friendly fitness assistant chatbot.

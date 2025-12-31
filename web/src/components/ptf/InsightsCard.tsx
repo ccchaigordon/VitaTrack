@@ -6,10 +6,9 @@ type InsightResponse = {
 
 interface Props {
   insight: InsightResponse | null;
-  // loading: boolean;
 }
 
-export function InsightsCard ({ insight, /*loading*/ }: Props) {
+export function InsightsCard ({ insight }: Props) {
   const lines =
     typeof insight?.summary === "string"
       ? [insight.summary]
@@ -24,11 +23,7 @@ export function InsightsCard ({ insight, /*loading*/ }: Props) {
         <h3 className="text-xl font-bold text-gray-800">Weekly Insights</h3>
       </div>
       
-      {/* {loading ? (
-        <div className="flex items-center gap-2 text-gray-400 text-sm">
-          <img src="src/assets/Loader.svg" className="animate-spin w-6 h-6" /> Generating analysis...
-        </div>
-      ) : */insight ? ( //}
+      {insight ? ( 
          <div className="space-y-2 animate-in fade-in duration-500">
           <ul className="list-disc list-inside space-y-1 text-left">
             {lines.length ? (

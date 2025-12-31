@@ -19,9 +19,9 @@ const tokenize = (s) =>
     .filter(Boolean)
     .map(singularize);
 
-const canonical = (s) => tokenize(s).join("");
+const normalise = (s) => tokenize(s).join("");
 
-async function recommendWorkouts(user_id, supabase) {
+async function recommendWellness(user_id, supabase) {
   try {   
       let userGoal = "";
       
@@ -50,9 +50,9 @@ async function recommendWorkouts(user_id, supabase) {
 
       // Fallback safety
       if (!userGoal || userGoal === "Unknown") {
-          userGoal = "General Health";
+          userGoal = "Stay Healthy";
       }
-      console.log("Inferred workout goal for recommendation:", userGoal);
+      console.log("Inferred wellness goal for recommendation:", userGoal);
 
       const { data: workoutLogs, error: logError } = await supabase
           .from("workout_logs")
@@ -65,7 +65,7 @@ async function recommendWorkouts(user_id, supabase) {
       }
           
       const recentWorkoutSet = new Set(
-          (workoutLogs || []).map(w => canonical(w.exercise_name))
+          (workoutLogs || []).map(w => normalise(w.exercise_name))
       );
 
 
@@ -81,7 +81,7 @@ async function recommendWorkouts(user_id, supabase) {
       }
 
       const filteredWorkouts = wellness_resources.filter(workout => {
-        const titleNorm = canonical(workout.title);
+        const titleNorm = normalise(workout.title);
 
           if (recentWorkoutSet.has(titleNorm)) return false;
 
@@ -99,9 +99,9 @@ async function recommendWorkouts(user_id, supabase) {
       return { recommendations };
 
   } catch (error) {
-      console.error("Error in recommendWorkouts:", error);
+      console.error("Error in recommendWellness:", error);
       throw error;
   }
 }
 
-module.exports = recommendWorkouts;
+module.exports = recommendWellness;
