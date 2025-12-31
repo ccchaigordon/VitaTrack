@@ -93,7 +93,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     }
 
     // Fallback safety
-    if (!userGoal) {
+    if (!userGoal || userGoal === "Unknown") {
         userGoal = "General Health";
     }
 
