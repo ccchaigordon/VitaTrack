@@ -424,14 +424,64 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
           Task:
           Politely inform the user that you know their preferences but no meals could be found matching their dietary preferences, allergies, or goals.
           Encourage them to adjust their preferences or log more meals.
+          Suggest some meals they can try with examples/explanations.
 
-          Meal time: ${mealTime || "any"}`;
+                Important: 
+                - If you suggest some meals, return ONLY valid JSON in the following format:
+                    meals: [
+                        {
+                            "recipe_id": "... recipe id ...",
+                            "title": "... meal title ...",
+                            "ingredients": [ "... ingredient 1 ...", "... ingredient 2 ..." ],
+                            "dietary_tags": [ "... tag 1 ...", "... tag 2 ..." ],
+                            "procedure": "... cooking procedure ...",
+                            "cooking_time": NUMBER,
+                            "calories": NUMBER,
+                            "protein": NUMBER,
+                            "carbs": NUMBER,
+                            "fat": NUMBER,
+                            "source_url": "source_url"
+                        }
+                    ]
 
-        const gResponse = await queryGemini(prompt);
-        return { reply: gResponse };
+                Keep it friendly.
+                
+                Return in JSON format including the response and any suggestions. For example:
+                {
+                    "reply": "Your friendly response here. Some explanations/full guide to prepare about the meals you suggested.",
+                    "meals": [ ... ]
+                }`;               
+
+            gResponse = await queryGemini(prompt);
+
+            let parsed;
+
+            try {
+                const cleanText = gResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+                parsed = JSON.parse(cleanText);
+            } catch (err) {
+                console.error("Failed to parse Gemini output:", err);
+                gResponse = `I'm sorry, I encountered an error while processing your request. Could you please try again later?`;
+                res.json({ chat_id: finalChatId, reply: gResponse, choices: choices }) 
+            };
+
+            const meals = Array.isArray(parsed.meals) ? parsed.meals : [];
+            const firstMeal = meals.length > 0 ? [meals[0]] : [];
+
+            conversationState.set(user_id, {
+                state: "SHOWING_RESULTS",
+                type: "MEAL",
+                recommended: meals,
+                multimodalContext: {
+                    meals: firstMeal,
+                    workouts: []
+                },
+                selectedIndex: 0
+            });
+        return { reply: parsed.reply };
       }     
 
-    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
+    //console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
@@ -494,15 +544,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       indices
     ]);
 
-    // Save to conversation state
-    conversationState.set(user_id, {
-        state: "SHOWING_RESULTS",
-        type: "MEAL",
-        recommended: recommendations,
-        selectedIndex: 0,
-        referenceVector
-    });
-
     const top = recommendations[0];
 
     if (!top) {
@@ -513,6 +554,19 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
 
         return { reply: "Sorry, I couldn't find a suitable meal recommendation." };
     }
+
+    // Save to conversation state
+    conversationState.set(user_id, {
+        state: "SHOWING_RESULTS",
+        type: "MEAL",
+        recommended: recommendations, 
+        multimodalContext: {
+            meals: top ? [top.meal] : [], 
+            workouts: []
+        },
+        selectedIndex: 0,
+        referenceVector
+    });
 
     const m = top.meal;
 

@@ -19,7 +19,7 @@ function isEmptyMeal(meals) {
   if (!Array.isArray(meals) || meals.length === 0) return true;
 
   return meals.every(meal =>
-    !meal?.meal_name ||
+    !meal?.title ||
     Number.isNaN(Number(meal.calories)) ||
     Number(meal.calories) <= 0
   );
@@ -57,17 +57,33 @@ async function logMealHandler(message, multimodalContext, conversationState, use
         };
       }
 
+      const timeNow = new Date();
+      let mealTime = " ";
+
+      if (timeNow.getHours() >= 22 || timeNow.getHours() < 5) {
+        mealTime = "Snack";
+      } else if (timeNow.getHours() >= 18) {
+        mealTime = "Dinner";
+      } else if (timeNow.getHours() >= 15) {
+        mealTime = "Snack";
+      } else if (timeNow.getHours() >= 11) {
+        mealTime = "Lunch";
+      } else {
+        mealTime = "Breakfast";
+      }
+
+
       for (const mealDataItem of mealData) {
         const { data, error } = await supabase
           .from("meal_logs")
           .insert({
-            meal_name: mealDataItem.meal_name,
+            meal_name: mealDataItem.title,
             protein: mealDataItem.protein,
             carbs: mealDataItem.carbs,
             fat: mealDataItem.fat,
             calories: mealDataItem.calories,
-            source: mealDataItem.source,
-            meal_time: mealDataItem.meal_time,
+            source: mealDataItem.source || "ai assistant",
+            meal_time: mealDataItem.meal_time || mealTime,
             user_id: user_id,
             created_at: new Date()
           });
@@ -146,7 +162,7 @@ async function logMealHandler(message, multimodalContext, conversationState, use
         Task:
         Write a short, friendly response. Can use emojis naturally.
         - Acknowledge the logged meal
-        - Mention calories and macros
+        - Mention calories and macros. If you do not know, do not mention you do not know. 
         - Ask if they need anything else
         `;
       

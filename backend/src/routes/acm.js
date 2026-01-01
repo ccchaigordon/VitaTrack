@@ -201,6 +201,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     .join('\n');
 
   let state = conversationState.get(user.id);
+  console.log("State at Log this meal?:", state);
+
 
   if(files && files.length > 0) {
     multimodalContext = await processUploadedFilesHandler( message, files );
@@ -263,6 +265,22 @@ router.post("/chat", upload.any(), async (req, res) => {
     case 'Select recommendation':
       intent = 'select_recommendation';
       break;    
+    case 'Log this workout?':
+      if (state.get('multimodalContext')?.workouts?.length > 0) {
+        multimodalContext = state.get('multimodalContext');
+        intent = 'log_workout';
+      } else {
+        console.log("No workout available to log.");
+      }
+      break;
+    case 'Log this meal?':
+      if (state.get('multimodalContext')?.meals?.length > 0) {  
+        multimodalContext = state.get('multimodalContext');
+        intent = 'log_meal';
+      } else {
+        console.log("No meal available to log.");
+      }
+      break;
     default:
       intent = 'chat';
   }
@@ -551,7 +569,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       });
     }
 
-    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Workout recommendation"];
+    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log this meal?", "Log workout", "Workout recommendation"];
 
     // append response with chat id
     response = { ...response, chat_id: finalChatId, choices: choices };
@@ -574,12 +592,18 @@ router.post("/chat", upload.any(), async (req, res) => {
     let stateObj = {};
     let state = conversationState.get(user.id);
 
+    let choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Meal recommendation"];
+
     if (state instanceof Map) {
       // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
       // Already an object
       stateObj = state;
+    }
+    
+    if (stateObj?.multimodalContext?.workouts?.length > 0) {
+      choices.push("Log this workout?");
     }
 
     console.log("State object to save:", stateObj);
@@ -604,7 +628,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       });
     }
 
-    const choices = ["Select recommendation", "More recommendation", "Log meal", "Log workout", "Meal recommendation"];
+    
 
     // append response with chat id
     const responseWithChatId = { ...response, chat_id: finalChatId, choices: choices };
@@ -643,6 +667,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const item = state.get("recommended")[nextIndex];
     let prompt = "";
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     if (state.get("type") === "MEAL") {
       const meal = item.meal;
@@ -673,7 +698,7 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Use emojis naturally
         `;
 
-
+      choices.push("Log this meal?");
     }
 
     if (state.get("type") === "WORKOUT") {
@@ -699,6 +724,8 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Ask if the user wants more recommendation
         - Use emojis naturally
         `;
+
+      choices.push("Log this workout?");
     }
     
     const gResponse = await queryGemini(prompt);
@@ -743,8 +770,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
 
     console.log('Gemini response for more recommendation:', gResponse);
-
-    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     return res.json({
       chat_id: finalChatId,
@@ -785,6 +810,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const item = state.get("recommended")[prevIndex];
     let prompt = "";
+    let choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     if (state.get("type") === "MEAL") {
       const meal = item.meal;
@@ -811,6 +837,8 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Use emojis naturally
         - Keep it under 2 sentences
         `;
+
+      choices.push("Log this meal?");
     }
 
     if (state.type === "WORKOUT") {
@@ -835,6 +863,8 @@ router.post("/chat", upload.any(), async (req, res) => {
         - Use emojis naturally
         - Keep it under 2 sentences
         `;
+
+      choices.push("Log this workout?");
     }
     
     const gResponse = await queryGemini(prompt);
@@ -879,8 +909,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
 
     console.log('Gemini response for more recommendation:', gResponse);
-
-    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     return res.json({
       chat_id: finalChatId,
@@ -1052,7 +1080,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     Important:
     - If user ask for meal or workout recommendations, please tell them to use the dedicated buttons for better experience ("Meal recommendation" or "Workout recommendation").
     - If user ask to log meal or workout, please tell them to use the dedicated buttons for better experience ("Log meal" or "Log workout").
-    - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience ("More recommendations", "Previous recommendation", "Select recommendation").
+    - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience ("More recommendations", "Previous recommendation", "Select recommendation"). However, if previous recommendations are not available, you can tell them to choose "Meal recommendation" or "Workout recommendation" first.
     - If user ask for viewing meal or workout logs, please use the dedicated buttons for better experience ("View meals log" or "View workouts log").
     - Other than above, you can answer normally. 
     - If user ask for goal, analyze their goals based on ${userProfile?.goals || 'not specified'} and provide further insights.
@@ -1065,12 +1093,46 @@ router.post("/chat", upload.any(), async (req, res) => {
       - Allergies: ${userProfile?.allergies || 'Not specified'}
       - Medical Conditions: ${userProfile?.medical_conditions || 'Not specified'}
       - Goals: ${userProfile?.goals || 'Not specified'}
-    
-    - If the message contains any information about nutrition details, return the analysis based on that information. If does not contain, just return []. You are not logging the meal, just analyzing the nutrition details.
-      Return the nutritional analysis in this format:
+
+    IMPORTANT RULE (MUST FOLLOW):
+
+    Remember you are not logging the meal, just analyzing the nutrition details or workout details.
+
+    Before responding, you MUST check whether your final reply (including your own suggestions)
+    mentions ANY nutrition details (e.g. meal components, calories, macros, food items).
+
+    - If YES:
+    - You MUST include a non-empty "meal_analysis" array.
+    - The meal_analysis must reflect ALL nutrition details you mentioned.
+    - If exact values are unknown, you MUST still provide reasonable estimates.
+      You are explicitly ALLOWED to infer typical values based on common fitness standards.
+      This is NOT considered guessing.
+
+    OR ANY workout or exercise details (e.g. exercise names, sets, reps, duration, calories burned).
+    - If YES:
+    - You MUST include a non-empty "workout_analysis" array.
+    - The workout_analysis must reflect ALL exercises you mentioned.
+    - If exact values are unknown, you MUST still provide reasonable estimates.
+      You are explicitly ALLOWED to infer typical values based on common fitness standards.
+      This is NOT considered guessing.
+
+    If NO workout is mentioned at all, return an empty workout_analysis array.
+    If NO nutrition details are mentioned at all, return an empty meal_analysis array.
+
+    STRICT ENFORCEMENT RULE:
+
+    If your response mentions any workout or exercise:
+    - You MUST populate duration and calories_burned with reasonable estimated values.
+    - Zero, null, or missing values are NOT allowed.
+    - Estimation is REQUIRED even if the user did not provide details.
+    - Use common fitness assumptions (e.g., moderate intensity, 30-45 minutes).
+
+    Format your ANALYSIS strictly in JSON as follows (no extra text outside the JSON):    
+     
+      Nutritional analysis in this format:
       [
         {
-          "meal_name": "... list of items ...",
+          "title": "... list of items ...",
           "protein": NUMBER,
           "carbs": NUMBER,
           "fat": NUMBER,
@@ -1080,29 +1142,28 @@ router.post("/chat", upload.any(), async (req, res) => {
         }
       ]
 
-    - If the message contains any information about workout details, return the analysis based on that information If does not contain, just return []. You are not logging the workout, just analyzing the workout details.
-      Return the workout analysis in this format:
+      Workout analysis in this format:
       [
         {
-          "exercise_name": "... exercise name ...",
+          "title": "... exercise name ...",
           "sets": NUMBER,
           "reps": NUMBER,
           "duration": NUMBER,
-          "calories_burned": NUMBER
+          "calories_burned": NUMBER,
           "source": "source_tag"
         }
       ]
 
     Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.
     
-    Return in JSON format including the response and any analyses detected. For example:
+    MUST return your final response in JSON format including the response and any analyses detected. For example:
     {
       "reply": "Your friendly response here.",
       "meal_analysis": [ ... ],
       "workout_analysis": [ ... ]
     }`;
 
-    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    let choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
@@ -1138,17 +1199,43 @@ router.post("/chat", upload.any(), async (req, res) => {
     const newMeals = Array.isArray(meal_analysis) ? meal_analysis : [];
     const newWorkouts = Array.isArray(workout_analysis) ? workout_analysis : [];
 
-    multimodalContext = {
-      ...multimodalContext,
-      meals: [
-        ...(multimodalContext.meals || []),
-        ...newMeals
-      ],
-      workouts: [
-        ...(multimodalContext.workouts || []),
-        ...newWorkouts
-      ]
-    };
+    if (newMeals.length > 0 || newWorkouts.length > 0) {
+      multimodalContext = {
+        ...multimodalContext,
+        meals: [
+          ...(multimodalContext.meals || []),
+          ...newMeals
+        ],
+        workouts: [
+          ...(multimodalContext.workouts || []),
+          ...newWorkouts
+        ]
+      };
+
+      let state = conversationState.get(user.id);
+      state = state instanceof Map ? Object.fromEntries(state) : state;
+
+      conversationState.set(user.id, {
+        ...state,
+
+        state: "SHOWING_RESULTS",
+
+        type: meal_analysis.length > 0 ? "MEAL" : "WORKOUT",
+        
+        recommended: meal_analysis.length > 0
+          ? meal_analysis
+          : workout_analysis,
+
+        multimodalContext: {
+          meals: meal_analysis.length > 0 ? [meal_analysis[0]] : [],
+          workouts: workout_analysis.length > 0 ? [workout_analysis[0]] : []
+        },
+
+        selectedIndex: 0
+      });
+
+      choices = ["Log meal", "Log this meal?", "View meals log", "Log workout", "Log this workout?", "View workouts log", "Meal recommendation", "Workout recommendation"];
+    }
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
