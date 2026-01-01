@@ -1050,10 +1050,10 @@ router.post("/chat", upload.any(), async (req, res) => {
     If contextual data from uploaded files is provided, use it as the primary source of truth for nutrition or workout analysis. Do NOT guess nutrition or workout details beyond the provided context. MENTION based on the uploaded files.
 
     Important:
-    - If user ask for meal or workout recommendations, please tell them to use the dedicated buttons for better experience.
-    - If user ask to log meal or workout, please tell them to use the dedicated buttons for better experience.
-    - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience.
-    - If user ask for viewing meal or workout logs, please use the dedicated buttons for better experience.
+    - If user ask for meal or workout recommendations, please tell them to use the dedicated buttons for better experience ("Meal recommendation" or "Workout recommendation").
+    - If user ask to log meal or workout, please tell them to use the dedicated buttons for better experience ("Log meal" or "Log workout").
+    - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience ("More recommendations", "Previous recommendation", "Select recommendation").
+    - If user ask for viewing meal or workout logs, please use the dedicated buttons for better experience ("View meals log" or "View workouts log").
     - Other than above, you can answer normally. 
     - If user ask for goal, analyze their goals based on ${userProfile?.goals || 'not specified'} and provide further insights.
     - If user ask anything about their profile (age, weight, height, etc), use the following details:
