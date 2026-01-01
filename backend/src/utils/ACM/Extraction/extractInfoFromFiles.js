@@ -35,7 +35,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
 
             meals: [
                 {
-                "title": "... list of items ...",
+                "meal_name": "... list of items ...",
                 "protein": NUMBER,
                 "carbs": NUMBER,
                 "fat": NUMBER,
@@ -56,7 +56,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
 
             workouts: [
                 {
-                    "title": "... exercise name ...",
+                    "exercise_name": "... exercise name ...",
                     "sets": NUMBER,
                     "reps": NUMBER,
                     "duration": NUMBER,
@@ -81,7 +81,6 @@ async function extractInfoFromFiles(message, combinedText, images) {
       "${message}"
 
       Instructions:
-      Determine the image content first. If it contains meal information, extract the following:
       - If multiple images are present analyze each image separately.
       - Extract protein, carbs, fat, calories and meal time (Breakfast, Lunch, Snack, Dinner) for each meal.
       - Meal time must be inferred STRICTLY based on the current local time using the following rules:
@@ -104,11 +103,6 @@ async function extractInfoFromFiles(message, combinedText, images) {
           "source": "source_tag"
         }
       ]
-
-      If the image content does not contains meal information, respond with any answer according to your knowledge. Return in valid JSON format as below: 
-      {
-        "reply": ".... your response ...."
-      }
     `;
 
     responseForImages = await queryGeminiWithImages(promptForImages, images);

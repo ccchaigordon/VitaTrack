@@ -19,7 +19,7 @@ function isEmptyWorkout(workouts) {
   if (!Array.isArray(workouts) || workouts.length === 0) return true;
 
   return workouts.every(w =>
-    !w?.title ||
+    !w?.exercise_name ||
     Number(w.duration) <= 0 ||
     (Number(w.sets) <= 0 && Number(w.reps) <= 0) ||
     Number(w.calories_burned) <= 0
@@ -62,12 +62,12 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       const { data, error } = await supabase
         .from("workout_logs")
         .insert({
-          exercise_name: workout.title,
+          exercise_name: workout.exercise_name,
           sets: workout.sets,
           reps: workout.reps,
           duration: workout.duration,
           calories_burned: workout.calories_burned,
-          source: workout.source || "ai assistant",
+          source: workout.source,
           user_id: user_id,
           created_at: new Date()
         });
