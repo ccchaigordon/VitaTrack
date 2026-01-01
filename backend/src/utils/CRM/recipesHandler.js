@@ -1,7 +1,6 @@
-/*-------------------------------------------------------------
-  Transforms Spoonacular API raw data and inserts into Supabase recipes table
- -------------------------------------------------------------*/
-
+//
+// Transforms Spoonacular API raw data and inserts into Supabase recipes table 
+//
 const supabaseServer = require("../../services/supabaseClient");
 const fs = require("fs");
 const path = require("path");
@@ -46,9 +45,9 @@ function cleanProcedure(str) {
     .trim();
 }
 
-/*-------------------------------------------------------------
-    MAIN LOGIC: transform Spoonacular recipe to supabase schema
- -------------------------------------------------------------*/
+//
+// MAIN LOGIC: transform Spoonacular recipe to supabase schema
+//
 
 function transformRecipe(r) {
   // Extract macronutrients only

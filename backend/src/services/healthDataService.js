@@ -1,5 +1,4 @@
 const supabaseServer = require("./supabaseClient");
-const DIET_TYPES = require("../data/dietTypes.json");
 
 // Map database row to recipe object
 function mapRecipeRow(row) {
@@ -16,7 +15,6 @@ function mapRecipeRow(row) {
     fat: nutrition.fat,
     dietary_tags: row.dietary_tags,
     cooking_time: row.cooking_time,
-    external_api_id: row.external_api_id,
   };
 }
 
@@ -30,7 +28,7 @@ async function getRecipes(filters = {}, userAccessToken = null) {
     let query = client.from("recipes").select("*");
 
     if (filters.search) {
-      query = query.ilike("title", `%${filters.search}%`);
+      query = query.ilike("title", `%${filters.search}%`);  //  case-insensitive search
     }
     if (filters.dietaryRestriction) {
       query = query.contains("dietary_tags", [filters.dietaryRestriction]);
@@ -45,7 +43,6 @@ async function getRecipes(filters = {}, userAccessToken = null) {
     return { success: false, error: err.message };
   }
 }
-
 
 // Get single recipe by ID
 async function getRecipeById(recipeId, userAccessToken = null) {
@@ -138,17 +135,25 @@ async function getPersonalizedFeed(
 
     if (profileError) throw profileError;
 
-    let finalResources = [];
-    const type = contentType.toLowerCase(); // Normalize type for consistent checking
+    // Normalize diet_type for reusable filtering
+    if (userProfile.diet_type) {
+      userProfile.diet_type = userProfile.diet_type.trim().toLowerCase();
+      userProfile.diet_type =
+        userProfile.diet_type.charAt(0).toUpperCase() +
+        userProfile.diet_type.slice(1);
+    }
 
     // Check user allergies to exclude certain recipes
-    // 1. Map allergies to dietary tags to exclude
+    // 1. Create allergy tags for dietary_tags filtering
     const allergies = userProfile.allergies
-      ? userProfile.allergies.split(",")
+      ? userProfile.allergies
+          .split(",")
+          .map((a) => a.trim().toLowerCase())
+          .filter((a) => a.length > 0)  // remove empty strings
       : [];
-    const essentialTags = [];
-    if (allergies.includes("Gluten")) essentialTags.push("Gluten Free");
-    if (allergies.includes("Dairy")) essentialTags.push("Dairy Free");
+    const allergiesTags = [];
+    if (allergies.includes("gluten")) allergiesTags.push("Gluten free");
+    if (allergies.includes("dairy")) allergiesTags.push("Dairy free");
 
     // 2. Map allergies to ingredient keywords to exclude
     let keywordsToExclude = [];
@@ -181,31 +186,35 @@ async function getPersonalizedFeed(
       }
     });
 
+    let finalResources = [];
+    const type = contentType.toLowerCase(); // Normalize type for consistent checking
+
     // RECIPES
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
-      const isBalanced = userProfile.diet_type && 
-        userProfile.diet_type.toLowerCase().trim() === "balanced";
-      
+      const isBalanced = userProfile.diet_type === "balanced";
+
+      // Check if diet_type is set and not Balanced
+      // 1. Apply diet type filters
       if (userProfile.diet_type && !isBalanced) {
         const dietArray = userProfile.diet_type
           .split(",")
-          .map((item) => item.trim());
-        query = query.overlaps("dietary_tags", dietArray);
+          .map((item) => item.trim());  // remove extra spaces
+        query = query.overlaps("dietary_tags", dietArray);  // overlaps to match any of the diet types
       } else {
-        query = query.contains("dietary_tags", ["Popular"]); // if diet tags is Balanced, show popular recipes
+        query = query.overlaps("dietary_tags", ["Popular"]); // if diet tags is balanced or none, show 'Popular' recipes
       }
 
-      // 2. Apply allergy filters (essential dietary tags)
-      if (essentialTags.length > 0) {
-        query = query.contains("dietary_tags", essentialTags);
+      // 2. Apply allergy filters (mainly dietary tags)
+      if (allergiesTags.length > 0) {
+        query = query.overlaps("dietary_tags", allergiesTags);
       }
 
       let { data: recipeData, error: recipeError } = await query;
       if (recipeError) throw recipeError;
 
-      // 3. Apply ingredient keyword exclusion
+      // 3. Apply ingredient keyword exclusion (allergies)
       if (recipeData && keywordsToExclude.length > 0) {
         recipeData = recipeData.filter((r) => {
           const ingText = JSON.stringify(r.ingredients).toLowerCase(); // Normalization for easy searching
@@ -217,12 +226,12 @@ async function getPersonalizedFeed(
         });
       }
 
-      // fallback if no recipes found
+      // fallback if no recipes found, get top 300 recipes
       if (!recipeData || recipeData.length === 0) {
         const { data: fallback } = await client
           .from("recipes")
           .select("*")
-          .limit(20);
+          .limit(300);
         recipeData = fallback || [];
       }
 
@@ -236,32 +245,43 @@ async function getPersonalizedFeed(
 
       // 1. Apply type filter, search by type if specified: Article, Video
       if (type !== "all") {
-        const singleType = type.replace(/s$/, "");
+        const singleType = type.replace(/s$/, "");  // Remove plural 's' of type extracted 
         const capType =
           singleType.charAt(0).toUpperCase() + singleType.slice(1);
-        query = query.eq("type", capType);  // Article or Video
+        query = query.eq("type", capType); // Article or Video
       }
 
       // 2. Apply goal-based filtering
-      if (userProfile.goals) {
-        const formattedGoal = userProfile.goals
-          .split(" ")
-          .map(
-            (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()  // Capitalize first letter, category tags are capitalized
+      if (userProfile.goals && userProfile.goals.trim().length > 0) { // Ensure goals exist, not empty
+        const goalsArray = userProfile.goals
+          .split(/,|;|\/|\band\b|&/i) // Regex to split by comma, semicolon, slash, "and" (case-insensitive), or &
+          .map((goal) =>
+            goal
+              .trim()
+              .split(" ")
+              .map(
+                (word) =>
+                  word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+              )
+              .join(" ")
           )
-          .join(" ");
-        query = query.contains("category_tags", [formattedGoal]);
+          .filter((goal) => goal.length > 0); // Remove empty strings
+
+        // Use overlaps to match any of the user's goals (if match category tags)
+        if (goalsArray.length > 0) {
+          query = query.overlaps("category_tags", goalsArray);
+        }
       }
 
       let { data: wellnessData, error: wellnessError } = await query;
       if (wellnessError) throw wellnessError;
 
-      // Fallback if no wellness resources found
+      // Fallback if missing wellness resources, fetch top 300
       if (!wellnessData || wellnessData.length === 0) {
         const { data: fallbackW } = await client
           .from("wellness_resources")
           .select("*")
-          .limit(20);
+          .limit(300);
         wellnessData = fallbackW || [];
       }
 

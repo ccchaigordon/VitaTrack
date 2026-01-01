@@ -13,6 +13,15 @@ export async function getPersonalizedFeed(userId: string, contentType: string = 
   }>(`/feed?${params}`);
 }
 
+// Fetch detailed info for a specific recipe by ID
+export async function getRecipeDetails(recipeId: string) {
+  return apiFetch<{
+    success: boolean;
+    recipe?: unknown;
+  }>(`/recipes/${recipeId}`);
+}
+
+// If want to browse all resources without filters
 // RECIPE APIs - Fetch all recipes and details
 export async function getRecipes(
   search: string | null = null,
@@ -28,14 +37,6 @@ export async function getRecipes(
     success: boolean;
     recipes?: unknown[];
   }>(`/recipes?${params}`);
-}
-
-// Fetch detailed info for a specific recipe by ID
-export async function getRecipeDetails(recipeId: string) {
-  return apiFetch<{
-    success: boolean;
-    recipe?: unknown;
-  }>(`/recipes/${recipeId}`);
 }
 
 // WELLNESS RESOURCES APIs - Fetch all resources and details
@@ -62,10 +63,3 @@ export async function getResourceDetails(resourceId: string) {
     resource?: unknown;
   }>(`/resources/${resourceId}`);
 }
-
-// export async function getResourcesByCategory(category: string) {
-//   return apiFetch<{
-//     success: boolean;
-//     resources?: unknown[];
-//   }>(`/resources/category/${category}`);
-// }
