@@ -41,8 +41,8 @@ const MacroItem: React.FC<{ icon: string; color?: string; label: string; value: 
   const isPositive = delta > 0;
   return (
     <div className="flex items-center gap-3 p-1">
-      <div className={`p-2 rounded-xl ${color} flex items-center justify-center w-12 md:w-14 aspect-square`}>
-        <img src={icon} className="w-6 h-6" />
+      <div className={`shrink-0 rounded-xl ${color} flex items-center justify-center w-12 h-12 md:w-14 md:h-14`}>
+        <img src={icon} className="w-6 h-6 block object-contain" alt="" />
       </div>
       <div className="flex flex-col items-start text-left">
         <p className="text-[15px] text-gray-400 font-medium mb-0.5">{label}</p>
@@ -67,7 +67,7 @@ export function MacroCard ({ data, rangeDays, onRangeChange }: Props) {
         <RangeSelect value={rangeDays} options={macroOptions} onChange={onRangeChange}  />
       </div>
       
-      <div className="grid grid-cols-2 gap-y-5 gap-x-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-x-4 md:gap-y-5">
         <MacroItem icon={Calorie} color='bg-lime-300' label="Total Calories" value={data.current.totalCalories} unit="kcal" delta={data.deltaPercent.calories} comparison={comparison}/>
         <MacroItem icon={Carbs} color="bg-amber-300" label="Total Carbohydrates" value={data.current.carbs} unit="g" delta={data.deltaPercent.carbs} comparison={comparison}/>
         <MacroItem icon={Protein} color="bg-orange-300" label="Total Proteins" value={data.current.protein} unit="g" delta={data.deltaPercent.protein} comparison={comparison}/>

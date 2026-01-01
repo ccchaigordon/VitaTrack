@@ -31,10 +31,10 @@ export function LineChart ({ data }: { data: WorkoutData[] }) {
     .join(" ");
 
   return (
-    <div className="w-full h-full min-h-[200px] flex items-center justify-center">
+    <div className="w-full h-full min-h-[200px] flex items-center justify-center max-md:justify-start max-md:overflow-x-auto max-md:[-webkit-overflow-scrolling:touch]">
       <svg 
         viewBox={`0 0 ${width} ${height}`} 
-        className="w-full h-full overflow-visible"
+        className="w-full h-full overflow-visible max-md:min-w-[800px]"
         preserveAspectRatio="none"
       >
         {/* Grid Lines (Y-Axis) */}
