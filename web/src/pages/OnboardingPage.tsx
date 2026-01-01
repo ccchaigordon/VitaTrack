@@ -119,7 +119,7 @@ export function OnboardingPage() {
       .then((me) => {
         if (!mounted) return;
         if (me.profileComplete) {
-          nav("/dashboard", { replace: true });
+          nav("/home", { replace: true });
           return;
         }
         const existingUsername = me.user?.username?.trim() ?? "";
@@ -322,8 +322,8 @@ export function OnboardingPage() {
     else if (step === 2) animateToStep(1, "right");
   }
 
-  function goToDashboard() {
-    nav("/dashboard", { replace: true });
+  function goToHome() {
+    nav("/home", { replace: true });
   }
 
   const slideClass =
@@ -374,7 +374,7 @@ export function OnboardingPage() {
             />
           </div>
           <button
-            onClick={goToDashboard}
+            onClick={goToHome}
             className="mt-10 cursor-pointer rounded-lg bg-[#1A381D] px-10 py-2 text-xs font-medium text-white transition-colors hover:bg-[#3d4f3d] sm:mt-16 sm:px-16 sm:py-3 sm:text-sm"
           >
             Let's Start
