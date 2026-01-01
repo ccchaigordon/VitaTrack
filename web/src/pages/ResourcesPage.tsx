@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getPersonalizedFeed } from "../services/healthApi";
 import { useUser } from "../contexts/UserContext";
-import type { ResourceItem, RecipeResponse, WellnessResourceResponse } from "../services/resources";
+import type {
+  ResourceItem,
+  RecipeResponse,
+  WellnessResourceResponse,
+} from "../services/resources";
 
 type Category = "Articles" | "Recipes" | "Tutorials";
 
@@ -30,98 +34,121 @@ function RecipeImage({ imageUrl, title }: { imageUrl: string; title: string }) {
 
 // Card component to display individual items
 function ResourceCard({
-    item,
-    navigate,
-  }: {
-    item: ResourceItem;
-    navigate: (path: string) => void;
-  }) {
-    const handleCardClick = () => {
-      if (item.isRecipe) {
-        navigate(`/resources/recipes/${item.id}`);
-      } else if (item.link) {
-        window.open(item.link, "_blank");
-      }
-    };
+  item,
+  navigate,
+}: {
+  item: ResourceItem;
+  navigate: (path: string) => void;
+}) {
+  const handleCardClick = () => {
+    if (item.isRecipe) {
+      navigate(`/resources/recipes/${item.id}`);
+    } else if (item.link) {
+      window.open(item.link, "_blank");
+    }
+  };
 
-    return (
-      <div
-        onClick={handleCardClick}
-        className={`flex flex-col rounded-lg border border-gray-200 bg-white p-6 h-full ${
-          item.isRecipe || item.link
-            ? "cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm"
-            : ""
-        }`}
-      >
-        <div className="flex items-start justify-between gap-3 mb-4">
-          <h3 className="text-lg font-semibold text-gray-900 leading-tight flex-1">
-            {item.title}
-          </h3>
-          {item.isRecipe && item.image_url ? (
-            <RecipeImage imageUrl={item.image_url} title={item.title} />
-          ) : (
-            <span className="rounded-md bg-[#DDF3D8] px-2.5 py-1 text-xs font-medium text-[#1A381D] whitespace-nowrap shrink-0">
-              {item.badge}
-            </span>
-          )}
-        </div>
-
-        {/* Recipe Card: Show Macros */}
-        {item.isRecipe && (
-          <div className="mb-4 grid grid-cols-4 gap-2">
-            <MacroBox label="Cal" value={item.calories} />
-            <MacroBox label="Carbs" value={item.carbs} suffix="g" color="bg-[#E8F5E3] text-[#2A4A2D]" />
-            <MacroBox label="Protein" value={item.protein} suffix="g" />
-            <MacroBox label="Fat" value={item.fat} suffix="g" color="bg-[#E8F5E3] text-[#2A4A2D]" />
-          </div>
+  return (
+    <div
+      onClick={handleCardClick}
+      className={`flex flex-col rounded-lg border border-gray-200 bg-white p-6 h-full ${
+        item.isRecipe || item.link
+          ? "cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm"
+          : ""
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <h3 className="text-lg font-semibold text-gray-900 leading-tight flex-1">
+          {item.title}
+        </h3>
+        {item.isRecipe && item.image_url ? (
+          <RecipeImage imageUrl={item.image_url} title={item.title} />
+        ) : (
+          <span className="rounded-md bg-[#DDF3D8] px-2.5 py-1 text-xs font-medium text-[#1A381D] whitespace-nowrap shrink-0">
+            {item.badge}
+          </span>
         )}
-
-        {/* Recipe Card: Show Ingredients and Cooking Time */}
-        {item.isRecipe && (
-          <div className="mb-4 space-y-1.5">
-            {item.cooking_time && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-gray-400">Time:</span>
-                <span>{item.cooking_time} min</span>
-              </div>
-            )}
-            {item.ingredients && item.ingredients.length > 0 && (
-              <div className="flex items-center gap-2 text-sm text-gray-600">
-                <span className="text-gray-400">Ingredients:</span>
-                <span>{item.ingredients.length}</span>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col">
-          <p className="text-sm text-gray-600 mb-4 leading-relaxed line-clamp-3 flex-1">
-            {item.summary}
-          </p>
-
-          {/* External Link for Articles/Tutorials */}
-          {!item.isRecipe && item.link && (
-            <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
-              View More →
-            </div>
-          )}
-
-          {/* Recipe Card: Click to View Full Recipe */}
-          {item.isRecipe && (
-            <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
-              View Full Recipe →
-            </div>
-          )}
-        </div>
       </div>
-    );
-  }
+
+      {/* Recipe Card: Show Macros */}
+      {item.isRecipe && (
+        <div className="mb-4 grid grid-cols-4 gap-2">
+          <MacroBox label="Cal" value={item.calories} />
+          <MacroBox
+            label="Carbs"
+            value={item.carbs}
+            suffix="g"
+            color="bg-[#E8F5E3] text-[#2A4A2D]"
+          />
+          <MacroBox label="Protein" value={item.protein} suffix="g" />
+          <MacroBox
+            label="Fat"
+            value={item.fat}
+            suffix="g"
+            color="bg-[#E8F5E3] text-[#2A4A2D]"
+          />
+        </div>
+      )}
+
+      {/* Recipe Card: Show Ingredients and Cooking Time */}
+      {item.isRecipe && (
+        <div className="mb-4 space-y-1.5">
+          {item.cooking_time && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="text-gray-400">Time:</span>
+              <span>{item.cooking_time} min</span>
+            </div>
+          )}
+          {item.ingredients && item.ingredients.length > 0 && (
+            <div className="flex items-center gap-2 text-sm text-gray-600">
+              <span className="text-gray-400">Ingredients:</span>
+              <span>{item.ingredients.length}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex-1 flex flex-col">
+        <p className="text-sm text-gray-600 mb-4 leading-relaxed line-clamp-3 flex-1">
+          {item.summary}
+        </p>
+
+        {/* External Link for Articles/Tutorials */}
+        {!item.isRecipe && item.link && (
+          <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
+            View More →
+          </div>
+        )}
+
+        {/* Recipe Card: Click to View Full Recipe */}
+        {item.isRecipe && (
+          <div className="text-sm font-medium text-[#2A4A2D] mt-auto">
+            View Full Recipe →
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Helper for macros display in recipe cards
-const MacroBox = ({ label, value, suffix = "", color = "bg-[#DDF3D8] text-[#1A381D]" }: any) => (
+type MacroBoxProps = {
+  label: string;
+  value: number | undefined;
+  suffix?: string;
+  color?: string;
+};
+
+const MacroBox = ({
+  label,
+  value,
+  suffix = "",
+  color = "bg-[#DDF3D8] text-[#1A381D]",
+}: MacroBoxProps) => (
   <div className={`${color} rounded-md p-2.5 text-center`}>
     <div className={`text-sm font-semibold`}>
-      {value || 0}{suffix}
+      {value || 0}
+      {suffix}
     </div>
     <div className="text-xs text-gray-600 mt-0.5">{label}</div>
   </div>
@@ -141,6 +168,7 @@ export default function ResourcesPage() {
   const [recipes, setRecipes] = useState<ResourceItem[]>([]);
   const [articles, setArticles] = useState<ResourceItem[]>([]);
   const [tutorials, setTutorials] = useState<ResourceItem[]>([]);
+  const [visibleTagsCount, setVisibleTagsCount] = useState(10);
 
   // Map URL category to Category type (articles, recipes, tutorials)
   const getCategoryFromUrl = (urlCategory?: string): Category => {
@@ -172,7 +200,9 @@ export default function ResourcesPage() {
 
         // Fetch personalized feed (recipes + wellness resources)
         const feed = await getPersonalizedFeed(userId, "all");
-        const feedResources = (feed.resources as any[]) || [];
+        const feedResources =
+          (feed.resources as (RecipeResponse | WellnessResourceResponse)[]) ||
+          [];
 
         const recipeItems: ResourceItem[] = feedResources
           .filter((item) => "recipe_id" in item)
@@ -196,8 +226,9 @@ export default function ResourcesPage() {
           }));
 
         const wellnessItems = feedResources.filter(
-          (item: any) => "resource_id" in item || (item).type
-        ) as WellnessResourceResponse[];
+          (item): item is WellnessResourceResponse =>
+            "resource_id" in item || ("type" in item && item.type !== undefined)
+        );
 
         const articlesData: ResourceItem[] = wellnessItems
           .filter((resource) =>
@@ -211,7 +242,7 @@ export default function ResourcesPage() {
             link: resource.source_url,
             content: resource.description,
             isRecipe: false,
-            category_tags: (resource as any).category_tags || [],
+            category_tags: resource.category_tags || [],
           }));
 
         const tutorialsData: ResourceItem[] = wellnessItems
@@ -222,12 +253,13 @@ export default function ResourcesPage() {
           .map((resource) => ({
             id: resource.resource_id,
             title: resource.title,
-            summary: resource.description || "Watch this tutorial to learn more",
+            summary:
+              resource.description || "Watch this tutorial to learn more",
             badge: "Tutorial",
             link: resource.source_url,
             content: resource.description,
             isRecipe: false,
-            category_tags: (resource as any).category_tags || [],
+            category_tags: resource.category_tags || [],
           }));
 
         setRecipes(recipeItems);
@@ -263,7 +295,10 @@ export default function ResourcesPage() {
   const allTags = useMemo(() => {
     const normalizedToOriginal = new Map<string, string>();
     RESOURCES[activeTab].forEach((item) => {
-      const tags = [...(item.category_tags || []), ...(item.dietary_tags || [])];
+      const tags = [
+        ...(item.category_tags || []),
+        ...(item.dietary_tags || []),
+      ];
       tags.forEach((tag) => {
         const normalized = tag.toLowerCase();
         // Ensure consistent capitalization for tags differing only by case
@@ -315,7 +350,7 @@ export default function ResourcesPage() {
     return items;
   }, [RESOURCES, activeTab, searchQuery, selectedTags]);
 
-  // Pagination 
+  // Pagination
   const itemsPerPage = 9;
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -330,6 +365,7 @@ export default function ResourcesPage() {
   // Reset tags when switching categories to avoid stale filters
   useEffect(() => {
     setSelectedTags([]);
+    setVisibleTagsCount(10); // Reset visible tags count when switching categories
   }, [activeTab]);
 
   // Render
@@ -372,7 +408,7 @@ export default function ResourcesPage() {
                       Filter by Tags
                     </label>
                     <div className="flex flex-wrap gap-2">
-                      {allTags.map((tag) => {
+                      {allTags.slice(0, visibleTagsCount).map((tag) => {
                         const tagNormalized = tag.toLowerCase();
                         const isSelected = selectedTags.some(
                           (selectedTag) =>
@@ -409,6 +445,18 @@ export default function ResourcesPage() {
                         );
                       })}
                     </div>
+                    {allTags.length > visibleTagsCount && (
+                      <button
+                        onClick={() => {
+                          setVisibleTagsCount((prev) =>
+                            Math.min(prev + 10, allTags.length)
+                          );
+                        }}
+                        className="mt-3 text-xs text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer"
+                      >
+                        Show more
+                      </button>
+                    )}
                     {selectedTags.length > 0 && (
                       <button
                         onClick={() => {

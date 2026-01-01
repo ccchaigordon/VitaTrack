@@ -45,7 +45,7 @@ export function AuthCallbackPage() {
           }
         }
         if (!mounted) return;
-        nav(me.profileComplete ? "/dashboard" : "/onboarding", {
+        nav(me.profileComplete ? "/home" : "/onboarding", {
           replace: true,
         });
       } catch (err: unknown) {
