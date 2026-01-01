@@ -217,32 +217,92 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     function matchesGoals(meal, goals = []) {
       if (!goals.length) return true;
 
-      // Simple macro-based rules (adjust later)
       return goals.every(goal => {
-        if (goal === "Muscle Gain") {
-          return meal.protein >= 25;
+        switch (goal) {
+          // Muscle & Strength
+          case "Build Muscle":
+            return meal.protein >= 25; // high protein
+          case "Strength":
+          case "Power":
+            return meal.protein >= 20 && meal.carbs >= 30; // protein + energy
+          case "Legs":
+            return meal.carbs >= 30; // energy for leg workouts
+
+          // Cardio & Conditioning
+          case "Cardio":
+          case "Hiit":
+          case "Endurance":
+            return meal.carbs >= 40; // energy for endurance
+
+          // Weight & Health
+          case "Lose Weight":
+            return meal.calories <= 600 && meal.fat <= 20;
+          case "Balanced":
+          case "Stay Healthy":
+          case "Health":
+          case "Fitness":
+            return meal.calories >= 300 && meal.calories <= 700;
+
+          // Nutrition & Diet
+          case "Nutrition":
+          case "Diet":
+          case "Food":
+          case "Cooking":
+          case "Recipes":
+          case "Keto":
+            return true; // no strict macro rules, include all relevant meals
+          case "Supplements":
+            return meal.supplements === true; // flag in meal object
+          case "Water":
+            return meal.isDrink === true && meal.type === "water";
+
+          // Mental & Recovery
+          case "Mental Health":
+          case "Psychology":
+          case "Meditation":
+          case "Sleep":
+          case "Recovery":
+          case "Rehab":
+          case "Pain Relief":
+            return true; // mostly informational, include all
+
+          // Mobility & Posture
+          case "Mobility":
+          case "Posture":
+          case "Yoga":
+            return meal.calories <= 500; // light meals
+
+          // Training Type
+          case "Home":
+          case "Gym":
+          case "Calisthenics":
+          case "Beginner":
+            return true; // general support
+
+          // Lifestyle / Utility
+          case "Lifestyle":
+          case "Habits":
+          case "Activity":
+          case "Time":
+          case "Environment":
+          case "Utility":
+          case "Money":
+          case "Shopping":
+          case "Office":
+          case "Education":
+          case "Science":
+          case "Review":
+          case "Tips":
+          case "Math":
+          case "Clam":
+            return true; // informational, include all
+
+          default:
+            return true; // unknown goals: allow by default
         }
-        if (goal === "Weight Loss") {
-          return meal.calories <= 600 && meal.fat <= 20;
-        }
-        if (goal === "Strength") {
-          return meal.protein >= 20 && meal.carbs >= 30;
-        }
-        if (goal === "Endurance") {
-          return meal.carbs >= 40;
-        }
-        if (goal === "Flexibility") {
-          return meal.fat <= 25;
-        }
-        if (goal === "General Health") {
-          return meal.calories >= 300 && meal.calories <= 700;
-        }        
-        if (goal === "Maintenance") {
-          return meal.calories >= 400 && meal.calories <= 700;
-        }
-        return true;
       });
     }
+
 
     // Filter by rules 
     function filterMealsByTime(meals, mealTime) {
@@ -472,7 +532,8 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       - Procedure: ${m.procedure}
       - Cooking time: ${m.cooking_time} minutes
     
-      Tell the user that, for more information can browse the source link: ${m.source_url}
+      Tell the user that, for more information can browse the source link.
+      Include a **clickable Markdown link** to the recipe using the format[View recipe](/resources/recipes/${m.recipe_id})
 
       Task:
       Write a short, friendly response:

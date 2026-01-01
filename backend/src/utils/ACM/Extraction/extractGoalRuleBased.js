@@ -1,4 +1,4 @@
-function detectUserGoalRuleBased(text = "") {
+function detectUserGoalsRuleBased(text = "") {
   const t = text.toLowerCase();
 
   const RULES = [
@@ -79,16 +79,14 @@ function detectUserGoalRuleBased(text = "") {
     { label: "Math", regex: /math|calculation/ },
 
     // Edge / Unknown
-    { label: "Clam", regex: /clam/ } // included explicitly as requested
+    { label: "Clam", regex: /clam/ }
   ];
 
-  for (const rule of RULES) {
-    if (rule.regex.test(t)) {
-      return rule.label;
-    }
-  }
+  // Collect all matches
+  const matches = RULES.filter(rule => rule.regex.test(t)).map(rule => rule.label);
 
-  return "Unknown";
+  // Return unique matches or ["Unknown"] if none
+  return matches.length ? Array.from(new Set(matches)) : ["Unknown"];
 }
 
-module.exports = detectUserGoalRuleBased;
+module.exports = detectUserGoalsRuleBased;
