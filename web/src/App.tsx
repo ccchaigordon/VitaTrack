@@ -6,7 +6,7 @@ import { ScrollToTop } from "./components/ScrollToTop";
 import { DocumentTitle } from "./components/DocumentTitle";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
-import { DashboardPage } from "./pages/DashboardPage";
+import { HomePage } from "./pages/HomePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { ProfileEditPage } from "./pages/ProfileEditPage";
@@ -96,11 +96,11 @@ export function App() {
           }
         />
         <Route
-          path="/dashboard"
+          path="/home"
           element={
             <RequireAuth>
               <AuthenticatedLayout showFooter>
-                <DashboardPage />
+                <HomePage />
               </AuthenticatedLayout>
             </RequireAuth>
           }

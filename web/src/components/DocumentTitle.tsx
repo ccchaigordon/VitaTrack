@@ -7,7 +7,7 @@ const routeTitles: Record<string, string> = {
   "/signup": "Sign Up - VitaTrack",
   "/auth/callback": "Signing In - VitaTrack",
   "/onboarding": "Onboarding - VitaTrack",
-  "/dashboard": "Dashboard - VitaTrack",
+  "/home": "Home - VitaTrack",
   "/profile": "Profile - VitaTrack",
   "/profile/edit": "Edit Profile - VitaTrack",
   "/chatbot": "Chatbot - VitaTrack",

@@ -146,7 +146,7 @@ function MiniContentCard({ item }: { item: ResourceItem }) {
   );
 }
 
-export function DashboardPage() {
+export function HomePage() {
   const navigate = useNavigate();
   const { me, loading: userLoading } = useUser();
   const userId = me?.user?.user_id || "";

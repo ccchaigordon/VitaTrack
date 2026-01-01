@@ -32,6 +32,6 @@ export function RedirectIfAuth({ children }: PropsWithChildren) {
   }, []);
 
   if (loading) return null;
-  if (hasSession) return <Navigate to="/dashboard" replace />;
+  if (hasSession) return <Navigate to="/home" replace />;
   return <>{children}</>;
 }
