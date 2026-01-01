@@ -63,6 +63,7 @@ async function extractUserGoal(message) {
     - Pain Relief: If the user mentions pain relief.
     - Unknown: If the goal is unclear or not listed above.
     
+    
     STRICT RULES:
     - Return "Unknown" if the user does NOT clearly mention a specific fitness goal.
     - Generic exercise requests (e.g. "I want to exercise", "suggest workouts", "recommend exercises") MUST be classified as "Unknown".
