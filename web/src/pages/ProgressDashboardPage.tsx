@@ -399,7 +399,6 @@ export function ProgressDashboardPage() {
 
   const handleRecommendation = () => {
     setRecOpen((prev) => !prev);
-    if (!recOpen) setActiveTab("progress");
   };
 
   const handleLogToggle = () => {
