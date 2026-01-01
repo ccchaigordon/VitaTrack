@@ -209,7 +209,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   console.log("Multimodal context extracted:", multimodalContext);
 
-  const goal = await detectGoal(message, state, conversationContext);
+  const goal = await detectGoal(message);
   console.log("Goal:", goal);
 
   // if goal is not equal to empty string, replace the existing goal in user profile
@@ -1065,16 +1065,95 @@ router.post("/chat", upload.any(), async (req, res) => {
       - Allergies: ${userProfile?.allergies || 'Not specified'}
       - Medical Conditions: ${userProfile?.medical_conditions || 'Not specified'}
       - Goals: ${userProfile?.goals || 'Not specified'}
+    
+    - If the message contains any information about nutrition details, return the analysis based on that information. If does not contain, just return []. You are not logging the meal, just analyzing the nutrition details.
+      Return the nutritional analysis in this format:
+      [
+        {
+          "meal_name": "... list of items ...",
+          "protein": NUMBER,
+          "carbs": NUMBER,
+          "fat": NUMBER,
+          "calories": NUMBER,
+          "meal_time": "... inferred meal time ...",
+          "source": "source_tag"
+        }
+      ]
 
-    Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.`;
+    - If the message contains any information about workout details, return the analysis based on that information If does not contain, just return []. You are not logging the workout, just analyzing the workout details.
+      Return the workout analysis in this format:
+      [
+        {
+          "exercise_name": "... exercise name ...",
+          "sets": NUMBER,
+          "reps": NUMBER,
+          "duration": NUMBER,
+          "calories_burned": NUMBER
+          "source": "source_tag"
+        }
+      ]
+
+    Respond naturally, considering the conversation context if provided. Keep responses concise but helpful.
+    
+    Return in JSON format including the response and any analyses detected. For example:
+    {
+      "reply": "Your friendly response here.",
+      "meal_analysis": [ ... ],
+      "workout_analysis": [ ... ]
+    }`;
+
+    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
 
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
 
+    let parsed;
+
+    try {
+      const cleanText = gResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+      parsed = JSON.parse(cleanText);
+    } catch (err) {
+      console.error("Failed to parse Gemini output:", err);
+      gResponse = `I'm sorry, I encountered an error while processing your request. Could you please try again later?`;
+      res.json({ chat_id: finalChatId, reply: gResponse, choices: choices }) 
+    }
+
+    const reply = parsed.reply || "";
+    const meal_analysis = Array.isArray(parsed.meal_analysis) ? parsed.meal_analysis : [];
+    const workout_analysis = Array.isArray(parsed.workout_analysis) ? parsed.workout_analysis : [];
+
+    console.log("Reply:", reply);
+    console.log("Meal analysis:", meal_analysis);
+    console.log("Workout analysis:", workout_analysis);
+
+    // console.log("Meal analysis from Gemini:", meal_analysis);
+    // console.log("Workout analysis from Gemini:", workout_analysis);
+
+    let multimodalContext =
+      conversationState.get(user.id)?.multimodalContext || {
+        meals: [],
+        workouts: []
+      };
+
+    const newMeals = Array.isArray(meal_analysis) ? meal_analysis : [];
+    const newWorkouts = Array.isArray(workout_analysis) ? workout_analysis : [];
+
+    multimodalContext = {
+      ...multimodalContext,
+      meals: [
+        ...(multimodalContext.meals || []),
+        ...newMeals
+      ],
+      workouts: [
+        ...(multimodalContext.workouts || []),
+        ...newWorkouts
+      ]
+    };
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
-      message: gResponse,
+      message: reply,
       created_at: new Date(),  
     });
 
@@ -1087,6 +1166,15 @@ router.post("/chat", upload.any(), async (req, res) => {
     } else if (state && typeof state === "object") {
       // Already an object
       stateObj = state;
+    }
+
+    stateObj.multimodalContext = multimodalContext;
+
+    if (state instanceof Map) {
+      state.set("multimodalContext", multimodalContext);
+      conversationState.set(user.id, state); // Map updated
+    } else {
+      conversationState.set(user.id, stateObj); // Object updated
     }
 
     console.log("State object to save:", stateObj);
@@ -1111,9 +1199,9 @@ router.post("/chat", upload.any(), async (req, res) => {
       });
     }
 
-    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    
 
-    return res.json({ chat_id: finalChatId, reply: gResponse, choices: choices });
+    return res.json({ chat_id: finalChatId, reply: reply, choices: choices });
   }
 
   // Default fallback - if intent doesn't match, treat as general chat
@@ -1246,6 +1334,7 @@ router.get("/loadchat", async (req, res) => {
           message: null,
           file_name: f.file_name,
           file_url: data?.signedUrl,
+          file_type: f.file_type,
           created_at: f.uploaded_at,
           msg_id: f.msg_id
         };

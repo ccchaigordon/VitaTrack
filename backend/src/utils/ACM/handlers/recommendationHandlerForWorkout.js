@@ -28,11 +28,20 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         let userGoal = "";
         let gResponse = "";
 
+        // Fetch user profile goal first
+        const { data: userProfile } = await supabase
+            .from("user_profiles")
+            .select("goals")
+            .eq("user_id", user_id)
+            .single();
+        
+        goal = userProfile?.goals || "";
+
         // Try rule-based detection from message
-        userGoal = detectUserGoalRuleBased(message);
+        userGoal = detectUserGoalRuleBased(goal);
         
          // If still unknown, try user profile
-        if (!userGoal || userGoal === "Unknown") {
+        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
             const { data: userProfile } = await supabase
                 .from("user_profiles")
                 .select("goals")
@@ -43,10 +52,10 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         }
 
         // LAST RESORT: Gemini
-        if (!userGoal || userGoal === "Unknown") {
-            userGoal = await extractUserGoal(message);
+        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+            userGoal = await extractUserGoal(goal);
 
-            if (userGoal === "Unknown") {
+            if (Array.isArray(userGoal) && userGoal.includes("Unknown")) {
                 const { data: userProfile } = await supabase
                 .from("user_profiles")
                 .select("goals")
@@ -58,8 +67,8 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         }
 
         // Fallback safety
-        if (!userGoal || userGoal === "Unknown") {
-            userGoal = "General Health";
+        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+            userGoal = "Stay Healthy";
         }
 
         console.log("Inferred workout goal for recommendation:", userGoal);
@@ -87,10 +96,23 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
 
         console.log("Recent workouts in last 48h:", recentWorkoutSet);
 
+        let userGoals = Array.isArray(userGoal) ? userGoal : [userGoal];
+
+        // Check if it's a JSON string inside an array
+        if (userGoals.length === 1 && typeof userGoals[0] === "string" && userGoals[0].startsWith("[")) {
+            try {
+                userGoals = JSON.parse(userGoals[0]);
+            } catch (e) {
+                console.error("Failed to parse userGoals JSON", e);
+            }
+        }
+
+
+
         const { data: wellness_resources, error } = await supabase
             .from("wellness_resources")
             .select("*")
-            .contains("category_tags", [userGoal]);    
+            .overlaps("category_tags", userGoals);    
 
         if (error || !wellness_resources.length) {
             conversationState.set(user_id, {
@@ -104,7 +126,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
                 Context:
                 The user requested a workout/exercise recommendation.
 
-                Workout/exercise goal: ${userGoal || "any"}
+                Workout/exercise goal: ${goal || "any"}
                 
                 Inform the user that you know their goal but there are no suitable workout/exercise in the library.
                 Suggest the user to change their goal or log more workouts/exercises to get better recommendations.
@@ -147,6 +169,9 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         const prompt = `
             You are a friendly fitness assistant chatbot.
 
+            User goal:
+            ${goal}
+
             Context:
             The user is browsing workout/exercise recommendations.
 
@@ -159,7 +184,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             Task:
             Write a short, friendly response:
             - Tell the user that you know their goals.
-            - Suggest the recommended workout details based on their goals.
+            - Suggest the recommended workout details based on their goals ${goal}.
             - Mention the workout description, source url and category
             - Can add any extra explanation if needed
             - Ask if the user wants more recommendation

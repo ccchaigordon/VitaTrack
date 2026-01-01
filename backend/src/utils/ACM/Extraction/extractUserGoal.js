@@ -10,7 +10,7 @@ async function extractUserGoal(message) {
     Task:
     Classify the user's goal.
 
-    Respond with ONLY one of the following values:
+    Respond with possible of following values:
     - Stay Healthy: If the user explicitly mentions maintaining overall health or general fitness.
     - Mental Health: If the user mentions stress relief, anxiety reduction, mindfulness, or similar.
     - Meditation: If the user mentions meditation, mindfulness, or breathing exercises.
@@ -72,6 +72,8 @@ async function extractUserGoal(message) {
     - No explanations.
     - No emojis.
     - No extra text.
+
+    return in this format: ["<goal_label>", "... additional_goal_labels if any ..."]
     `;
 
   const response = await queryGemini(prompt);

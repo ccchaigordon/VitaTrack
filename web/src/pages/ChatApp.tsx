@@ -4,11 +4,15 @@
   import { useUser } from "../contexts/UserContext";
   import ReactMarkdown from "react-markdown";
   import { TypeAnimation } from "react-type-animation";
+  import { MealLogForm } from "../components/acm/mealLogForm";
+  import { WorkoutLogForm } from "../components/acm/WorkoutLogForm";
+  import { ImagePreview } from "../components/acm/ImagePreview";
+  import { ConfirmDelete } from "../components/acm/ConfirmDelete";
+
 
   type Message = {
     role: "user" | "assistant";
     text: string;
-    file?: File[]; // For newly uploaded files
     files?: FileItem[]; // For loaded messages from backend
     file_name?: string;
     file_url?: string;
@@ -22,6 +26,7 @@
     created_at: string;
     file_name: string | null;
     file_url: string | null;  
+    file_type: string | null;
     message: string | null;
     msg_id: string;
     log_data: any[] | null;
@@ -31,6 +36,7 @@
   type FileItem = {
     file_url: string;
     file_name: string;
+    file_type: string;
   };
 
   export function TypingIndicator() {
@@ -100,6 +106,46 @@
     URL.revokeObjectURL(url);
 }
 
+function TypingText({
+    text,
+    onFinish,
+  }: {
+    text: string;
+    speed?: number;
+    onFinish?: () => void;
+  }) {
+    
+    const finishedRef = useRef(false);
+
+    useEffect(() => {
+      // Auto-complete after 7 seconds
+      const timeout = setTimeout(() => {
+        if (!finishedRef.current) {
+          finishedRef.current = true;
+          onFinish?.();
+        }
+      }, 7000);
+
+      return () => clearTimeout(timeout);
+    }, [text, onFinish]);
+
+    return (
+        <TypeAnimation
+          sequence={[
+            text,
+            () => {
+              finishedRef.current = true;
+              onFinish?.();
+            },
+          ]}
+          speed={80}
+          cursor={false}
+          wrapper="div"
+          preRenderFirstString={false} // prevent flicker
+        />
+      );
+  }
+
 
   function ChatBubble({
     role,
@@ -109,7 +155,9 @@
     onTypingEnd,
     choices,
     onChoiceClick,
-    data
+    data,
+    isLast = false,
+    onImageClick,
   }: {
     role: "user" | "assistant";
     text: string;
@@ -119,6 +167,8 @@
     choices?: string[];
     onChoiceClick?: (choice: string) => void;
     data?: any[];
+    isLast?: boolean;
+    onImageClick?: (src: string) => void;
   }) {
     const isUser = role === "user";
     const { me } = useUser();
@@ -168,11 +218,12 @@
               >
                 {files.map((file, index) => (
                   <div key={index} className="max-w-[180px]">
-                    {file.file_url.match(/\.(jpeg|jpg|png|gif|webp)$/i) ? (
+                    {file.file_type.startsWith("image/") ? (
                       <img
                         src={file.file_url}
                         alt={file.file_name}
-                        className="rounded-lg max-w-full border border-gray-200"
+                        onClick={() => onImageClick?.(file.file_url)}
+                        className="rounded-lg max-w-full border border-gray-200 cursor-pointer hover:opacity-80"
                       />
                     ) : (
                       <a
@@ -202,14 +253,10 @@
               ) : text === "..." ? (
                 <TypingIndicator />
               ) : isTyping ? (
-                <TypeAnimation
-                  sequence={[
-                    text,
-                    () => onTypingEnd?.(), // callback after typing finishes
-                  ]}
+                <TypingText
+                  text={text}
                   speed={80}
-                  cursor={false}
-                  wrapper="div"
+                  onFinish={() => onTypingEnd?.()}
                 />
               ) : (
                 <div>
@@ -339,7 +386,7 @@
                     </button>
                   )}
 
-                  {choices && choices.length > 0 && (
+                  {isLast &&choices && choices.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         {choices.map((choice, idx) => (
                           <button
@@ -411,10 +458,54 @@
     >([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const [showMealModal, setShowMealModal] = useState(false);
+    const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<() => void>(() => () => {});
+    const [confirmTitle, setConfirmTitle] = useState("");
+    const [confirmMessage, setConfirmMessage] = useState("");
+    const [confirmText, setConfirmText] = useState("Confirm");
+    const [cancelText, setCancelText] = useState("Cancel");
+
+      // Mobile Menu States
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileAnimating, setMobileAnimating] = useState(false);
+
+  function openMobileMenu() {
+    setMobileOpen(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setMobileAnimating(true);
+      });
+    });
+  }
+
+  function closeMobileMenu() {
+    setMobileAnimating(false);
+    setTimeout(() => setMobileOpen(false), 300);
+  }
+  
     const handleChoiceClick = async (choice: string) => {
-      console.log("Choice clicked:", choice);
-      if(!choice) return; 
+      console.log("User selected choice:", choice);
+      if (!choice) return;
+
+      // No input & no files → open modal
+      if (!input.trim() && uploads.length === 0) {
+        if (choice === "Log meal") {
+          setShowMealModal(true);
+          return;
+        }
+        if (choice === "Log workout") {
+          setShowWorkoutModal(true);
+          return;
+        }
+
+        sendMessage(choice);
+        return;
+      }
+
       sendMessage(choice);
     };
 
@@ -437,7 +528,7 @@
                 ? {
                     ...msg,
                     text: "Hi! How can I help you today?",
-                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal Recommendation", "Workout Recommendation", "Other"],
+                    choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"],
                     isTyping: true,
                   }
                 : msg
@@ -500,10 +591,11 @@
           if (existingMsg) {
 
             // Append file info if exists
-            if (item.file_url && item.file_name) {
+            if (item.file_url && item.file_name && item.file_type) {
               existingMsg.files.push({
                 file_url: item.file_url,
                 file_name: item.file_name,
+                file_type: item.file_type
               });
             }
 
@@ -527,11 +619,12 @@
               role: item.role === "ai" ? "assistant" : "user",
               text: normalizeMessageText(item.message),
               files:
-                item.file_url && item.file_name
+                item.file_url && item.file_name && item.file_type
                   ? [
                       {
                         file_url: item.file_url,
                         file_name: item.file_name,
+                        file_type: item.file_type
                       },
                     ]
                   : [],
@@ -585,13 +678,18 @@
     };
 
     const sendMessage = async (forcedMessage?: string) => {
-      const messageText = forcedMessage?.trim() || input.trim();
+      const messageText = input.trim() || forcedMessage || "";
+
       if (!messageText) return;
 
       const newUserMessage: Message = {
         role: "user",
         text: messageText,
-        file: uploads,
+        files: uploads.map((file) => ({
+          file_name: file.name,
+          file_url: URL.createObjectURL(file),
+          file_type: file.type,
+        })),
       };
       setMessages((prev) => [...prev, newUserMessage]);
 
@@ -601,7 +699,6 @@
       const typingMessage: Message = {
         role: "assistant",
         text: "...",
-        file: [],
         msg_id: typingMessageId
       };
       setMessages((prev) => [...prev, typingMessage]);
@@ -692,10 +789,11 @@
           if (existingMsg) {
 
             // Append file info if exists
-            if (item.file_url && item.file_name) {
+            if (item.file_url && item.file_name && item.file_type) {
               existingMsg.files.push({
                 file_url: item.file_url,
                 file_name: item.file_name,
+                file_type: item.file_type,
               });
             }
 
@@ -719,11 +817,12 @@
               role: item.role === "ai" ? "assistant" : "user",
               text: normalizeMessageText(item.message),
               files:
-                item.file_url && item.file_name
+                item.file_url && item.file_name && item.file_type
                   ? [
                       {
                         file_url: item.file_url,
                         file_name: item.file_name,
+                        file_type: item.file_type,
                       },
                     ]
                   : [],
@@ -764,7 +863,7 @@
               ? {
                   ...msg,
                   text: "Hi! How can I help you today?",
-                  choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal Recommendation", "Workout Recommendation", "Other"],
+                  choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"],
                   isTyping: true,
                 }
               : msg
@@ -910,84 +1009,237 @@
     return (
       <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
         <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
-          {/* LEFT SIDEBAR */}
-          <div className="bg-white p-6 rounded-3xl w-75 border border-gray-200 shrink-0 flex flex-col">
-            <h1 className="mb-6 mt-2 text-left font-bold text-xs text-gray-700 uppercase tracking-wider">
-              Chat History
-            </h1>
-
+          {/* Mobile Menu */}
+          <div className="lg:hidden flex items-center justify-start gap-4 mb-150">
             <button
-              onClick={newChat}
-              className="bg-[#2A4A2D] hover:bg-[#1A381D] text-white text-sm font-medium px-4 py-2.5 w-full rounded-xl cursor-pointer transition-colors"
+              type="button"
+              onClick={openMobileMenu}
+              className="flex cursor-pointer  rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
             >
-              + New Chat
+              <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
             </button>
-
-            <div className="flex justify-between items-center text-gray-600 text-xs mb-4 mt-6">
-              <span className="font-medium">Recent Chats</span>
-              {chatList.length > 0 && (
-                <button
-                  onClick={clearAllChats}
-                  className="cursor-pointer hover:text-red-600 text-xs transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
-            </div>
-
-            {/* Chat list */}
-            <div className="flex flex-col overflow-y-auto mt-2 pr-1 flex-1 gap-1.5 scroll-smooth min-h-0">
-              {chatList.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-8">
-                  No chats yet. Start a new conversation!
-                </p>
-              ) : (
-                chatList.map((chat) => (
-                  <div
-                    key={chat.chat_id}
-                    className={`flex items-center p-2.5 rounded-lg transition-all duration-200 cursor-pointer
-                                  hover:bg-gray-50
-                                  ${
-                                    activeChatId === chat.chat_id
-                                      ? "bg-[#DDF3D8] text-gray-900"
-                                      : "text-gray-600 hover:text-gray-900"
-                                  }`}
-                    onClick={() => loadChat(chat.chat_id)}
-                  >
-                    {/* Left: chat icon */}
-                    <img
-                      src="/src/assets/Chatbot/Messages.svg"
-                      className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
-                      alt="Chat"
-                    />
-
-                    {/* Title: truncate */}
-                    <p className="text-xs font-medium truncate flex-1 min-w-0">
-                      {chat.title || "Untitled Chat"}
-                    </p>
-
-                    {/* Delete button only for active chat */}
-                    {activeChatId === chat.chat_id && (
-                      <button
-                        className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 w-6 h-6 flex justify-center items-center rounded transition-colors"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteChat(chat.chat_id);
-                        }}
-                        aria-label="Delete chat"
-                      >
-                        <img
-                          src="/src/assets/Chatbot/Delete.svg"
-                          className="w-4 h-4"
-                          alt="Delete"
-                        />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
           </div>
+
+        {/* Mobile Sidebar */}
+        {mobileOpen && (
+          <div className="fixed inset-0 z-[150] lg:hidden">
+            {/* Backdrop */}
+            <button
+              type="button"
+              onClick={closeMobileMenu}
+              className={`fixed inset-0 bg-black w-full h-full cursor-default transition-opacity duration-300 ${mobileAnimating ? "opacity-25" : "opacity-0"
+                }`}
+              aria-label="Close menu"
+            />
+
+            {/* Sidebar Panel */}
+            <nav
+              className={`fixed bottom-0 left-0 top-0 flex w-[300px] flex-col overflow-y-auto bg-white shadow-2xl rounded-r-2xl p-4 transition-transform duration-300 ease-out ${mobileAnimating ? "translate-x-0" : "-translate-x-full"
+                }`}
+            >
+              {/* LEFT SIDEBAR */}
+              <div className="bg-white p-0 rounded-3xl w-full h-full flex flex-col">
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 items-start self-end"
+                >
+                  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
+                <h1 className="mb-6 mt-2 text-left font-bold text-xs text-gray-700 uppercase tracking-wider">
+                  Chat History
+                </h1>
+
+                
+
+                <button
+                  onClick={newChat}
+                  className="bg-[#2A4A2D] hover:bg-[#1A381D] text-white text-sm font-medium px-4 py-2.5 w-full rounded-xl cursor-pointer transition-colors"
+                >
+                  + New Chat
+                </button>
+
+                <div className="flex justify-between items-center text-gray-600 text-xs mb-4 mt-6">
+                  <span className="font-medium">Recent Chats</span>
+                  {chatList.length > 0 && (
+                    <button
+                      onClick={() => {
+                        setConfirmTitle("Clear All Chats?");
+                        setConfirmMessage("Are you sure you want to clear all chats? This cannot be undone.");
+                        setConfirmText("Clear All");
+                        setCancelText("Cancel");
+                        setConfirmAction(() => clearAllChats);
+                        setShowConfirmModal(true);
+                      }}
+                      className="cursor-pointer hover:text-red-600 text-xs transition-colors"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+
+                {/* Chat list */}
+                <div className="flex flex-col overflow-y-auto mt-2 pr-1 flex-1 gap-1.5 scroll-smooth min-h-0">
+                  {chatList.length === 0 ? (
+                    <p className="text-xs text-gray-400 text-center py-8">
+                      No chats yet. Start a new conversation!
+                    </p>
+                  ) : (
+                    chatList.map((chat) => (
+                      <div
+                        key={chat.chat_id}
+                        className={`flex items-center p-2.5 rounded-lg transition-all duration-200 cursor-pointer
+                                      hover:bg-gray-50
+                                      ${
+                                        activeChatId === chat.chat_id
+                                          ? "bg-[#DDF3D8] text-gray-900"
+                                          : "text-gray-600 hover:text-gray-900"
+                                      }`}
+                        onClick={() => {
+                          loadChat(chat.chat_id);    // load the chat
+                          closeMobileMenu();          // close the sidebar
+                        }}
+                      >
+                        {/* Left: chat icon */}
+                        <img
+                          src="/src/assets/Chatbot/Messages.svg"
+                          className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
+                          alt="Chat"
+                        />
+
+                        {/* Title: truncate */}
+                        <p className="text-xs font-medium truncate flex-1 min-w-0">
+                          {chat.title || "Untitled Chat"}
+                        </p>
+
+                        {/* Delete button only for active chat */}
+                        {activeChatId === chat.chat_id && (
+                          <button
+                            className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 w-6 h-6 flex justify-center items-center rounded transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmTitle("Delete Chat?");
+                              setConfirmMessage("Are you sure you want to delete this chat? This action cannot be undone.");
+                              setConfirmText("Delete");
+                              setCancelText("Cancel");
+                              setConfirmAction(() => () => deleteChat(chat.chat_id));
+                              setShowConfirmModal(true);
+                            }}
+                            aria-label="Delete chat"
+                          >
+                            <img
+                              src="/src/assets/Chatbot/Delete.svg"
+                              className="w-4 h-4"
+                              alt="Delete"
+                            />
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              
+            </nav>
+          </div>
+        )}
+
+        {/* LEFT SIDEBAR */}
+        <div className="hidden lg:flex bg-white p-6 rounded-3xl w-75 border border-gray-200 shrink-0 flex flex-col">
+          <h1 className="mb-6 mt-2 text-left font-bold text-xs text-gray-700 uppercase tracking-wider">
+            Chat History
+          </h1>
+
+          <button
+            onClick={newChat}
+            className="bg-[#2A4A2D] hover:bg-[#1A381D] text-white text-sm font-medium px-4 py-2.5 w-full rounded-xl cursor-pointer transition-colors"
+          >
+            + New Chat
+          </button>
+
+          <div className="flex justify-between items-center text-gray-600 text-xs mb-4 mt-6">
+            <span className="font-medium">Recent Chats</span>
+            {chatList.length > 0 && (
+              <button
+                onClick={() => {
+                  setConfirmTitle("Clear All Chats?");
+                  setConfirmMessage("Are you sure you want to clear all chats? This cannot be undone.");
+                  setConfirmText("Clear All");
+                  setCancelText("Cancel");
+                  setConfirmAction(() => clearAllChats);
+                  setShowConfirmModal(true);
+                }}
+                className="cursor-pointer hover:text-red-600 text-xs transition-colors"
+              >
+                Clear All
+              </button>
+            )}
+          </div>
+
+          {/* Chat list */}
+          <div className="flex flex-col overflow-y-auto mt-2 pr-1 flex-1 gap-1.5 scroll-smooth min-h-0">
+            {chatList.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8">
+                No chats yet. Start a new conversation!
+              </p>
+            ) : (
+              chatList.map((chat) => (
+                <div
+                  key={chat.chat_id}
+                  className={`flex items-center p-2.5 rounded-lg transition-all duration-200 cursor-pointer
+                                hover:bg-gray-50
+                                ${
+                                  activeChatId === chat.chat_id
+                                    ? "bg-[#DDF3D8] text-gray-900"
+                                    : "text-gray-600 hover:text-gray-900"
+                                }`}
+                  onClick={() => loadChat(chat.chat_id)}
+                >
+                  {/* Left: chat icon */}
+                  <img
+                    src="/src/assets/Chatbot/Messages.svg"
+                    className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
+                    alt="Chat"
+                  />
+
+                  {/* Title: truncate */}
+                  <p className="text-xs font-medium truncate flex-1 min-w-0">
+                    {chat.title || "Untitled Chat"}
+                  </p>
+
+                  {/* Delete button only for active chat */}
+                  {activeChatId === chat.chat_id && (
+                    <button
+                      className="ml-2 text-red-500 hover:text-red-700 hover:bg-red-50 shrink-0 w-6 h-6 flex justify-center items-center rounded transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setConfirmTitle("Delete Chat?");
+                        setConfirmMessage("Are you sure you want to delete this chat? This action cannot be undone.");
+                        setConfirmText("Delete");
+                        setCancelText("Cancel");
+                        setConfirmAction(() => () => deleteChat(chat.chat_id));
+                        setShowConfirmModal(true);
+                      }}
+                      aria-label="Delete chat"
+                    >
+                      <img
+                        src="/src/assets/Chatbot/Delete.svg"
+                        className="w-4 h-4"
+                        alt="Delete"
+                      />
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+          
 
           {/* MAIN CHAT AREA */}
           <div className="bg-white flex-1 rounded-3xl p-8 flex flex-col min-h-0 border border-gray-200 overflow-hidden">
@@ -1002,13 +1254,7 @@
                     role={msg.role}
                     text={msg.text}
                     data={msg.data}
-                    files={[
-                      ...(msg.files || []), // loaded files
-                      ...(msg.file?.map((f) => ({
-                        file_name: f.name,
-                        file_url: URL.createObjectURL(f),
-                      })) || []), // newly uploaded
-                    ]}
+                    files={msg.files || []}
                     isTyping={msg.isTyping}
                     onTypingEnd={() => {
                       setMessages((prev) =>
@@ -1023,6 +1269,8 @@
                     onChoiceClick={(choice) => {                      
                         handleChoiceClick(choice);                      
                     }}
+                    isLast={index === messages.length - 1}
+                    onImageClick={(src) => setPreviewImage(src)}
                   />
                 ))}
                 <div ref={messagesEndRef} />
@@ -1048,6 +1296,50 @@
                   </p>
                 </div>
               </div>
+            )}
+
+            {showMealModal && (
+              <MealLogForm
+                onSubmit={(mealData) => {
+                  setShowMealModal(false);
+                  setInput(`Meal details: Meal name: ${mealData.meal_name}, Calories: ${mealData.calories} kcal, Protein: ${mealData.protein} g, Carbs: ${mealData.carbs} g, Fats: ${mealData.fats} g, Meal time: ${mealData.meal_time}`);
+                }}
+                onClose={() => setShowMealModal(false)}
+              />
+
+            )}
+
+            {showWorkoutModal && (
+              <WorkoutLogForm
+                onSubmit={(workoutData) => {
+                  setShowWorkoutModal(false);
+                  setInput(`Workout details: Exercise name: ${workoutData.exercise_name}, Sets: ${workoutData.sets}, Reps: ${workoutData.reps}, Duration: ${workoutData.duration} minutes, Calories burned: ${workoutData.calories_burned} kcal`);
+                }}
+                onClose={() => setShowWorkoutModal(false)}
+              />
+
+            )}
+
+            {previewImage && (
+              <ImagePreview
+                src={previewImage}
+                onClose={() => setPreviewImage(null)}
+              />
+            )}
+
+            {showConfirmModal && (
+              <ConfirmDelete
+                isOpen={showConfirmModal}
+                title={confirmTitle}
+                message={confirmMessage}
+                confirmText={confirmText}
+                cancelText={cancelText}
+                onCancel={() => setShowConfirmModal(false)}
+                onConfirm={() => {
+                  confirmAction();         
+                  setShowConfirmModal(false);
+                }}
+              /> 
             )}
 
             <div className="w-full flex justify-center mt-4">
@@ -1118,7 +1410,7 @@
                     onKeyDown={(e) =>
                       e.key === "Enter" && !e.shiftKey && sendMessage()
                     }
-                    className="flex-1 outline-none text-gray-700 text-sm bg-transparent placeholder:text-gray-400"
+                    className="flex-1 min-w-0 outline-none text-gray-700 text-sm bg-transparent placeholder:text-gray-400"
                     placeholder="Type your message..."
                   />
                   <button
@@ -1139,5 +1431,6 @@
           </div>
         </div>
       </div>
+      
     );
   }
