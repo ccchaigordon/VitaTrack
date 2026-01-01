@@ -5,14 +5,13 @@ async function extractMealInfoFromMsg(message) {
         You are a meal information extractor.
 
         - If multiple meals are present (breakfast, lunch, snack, dinner), extract each meal separately.
-        - Use the actual food items as "title", not "Breakfast", "Lunch", etc.
+        - Use the actual food items as "meal_name", not "Breakfast", "Lunch", etc.
         - Extract protein, carbs, fat, calories and meal time (breakfast, lunch, snack, dinner) for each meal.
-        - If protein, carbs, fat, or calories are not mentioned, return the values based on your best estimate/knowledge.
 
         From the following message, extract:
         [
             {
-            "title": "... list of items ...",
+            "meal_name": "... list of items ...",
             "protein": NUMBER,
             "carbs": NUMBER,
             "fat": NUMBER,
