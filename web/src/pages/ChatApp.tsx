@@ -1,3 +1,57 @@
+  import { useRef, useState, useEffect, useMemo } from "react";
+  import { useParams, useNavigate } from "react-router-dom";
+  import { apiFetch } from "../services/api";
+  import { useUser } from "../contexts/UserContext";
+  import ReactMarkdown from "react-markdown";
+  import { TypeAnimation } from "react-type-animation";
+  import { MealLogForm } from "../components/acm/MealLogForm";
+  import { WorkoutLogForm } from "../components/acm/WorkoutLogForm";
+  import { ImagePreview } from "../components/acm/ImagePreview";
+  import { ConfirmDelete } from "../components/acm/ConfirmDelete";
+
+
+  type Message = {
+    role: "user" | "assistant";
+    text: string;
+    files?: FileItem[]; // For loaded messages from backend
+    file_name?: string;
+    file_url?: string;
+    msg_id?: string;
+    isTyping?: boolean;
+    choices?: string[];
+    data?: any[];
+  };
+
+  type TimelineItem = {
+    created_at: string;
+    file_name: string | null;
+    file_url: string | null;  
+    file_type: string | null;
+    message: string | null;
+    msg_id: string;
+    log_data: any[] | null;
+    role: "user" | "ai";
+  };
+
+  type FileItem = {
+    file_url: string;
+    file_name: string;
+    file_type: string;
+  };
+
+  export function TypingIndicator() {
+    return (
+      <div className="flex gap-1">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 bg-[#2A4A2D] rounded-full animate-bounce"
+            style={{ animationDelay: `${i * 150}ms` }}
+          />
+        ))}
+      </div>
+    );
+  }
 import { useRef, useState, useEffect, useMemo } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../services/api";
@@ -1081,6 +1135,89 @@ function Avatar({
     }
   };
 
+    const handleMealSubmit = async (mealData: {
+      meal_description: string;
+      meal_time: string;
+    }) => {
+      console.log("Meal data submitted:", mealData);
+      const mealMessage = mealData.meal_description + " for " + mealData.meal_time;
+      const messageText = mealMessage;
+      console.log("Submitting meal message:", mealMessage);
+
+      const typingMessageId = Date.now().toString() + "-typing"; // unique id
+      const typingMessage: Message = {
+        role: "assistant",
+        text: "...",
+        msg_id: typingMessageId
+      };
+      setMessages((prev) => [...prev, typingMessage]);
+      const formData = new FormData();
+      formData.append("message", mealMessage);
+      formData.append("chat_id", activeChatId ?? "");
+      formData.append("is_new_chat", activeChatId ? "false" : "true");
+      formData.append("choice", "Log meal");
+
+      try {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
+          method: "POST",
+          json: formData,
+        });
+
+        console.log("Chat response data:", data);
+        const newChatId = activeChatId || data.chat_id;
+
+        if (!activeChatId) {
+          setActiveChatId(newChatId);
+          // Navigate to the new chat URL
+          navigate(`/chatbot/${newChatId}`, { replace: true });
+        }
+
+        setChatList((prev) => {
+          const chatExists = prev.find((c) => c.chat_id === newChatId);
+
+          if (chatExists) {
+            return prev.map((c) =>
+              c.chat_id === newChatId && c.title === "New chat"
+                ? { ...c, title: messageText } // update title only if it's "New chat"
+                : c
+            );
+          } else {
+            // if somehow chat is not in the list, add it
+            return [{ chat_id: newChatId, title: messageText }, ...prev];
+          }
+        });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: data.reply, data: data.data ?? [], isTyping: true, choices: data.choices ? data.choices : [] }
+              : msg
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: "Error: failed to contact server.", isTyping: true }
+              : msg
+          )
+        );
+      }
+
+      
+      setShowMealModal(false);
+    };
+
+    return (
+      <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
+          {/* Mobile Menu */}
+          <div className="lg:hidden flex items-center justify-start gap-4 mb-150">
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="flex cursor-pointer  rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
   return (
     <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
       <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
@@ -1344,6 +1481,35 @@ function Avatar({
           </div>
         </div>
 
+            {/* Empty State */}
+            {messages.length === 0 && (
+              <div className="flex flex-col items-center justify-center flex-1">
+                <div className="flex flex-col items-center gap-4">
+                  <img
+                    src="/src/assets/Chatbot/Logo.svg"
+                    className="w-[180px] opacity-90"
+                    alt="VitaTrack Chat"
+                  />
+                  <h2 className="text-2xl font-semibold text-gray-700">
+                    Hi! How can I help you today?
+                  </h2>
+                  <p className="text-sm text-gray-500 text-center max-w-md">
+                    Ask me anything about fitness, nutrition, or wellness. I can
+                    help you log meals, track workouts, and provide personalized
+                    recommendations.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {showMealModal && (
+              <MealLogForm
+                onSubmit={(mealData) => {
+                  setShowMealModal(false);
+                  handleMealSubmit(mealData);
+                }}
+                onClose={() => setShowMealModal(false)}
+              />
         {/* MAIN CHAT AREA */}
         <div className="bg-white flex-1 rounded-3xl p-8 flex flex-col min-h-0 border border-gray-200 overflow-hidden">
           {messages.length > 0 && (
