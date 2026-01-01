@@ -7,19 +7,19 @@ const MEAL_SCHEDULES = [
     name: 'Breakfast', 
     windowStart: 7,  // 7:00 AM
     windowEnd: 11,   // 11:00 AM
-    triggerHour: 8  // 8:00 AM
+    triggerHour: 12  // 12:00 PM
   },
   { 
     name: 'Lunch', 
     windowStart: 11, // 11:00 AM
     windowEnd: 16,   // 4:00 PM
-    triggerHour: 12  // 12:00 PM
+    triggerHour: 17  // 5:00 PM
   },
   { 
     name: 'Dinner', 
     windowStart: 17, // 5:00 PM
     windowEnd: 22,   // 10:00 PM
-    triggerHour: 18  // 6:00 PM
+    triggerHour: 23  // 11:00 PM
   }
 ];
 

@@ -17,7 +17,7 @@ function detectUserGoalsRuleBased(text = "") {
     { label: "Pain Relief", regex: /pain relief|reduce pain|ache|soreness/ },
 
     // Muscle & Strength
-    { label: "Build Muscle", regex: /build muscle|muscle gain|hypertrophy|bulking/ },
+    { label: "Build Muscle", regex: /build muscle|muscle gain|hypertrophy|bulking|bulk|big body|more muscle/ },
     { label: "Strength", regex: /strength|stronger|heavy lift/ },
     { label: "Power", regex: /power|explosive|max output/ },
 

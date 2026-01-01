@@ -68,7 +68,6 @@ async function extractUserGoal(message) {
     - Return "Unknown" if the user does NOT clearly mention a specific fitness goal.
     - Generic exercise requests (e.g. "I want to exercise", "suggest workouts", "recommend exercises") MUST be classified as "Unknown".
     - Do NOT infer or guess the goal.
-    - Only classify as "General Health" if the user explicitly says they want to maintain overall health or general fitness.
     - If multiple goals are mentioned, choose the most dominant one.
     - No explanations.
     - No emojis.

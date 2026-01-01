@@ -4,7 +4,7 @@ import { apiFetch } from "../services/api";
 import { useUser } from "../contexts/UserContext";
 import ReactMarkdown from "react-markdown";
 import { TypeAnimation } from "react-type-animation";
-import { MealLogForm } from "../components/acm/mealLogForm";
+import { MealLogForm } from "../components/acm/MealLogForm";
 import { WorkoutLogForm } from "../components/acm/WorkoutLogForm";
 import { ImagePreview } from "../components/acm/ImagePreview";
 import { ConfirmDelete } from "../components/acm/ConfirmDelete";
@@ -54,7 +54,7 @@ export function TypingIndicator() {
 
 const normalizeMessageText = (message: unknown): string => {
   if (typeof message === "string") {
-    // 🔥 try to parse JSON string
+    // try to parse JSON string
     try {
       const parsed = JSON.parse(message);
       if (parsed && typeof parsed.reply === "string") {
@@ -459,18 +459,16 @@ function Avatar({
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const hasProcessedInitialMessage = useRef(false);
-  const [showMealModal, setShowMealModal] = useState(false);
-  const [showWorkoutModal, setShowWorkoutModal] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [showMealModal, setShowMealModal] = useState(false);
+    const [showWorkoutModal, setShowWorkoutModal] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [confirmAction, setConfirmAction] = useState<() => void>(
-    () => () => {}
-  );
-  const [confirmTitle, setConfirmTitle] = useState("");
-  const [confirmMessage, setConfirmMessage] = useState("");
-  const [confirmText, setConfirmText] = useState("Confirm");
-  const [cancelText, setCancelText] = useState("Cancel");
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [confirmAction, setConfirmAction] = useState<() => void>(() => () => {});
+    const [confirmTitle, setConfirmTitle] = useState("");
+    const [confirmMessage, setConfirmMessage] = useState("");
+    const [confirmText, setConfirmText] = useState("Confirm");
+    const [cancelText, setCancelText] = useState("Cancel");
 
   // Mobile Menu States
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -1081,6 +1079,155 @@ function Avatar({
     }
   };
 
+  const handleMealSubmit = async (mealData: {
+      meal_description: string;
+      meal_time: string;
+    }) => {
+      console.log("Meal data submitted:", mealData);
+      const mealMessage = mealData.meal_description + " for " + mealData.meal_time;
+      const messageText = mealMessage;
+      console.log("Submitting meal message:", mealMessage);
+
+      const typingMessageId = Date.now().toString() + "-typing"; // unique id
+      const typingMessage: Message = {
+        role: "assistant",
+        text: "...",
+        msg_id: typingMessageId
+      };
+      setMessages((prev) => [...prev, typingMessage]);
+      const formData = new FormData();
+      formData.append("message", mealMessage);
+      formData.append("chat_id", activeChatId ?? "");
+      formData.append("is_new_chat", activeChatId ? "false" : "true");
+      formData.append("choice", "Log meal");
+
+      try {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
+          method: "POST",
+          json: formData,
+        });
+
+        console.log("Chat response data:", data);
+        const newChatId = activeChatId || data.chat_id;
+
+        if (!activeChatId) {
+          setActiveChatId(newChatId);
+          // Navigate to the new chat URL
+          navigate(`/chatbot/${newChatId}`, { replace: true });
+        }
+
+        setChatList((prev) => {
+          const chatExists = prev.find((c) => c.chat_id === newChatId);
+
+          if (chatExists) {
+            return prev.map((c) =>
+              c.chat_id === newChatId && c.title === "New chat"
+                ? { ...c, title: messageText } // update title only if it's "New chat"
+                : c
+            );
+          } else {
+            // if somehow chat is not in the list, add it
+            return [{ chat_id: newChatId, title: messageText }, ...prev];
+          }
+        });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: data.reply, data: data.data ?? [], isTyping: true, choices: data.choices ? data.choices : [] }
+              : msg
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: "Error: failed to contact server.", isTyping: true }
+              : msg
+          )
+        );
+      }
+      
+      setShowMealModal(false);
+    };
+
+    const handleWorkoutSubmit = async (workoutData: {
+      exercise_name: string;
+      sets: string;
+      reps: string;
+      duration: string;
+      calories_burned: string;
+    }) => {
+      console.log("Workout data submitted:", workoutData);
+      const workoutMessage = `I did ${workoutData.sets} sets of ${workoutData.reps} reps of ${workoutData.exercise_name}, lasting ${workoutData.duration} minutes and burning ${workoutData.calories_burned} calories.`;
+      const messageText = workoutMessage;
+      console.log("Submitting workout message:", workoutMessage);
+
+      const typingMessageId = Date.now().toString() + "-typing"; // unique id
+      const typingMessage: Message = {
+        role: "assistant",
+        text: "...",
+        msg_id: typingMessageId
+      };
+      setMessages((prev) => [...prev, typingMessage]);
+      const formData = new FormData();
+      formData.append("message", workoutMessage);
+      formData.append("chat_id", activeChatId ?? "");
+      formData.append("is_new_chat", activeChatId ? "false" : "true");
+      formData.append("choice", "Log workout");
+
+      try {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
+          method: "POST",
+          json: formData,
+        });
+
+        console.log("Chat response data:", data);
+        const newChatId = activeChatId || data.chat_id;
+
+        if (!activeChatId) {
+          setActiveChatId(newChatId);
+          // Navigate to the new chat URL
+          navigate(`/chatbot/${newChatId}`, { replace: true });
+        }
+
+        setChatList((prev) => {
+          const chatExists = prev.find((c) => c.chat_id === newChatId);
+
+          if (chatExists) {
+            return prev.map((c) =>
+              c.chat_id === newChatId && c.title === "New chat"
+                ? { ...c, title: messageText } // update title only if it's "New chat"
+                : c
+            );
+          } else {
+            // if somehow chat is not in the list, add it
+            return [{ chat_id: newChatId, title: messageText }, ...prev];
+          }
+        });
+
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: data.reply, data: data.data ?? [], isTyping: true, choices: data.choices ? data.choices : [] }
+              : msg
+          )
+        );
+      } catch (err) {
+        console.error(err);
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.msg_id === typingMessageId
+              ? { ...msg, text: "Error: failed to contact server.", isTyping: true }
+              : msg
+          )
+        );
+      }
+      
+      setShowMealModal(false);
+    };
+
   return (
     <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
       <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
@@ -1403,9 +1550,7 @@ function Avatar({
             <MealLogForm
               onSubmit={(mealData) => {
                 setShowMealModal(false);
-                setInput(
-                  `Meal details: Meal name: ${mealData.meal_name}, Calories: ${mealData.calories} kcal, Protein: ${mealData.protein} g, Carbs: ${mealData.carbs} g, Fats: ${mealData.fats} g, Meal time: ${mealData.meal_time}`
-                );
+                handleMealSubmit(mealData);
               }}
               onClose={() => setShowMealModal(false)}
             />
@@ -1415,9 +1560,7 @@ function Avatar({
             <WorkoutLogForm
               onSubmit={(workoutData) => {
                 setShowWorkoutModal(false);
-                setInput(
-                  `Workout details: Exercise name: ${workoutData.exercise_name}, Sets: ${workoutData.sets}, Reps: ${workoutData.reps}, Duration: ${workoutData.duration} minutes, Calories burned: ${workoutData.calories_burned} kcal`
-                );
+                handleWorkoutSubmit(workoutData);
               }}
               onClose={() => setShowWorkoutModal(false)}
             />

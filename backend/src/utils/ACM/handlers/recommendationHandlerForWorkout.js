@@ -35,39 +35,41 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             .eq("user_id", user_id)
             .single();
         
-        goal = userProfile?.goals || "";
+        let goal = userProfile?.goals || "";
 
         // Try rule-based detection from message
         userGoal = detectUserGoalRuleBased(goal);
-        
-         // If still unknown, try user profile
-        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
-            const { data: userProfile } = await supabase
-                .from("user_profiles")
-                .select("goals")
-                .eq("user_id", user_id)
-                .single();
+        console.log("Rule-based detected goal:", userGoal);
 
-            userGoal = detectUserGoalRuleBased(userProfile?.goals);
-        }
+        // --- Normalize function ---
+        const normalizeGoal = (g) => {
+            if (!g) return null;
+
+            // If it's a stringified array, parse it
+            if (typeof g === "string") {
+                try {
+                    const parsed = JSON.parse(g);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch {
+                    // Not JSON, keep as string
+                }
+            }
+            return g;
+        };
 
         // LAST RESORT: Gemini
         if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
             userGoal = await extractUserGoal(goal);
-
-            if (Array.isArray(userGoal) && userGoal.includes("Unknown")) {
-                const { data: userProfile } = await supabase
-                .from("user_profiles")
-                .select("goals")
-                .eq("user_id", user_id)
-                .single();
-
-                userGoal = await extractUserGoal(userProfile?.goals);
-            }
+            userGoal = normalizeGoal(userGoal);
+            console.log("Gemini-extracted goal:", userGoal);
         }
 
         // Fallback safety
-        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+        if (
+            !userGoal ||
+            (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+            (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+        ) {
             userGoal = "Stay Healthy";
         }
 
@@ -107,8 +109,6 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             }
         }
 
-
-
         const { data: wellness_resources, error } = await supabase
             .from("wellness_resources")
             .select("*")
@@ -130,11 +130,57 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
                 
                 Inform the user that you know their goal but there are no suitable workout/exercise in the library.
                 Suggest the user to change their goal or log more workouts/exercises to get better recommendations.
-                Keep it friendly.`;               
+                Suggest some workouts/exercises categories they can try with examples/explanations.
+
+                Important: 
+                - If you suggest some workout/exercise, return ONLY valid JSON in the following format:
+                    workouts: [
+                        {
+                            "title": "... exercise name ...",
+                            "sets": NUMBER,
+                            "reps": NUMBER,
+                            "duration": NUMBER,
+                            "calories_burned": NUMBER
+                            "source": "ai assistant"
+                        }
+                    ]
+
+                Keep it friendly.
+                
+                Return in JSON format including the response and any suggestions. For example:
+                {
+                    "reply": "Your friendly response here. Some explanations/full guide about the workouts/exercises you suggested.",
+                    "workout": [ ... ]
+                }`;               
 
             gResponse = await queryGemini(prompt);
 
-            return { reply: gResponse };
+            let parsed;
+
+            try {
+                const cleanText = gResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+                parsed = JSON.parse(cleanText);
+            } catch (err) {
+                console.error("Failed to parse Gemini output:", err);
+                gResponse = `I'm sorry, I encountered an error while processing your request. Could you please try again later?`;
+                res.json({ chat_id: finalChatId, reply: gResponse, choices: choices }) 
+            };
+
+            const workout = Array.isArray(parsed.workout) ? parsed.workout : [];
+            const firstWorkout = workout.length > 0 ? [workout[0]] : [];
+
+            conversationState.set(user_id, {
+                state: "SHOWING_RESULTS",
+                type: "WORKOUT",
+                recommended: workout,
+                multimodalContext: {
+                    meals: [],
+                    workouts: firstWorkout
+                },
+                selectedIndex: 0
+            });
+
+            return { reply: parsed.reply, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation"]};
         }
 
         const filteredWorkouts = wellness_resources.filter(workout => {
@@ -153,14 +199,6 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
 
         console.log("Filtered workout recommendations:", recommendations);
 
-        // Store conversation state
-        conversationState.set(user_id, {
-            state: "SHOWING_RESULTS",
-            type: "WORKOUT",
-            recommended: recommendations,
-            selectedIndex: 0
-        });  
-
         const top = recommendations[0];
         console.log("Top workout recommendation:", top);
 
@@ -176,7 +214,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             The user is browsing workout/exercise recommendations.
 
             Recommended workout details:
-            - Name: ${workout.title}
+            - Title: ${workout.title}
             - Description: ${workout.description}
             - Source: ${workout.source_url}
             - Category: ${workout.category_tags}
@@ -193,7 +231,18 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         
         gResponse = await queryGemini(prompt);
 
-        return { reply: gResponse };
+        conversationState.set(user_id, {
+            state: "SHOWING_RESULTS",
+            type: "WORKOUT",
+            recommended: workout,
+            multimodalContext: {
+                meals: [],
+                workouts: workout ? [workout] : []
+            },
+            selectedIndex: 0
+        });
+
+        return { reply: gResponse, choices: ["Select recommendation", "More recommendation", "Log meal", "Log this workout?", "View meals log", "Log workout", "View workouts log", "Meal recommendation"] };
 
     } catch (error) {
         console.error("Unexpected error in recommendationHandlerForWorkout:", error);
