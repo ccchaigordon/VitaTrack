@@ -286,41 +286,38 @@ export function HomePage() {
     const fetchTodayMetrics = async () => {
       setLoadingToday(true);
       try {
-        const data = await apiFetch<{
-          current: {
-            totalCalories: number;
-            protein: number;
-          };
-        }>(`/ptf/macros?days=1`);
+        const todayData = await apiFetch<{
+          calories: number;
+          protein: number;
+          carbs: number;
+          fat: number;
+          caloriesBurned: number;
+          workoutCount: number;
+          burnGoal: number | null;
+        }>(`/ptf/today`);
 
-        // Get today's workout status
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const workoutData = await apiFetch<
-          Array<{ date: string; count: number }>
-        >(`/ptf/workout`);
-
-        const todayKey = today.toISOString().slice(0, 10);
-        const todayWorkout = workoutData.find((w) => w.date === todayKey);
-
-        // Default goals
         const caloriesGoal = 2000;
         const proteinGoal = 150;
         const workoutsGoal = 1;
 
         setTodayMetrics({
-          calories: Math.round(data.current.totalCalories),
+          calories: Math.round(todayData.calories || 0),
           caloriesGoal,
-          workouts: todayWorkout?.count || 0,
+          workouts: todayData.workoutCount || 0,
           workoutsGoal,
-          protein: Math.round(data.current.protein),
+          protein: Math.round(todayData.protein || 0),
           proteinGoal,
         });
       } catch (err) {
         console.error("Failed to fetch today's metrics:", err);
+        setTodayMetrics({
+          calories: 0,
+          caloriesGoal: 2000,
+          workouts: 0,
+          workoutsGoal: 1,
+          protein: 0,
+          proteinGoal: 150,
+        });
       } finally {
         setLoadingToday(false);
       }

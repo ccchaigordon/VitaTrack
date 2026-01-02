@@ -591,4 +591,44 @@ router.get('/ptf/savedRecommendations', async (req, res) => {
   }
 });
 
+// TODAY AT A GLANCE (HOME PAGE)
+router.get('/ptf/today', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id;
+
+  try {
+    const today = new Date();
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayData = await fetchMetricsData(user_id, startOfToday, endOfToday, supabase);
+
+    const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
+    
+    const calories = sum(todayData, 'calories_in');
+    const protein = sum(todayData, 'protein');
+    const carbs = sum(todayData, 'carbs');
+    const fat = sum(todayData, 'fat');
+    const caloriesBurned = sum(todayData, 'calories_burned');
+    const workoutCount = sum(todayData, 'workout_completed') || 0;
+    const burnGoal = await extractUserGoal(user_id, supabase);
+
+    return res.json({
+      calories,
+      protein,
+      carbs,
+      fat,
+      caloriesBurned,
+      workoutCount,
+      burnGoal
+    });
+  } catch (err) {
+    console.error('Error fetching today metrics:', err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;
