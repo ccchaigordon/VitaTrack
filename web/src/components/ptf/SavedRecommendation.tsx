@@ -64,7 +64,7 @@ export function SavedRecommendation({ data }: Props) {
                     <td className="py-3 px-4 text-sm text-right">
                       <Link 
                         to={`/resources/recipes/${item.recipe_id}`}
-                        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors"
+                        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-md transition-colors"
                       >
                         View Recipe →
                       </Link>

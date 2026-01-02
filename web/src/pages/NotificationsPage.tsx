@@ -14,15 +14,41 @@ export function NotificationsPage() {
   const navigate = useNavigate();
   const [list, setList] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [,setUnreadCount] = useState(0);
+
+  const onRead = (count: number) => setUnreadCount(count);
+  const onReadAll = (count: number) => setUnreadCount(count);
+
+  useEffect(() => {
+    const handleGlobalUpdate = () => {
+      fetchData(); 
+    };
+    window.addEventListener('notificationUpdate', handleGlobalUpdate);
+    return () => window.removeEventListener('notificationUpdate', handleGlobalUpdate);
+  }, []);
+
 
   const handleItemClick = async (id: string, link?: string) => {
     try {
-      await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' });
-      
-      setList(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-      
+      setList(prevList => 
+        prevList.map(item => item.id === id ? { ...item, is_read: true } : item)
+      );
+      const res = await apiFetch<{ unreadCount: number }>(`/notifications/${id}/read`, { method: "PATCH" });
+      onRead(res.unreadCount);
+      window.dispatchEvent(new Event('notificationUpdate'));
       if (link) navigate(link);
     } catch (e) { console.error(e); }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      setList(prevList => prevList.map(item => ({ ...item, is_read: true })));
+      const res = await apiFetch<{ unreadCount: number }>(`/notifications/readAll`, { method: "PATCH" });
+      onReadAll(res.unreadCount);
+      window.dispatchEvent(new Event('notificationUpdate'));
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   useEffect(() => {
@@ -52,7 +78,14 @@ export function NotificationsPage() {
   return (
     <div className="min-h-screen bg-[#F5F7FA] p-6 flex justify-center">
       <div className="w-full max-w-3xl">
-        <h1 className="text-2xl font-bold text-[#1A381D] mt-2 mb-6">Notifications</h1>
+        <div className="flex flex-row justify-between items-center my-4">
+        <h1 className="text-2xl font-bold text-[#1A381D]">Notifications</h1>
+        <button 
+        onClick={handleMarkAllAsRead}
+        className="inline-flex items-center justify-center px-3 py-1.5 text-xs font-medium text-white bg-[#2A4A2D] hover:bg-[#24412A] rounded-full transition-colors cursor-pointer">
+          Mark All as Read
+        </button>
+        </div>
         
         {loading ? (
           <div className="text-gray-500">Loading...</div>
@@ -65,7 +98,7 @@ export function NotificationsPage() {
                 {list.map(n => (
                   <li key={n.id} 
                   onClick={() => handleItemClick(n.id, (n as any).action_link)}
-                  className={`p-4 border-b border-gray-100 flex gap-4 cursor-pointer hover:bg-gray-100 ${!n.is_read ? 'bg-[#F0FDF4]' : ''}`}>
+                  className={`p-4 border-b border-gray-200 flex gap-4 cursor-pointer hover:bg-gray-100 ${!n.is_read ? 'bg-[#F0FDF4]' : ''}`}>
                     <span className="text-xl mt-1">{getIcon(n.type)}</span>
                     <div className="flex-1">
                       <p className={`text-sm ${!n.is_read ? 'font-bold text-gray-900' : 'text-gray-700'}`}>

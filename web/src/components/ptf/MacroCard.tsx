@@ -49,8 +49,8 @@ const MacroItem: React.FC<{ icon: string; color?: string; label: string; value: 
         <p className="text-lg font-bold text-gray-900">{value.toLocaleString()} <span className="text-xs font-normal text-gray-400">{unit}</span></p>
         <div className="flex items-center gap-1 mt-1">
           {isPositive ? 
-          <img src="src/assets/Progress/TrendUp.svg" className="w-4 h-4"/> : 
-          <img src="src/assets/Progress/TrendDown.svg" className="w-4 h-4"/>}
+          <img src="src/assets/Progress/TrendUp.svg" alt="Trend Up" className="w-4 h-4"/> : 
+          <img src="src/assets/Progress/TrendDown.svg" alt="Trend Down" className="w-4 h-4"/>}
           <span className="text-[12px] font-bold text-gray-500">{Math.abs(delta)}% <span className="font-normal text-gray-400">{comparison}</span></span>
         </div>
       </div>
