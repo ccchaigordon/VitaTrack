@@ -712,7 +712,7 @@ export default function Navbar() {
                   >
                     <svg
                       className={`h-5 w-5 ${
-                        isActive("/pricings") ? "text-[#34A853]" : ""
+                        isActive("/help") ? "text-[#34A853]" : ""
                       }`}
                       viewBox="0 0 24 24"
                       fill="none"
