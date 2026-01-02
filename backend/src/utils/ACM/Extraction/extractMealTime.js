@@ -12,7 +12,7 @@ function inferMealTimeByClock() {
   if (hour >= 11 && hour < 16) return "lunch";
   if (hour >= 16 && hour < 18) return "snacks";
   if (hour >= 18 && hour < 22) return "dinner";
-  if (hour >= 22 || hour < 5) return "supper";
+  if (hour >= 22 || hour < 5) return "snacks";
 
   return null;
 }

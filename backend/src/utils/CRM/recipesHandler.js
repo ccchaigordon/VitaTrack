@@ -109,10 +109,8 @@ function transformRecipe(r) {
     // Format numbered lists with spacing
     procedureText = r.instructions.replace(/(\d+\.\s)/g, "\n\n$1");
   } else {
-    // procedureText = r.summary || "Instructions for this recipe are currently unavailable.";
-    const link = r.sourceUrl;
     procedureText =
-      `Instructions for this recipe are currently unavailable. Checkout more details from below link. ${link}`;
+      r.summary || "Instructions for this recipe are currently unavailable.";
   }
 
   // Final return object matching Supabase schema

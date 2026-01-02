@@ -18,11 +18,12 @@ export function WorkoutLogForm({
   return (
     <Base title="Log Workout" onClose={onClose}>
       <div className="space-y-3">
-        <input
-          className="w-full border rounded-lg px-3 py-2 text-sm"
+        <textarea
+          className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
           placeholder="Workout name"
           value={workoutName}
           onChange={(e) => setWorkoutName(e.target.value)}
+          rows={2}
         />
         <input
           className="w-full border rounded-lg px-3 py-2 text-sm"
@@ -30,6 +31,17 @@ export function WorkoutLogForm({
           value={caloriesBurned}
           onChange={(e) => setCaloriesBurned(e.target.value)}
         />
+        <p className="text-xs text-gray-500 mb-4">
+          Not sure about calories burned? You can calculate it{" "}
+          <a
+            href="https://www.calculator.net/calories-burned-calculator.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline hover:text-blue-700"
+          >
+            here
+          </a>.
+        </p>
         <input
           className="w-full border rounded-lg px-3 py-2 text-sm"
           placeholder="Sets"
@@ -47,14 +59,9 @@ export function WorkoutLogForm({
           placeholder="Duration (minutes)"
           value={duration}
           onChange={(e) => setDuration(e.target.value)}
-        />
-        <input
-          className="w-full border rounded-lg px-3 py-2 text-sm bg-gray-100"
-          value="user_message"
-          readOnly
-        />     
+        />    
         <button
-          className="w-full bg-[#2A4A2D] text-white py-2 rounded-lg"
+          className="w-full bg-[#2A4A2D] text-white py-2 rounded-lg cursor-pointer"
           onClick={() =>
             onSubmit({
               exercise_name: workoutName,              

@@ -11,7 +11,7 @@ async function extractWorkoutInfoFromMsg(message) {
         From the following message, extract:
         [
             {
-            "exercise_name": "... list of items ...",
+            "title": "... list of items ...",
             "sets": NUMBER,
             "reps": NUMBER,
             "duration": NUMBER,
