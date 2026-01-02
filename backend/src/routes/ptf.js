@@ -492,7 +492,7 @@ router.get('/ptf/recommendationWellness', async (req, res) => {
       id: w.resource_id,
       title: w.title,
       summary: w.description || "Great wellness resource for you.",
-      badge: w.category_tags ? w.category_tags[0] : "Wellness", 
+      badge: "Wellness", 
       link: w.source_url,
       isRecipe: false,
       category: "Wellness"
@@ -550,6 +550,43 @@ const supabase = getRlsClient(req);
     return res.json(userMealData || []);
   } catch (err) {
     console.error("Error in mealLog", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// VIEW SAVED RECOMMENDATIONS
+router.get('/ptf/savedRecommendations', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user = req.user;
+
+  try {
+    const { data, error } = await supabase
+      .from("recommendation_history")
+      .select(`
+        rec_id,
+        type,
+        created_at,
+        recipe_id,
+        resource_id,
+        recipes (
+          title
+        ),
+        wellness_resources (
+          title,
+          source_url
+        )
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching saved recommendations", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json(data || []);
+  } catch (err) {
+    console.error("Error in savedRecommendations", err);
     return res.status(500).json({ error: err.message });
   }
 });

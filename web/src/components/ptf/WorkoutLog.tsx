@@ -26,7 +26,7 @@ export function WorkoutLog({ logs }: Props) {
 return (
   <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col h-full max-h-[600px]">
     <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-      <h3 className="font-bold text-gray-800">Recent Workouts</h3>
+      <h3 className="font-bold text-gray-800">Recent Workouts 🏋️</h3>
       <span className="text-xs text-gray-500 font-medium bg-white px-2 py-1 rounded-md border border-gray-200">
         Last {logs.length} entries
       </span>
@@ -36,6 +36,7 @@ return (
       <table className="w-full text-left border-collapse">
         <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
           <tr>
+            <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase w-16 text-center">No.</th>
             <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Date & Time</th>
             <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Exercise</th>
             <th className="py-3 px-4 text-xs font-semibold text-gray-500 uppercase text-center">Sets</th>
@@ -52,6 +53,11 @@ return (
 
             return (
               <tr key={index} className="hover:bg-gray-50 transition-colors">
+
+                <td className="py-3 px-4 text-sm text-gray-500 text-center">
+                  {index + 1}
+                </td>
+
                 {/* Date */}
                 <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
                   {dateLabel}

@@ -7,6 +7,7 @@ import { LineChart } from '../components/ptf/LineChart';
 import { apiFetch } from "../services/api";
 import { WorkoutLog } from '../components/ptf/WorkoutLog';
 import { MealLog } from '../components/ptf/MealLog';
+import { SavedRecommendation } from '../components/ptf/SavedRecommendation';
 
 interface CaloriesActivity {
   date: string;
@@ -102,6 +103,25 @@ interface MealLogItem {
   meal_time: string | null;
 }
 
+interface RecipeJoin {
+  title: string;
+}
+
+interface WellnessJoin {
+  title: string;
+  source_url: string;
+}
+
+interface RecommendationItem {
+  rec_id: number;
+  type: 'MEAL' | 'WORKOUT' | string;
+  created_at: string;
+  recipe_id: string | null;
+  resource_id: string | null;
+  recipes: RecipeJoin | null; 
+  wellness_resources: WellnessJoin | null;
+}
+
 const LoadingPlaceholder = ({ text = "Loading data...", height = "h-full", minHeight = "min-h-[200px]" }: { text?: string, height?: string, minHeight?: string }) => (
   <div className={`flex items-center justify-center ${height} ${minHeight} bg-white rounded-2xl border border-gray-200`}>
     <span className="text-gray-500 font-medium">{text}</span>
@@ -125,12 +145,13 @@ interface NavContentProps {
   recOpen: boolean;
   logOpen: boolean;
   onProgress: () => void;
+  onSavedRec: () => void; 
   onRecToggle: () => void;
   onLogToggle: () => void;
   onChildClick: (tab: "recipe" | "wellness" | "meallog" | "workoutlog") => void;
 }
 
-const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onRecToggle, onLogToggle, onChildClick }: NavContentProps) => {
+const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,onRecToggle, onLogToggle, onChildClick }: NavContentProps) => {
   const activeBtn = "bg-[#2A4A2D] text-white shadow-sm";
   const inactiveBtn = "text-black hover:bg-gray-50";
   const recSectionActive = ["recommendation", "recipe", "workout"].includes(activeTab);
@@ -146,6 +167,16 @@ const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onRecToggle, 
         <img src={activeTab === "progress" ? "src/assets/Progress/Progress_active.svg" : 
           "src/assets/Progress/Progress.svg"} className="w-5 h-5" alt="Progress" />
         Progress
+      </button>
+
+      <button 
+        onClick={onSavedRec}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
+          activeTab === 'savedRec' ? activeBtn : inactiveBtn
+        }`}>
+        <img src={activeTab === "savedRec" ? "src/assets/Progress/Saved_active.svg" : 
+          "src/assets/Progress/Saved.svg"} className="w-5.5 h-5.5" alt="savedRec" />
+        Saved List
       </button>
 
       <button
@@ -352,6 +383,7 @@ export function ProgressDashboardPage() {
   const [recWellness, setRecWellness] = useState<ResourceItem[]>([]);
   const [workoutLog, setWorkoutLogs] = useState<WorkoutLogItem[]>([]);
   const [mealLog, setMealLogs] = useState<MealLogItem[]>([]);
+  const [savedRec, setSavedRec] = useState<RecommendationItem[]>([]);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
@@ -371,7 +403,8 @@ export function ProgressDashboardPage() {
   const [loadingCalories, setLoadingCalories] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(false);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadingSavedRec, setLoadingSavedRec] = useState(false);
 
   // Mobile Menu States
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -396,6 +429,12 @@ export function ProgressDashboardPage() {
     setRecOpen(false);
     if (mobileOpen) closeMobileMenu();
   };
+
+  const handleSavedRec = () => {
+    setActiveTab("savedRec");
+    setRecOpen(false);
+    if (mobileOpen) closeMobileMenu();
+  }
 
   const handleRecommendation = () => {
     setRecOpen((prev) => !prev);
@@ -524,14 +563,14 @@ export function ProgressDashboardPage() {
   useEffect(() => {
     if (activeTab === 'workoutlog') {
       const fetchLogs = async () => {
-        setLogsLoading(true);
+        setLoadingLogs(true);
         try {
           const data = await apiFetch<WorkoutLogItem[]>('/ptf/workoutLog');
           setWorkoutLogs(data);
         } catch (err) {
           console.error("Failed to fetch logs", err);
         } finally {
-          setLogsLoading(false);
+          setLoadingLogs(false);
         }
       };
       fetchLogs();
@@ -541,17 +580,34 @@ export function ProgressDashboardPage() {
   useEffect(() => {
     if (activeTab === 'meallog') {
       const fetchLogs = async () => {
-        setLogsLoading(true);
+        setLoadingLogs(true);
         try {
           const data = await apiFetch<MealLogItem[]>('/ptf/mealLog');
           setMealLogs(data);
         } catch (err) {
           console.error("Failed to fetch logs", err);
         } finally {
-          setLogsLoading(false);
+          setLoadingLogs(false);
         }
       };
       fetchLogs();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'savedRec') { 
+      const fetchSavedRecs = async () => {
+        setLoadingSavedRec(true);
+        try {
+          const data = await apiFetch<RecommendationItem[]>('/ptf/savedRecommendations');
+          setSavedRec(data);
+        } catch (err) {
+          console.error("Failed to fetch saved recommendations", err);
+        } finally {
+          setLoadingSavedRec(false);
+        }
+      };
+      fetchSavedRecs();
     }
   }, [activeTab]);
 
@@ -622,7 +678,7 @@ export function ProgressDashboardPage() {
       return (
         <section className="h-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Workout History</h2>
-          {logsLoading ? (
+          {loadingLogs ? (
             <LoadingPlaceholder text="Loading workout history..." height="h-96" />
           ) : (
             <WorkoutLog logs={workoutLog} />
@@ -635,10 +691,23 @@ export function ProgressDashboardPage() {
       return (
         <section className="h-full">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Meal History</h2>
-          {logsLoading ? (
+          {loadingLogs ? (
             <LoadingPlaceholder text="Loading meal history..." height="h-96" />
           ) : (
             <MealLog logs={mealLog} />
+          )}
+        </section>
+      );
+    }
+
+    if (activeTab === 'savedRec') {
+      return (
+        <section className="h-full">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Saved Recommendations</h2>
+          {loadingSavedRec ? (
+            <LoadingPlaceholder text="Loading saved recommendations..." height="h-96" />
+          ) : (
+            <SavedRecommendation data={savedRec} />
           )}
         </section>
       );
@@ -775,6 +844,7 @@ if (activeTab === 'recipe' || activeTab === 'wellness') {
               recOpen={recOpen}
               logOpen={logOpen}
               onProgress={handleProgress}
+              onSavedRec={handleSavedRec}
               onRecToggle={handleRecommendation}
               onLogToggle={handleLogToggle}
               onChildClick={handleChild}
@@ -817,6 +887,7 @@ if (activeTab === 'recipe' || activeTab === 'wellness') {
                 recOpen={recOpen}
                 logOpen={logOpen}
                 onProgress={handleProgress}
+                onSavedRec={handleSavedRec}
                 onRecToggle={handleRecommendation}
                 onLogToggle={handleLogToggle}
                 onChildClick={handleChild}
