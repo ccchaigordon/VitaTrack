@@ -346,7 +346,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const { data: userMealData, error: userMealDataError } = await supabase
       .from("meal_logs")
-      .select("*")
+      .select("created_at, meal_name, protein, carbs, fat, calories, source, meal_time")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30);
@@ -466,7 +466,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const { data: userWorkoutData, error: userWorkoutDataError } = await supabase
       .from("workout_logs")
-      .select("*")
+      .select("created_at, exercise_name, sets, reps, duration, calories_burned, source")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .limit(30);

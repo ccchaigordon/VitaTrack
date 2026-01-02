@@ -1,31 +1,60 @@
 const { queryGemini } = require('../../../services/geminiClient');
 
 async function extractWorkoutInfoFromMsg(message) {
-    const prompt = `
-        You are a workout information extractor.
+   const prompt = `
+        You are a workout and physical activity information extractor.
 
-        - If multiple workouts are present, extract each workout separately.
-        - Use the actual exercise names as "exercise_name".
-        - Extract sets, reps, duration, and calories burned for each workout.
+        Definition:
+        - A workout can be ANY physical activity, including:
+        - Gym exercises (e.g. squats, bench press)
+        - Cardio activities (e.g. running, cycling)
+        - Sports and games (e.g. badminton, basketball, football)
+        - General activities (e.g. walking, hiking)
 
-        From the following message, extract:
+        Rules:
+        - If multiple workouts are mentioned, extract each one separately.
+        - Use the actual activity or exercise name as "title".
+        - Extract or infer the following:
+        - sets (number of sets, if applicable)
+        - reps (number of repetitions, if applicable)
+        - duration (in minutes)
+        - calories_burned (in kcal)
+
+        Calories estimation rules:
+        - If calories are explicitly stated, use that value.
+        - If calories are not stated:
+        - Estimate calories ONLY if duration is provided.
+        - Use reasonable average values for a typical adult.
+        - Sports and cardio activities MUST have estimated calories only if duration exists.
+        - Calories_burned must NEVER be null if duration is available.
+        - Do NOT guess or invent duration. If duration is missing, set "duration": null and "calories_burned": 0.
+
+        Other rules:
+        - For sports or cardio activities, sets and reps are usually null.
+        - Convert hours to minutes if duration is provided in hours.
+        - If a value cannot be determined at all (except calories when duration exists), return null.
+
+        Return the result as a JSON array in the following format:
+
         [
-            {
-            "title": "... list of items ...",
-            "sets": NUMBER,
-            "reps": NUMBER,
-            "duration": NUMBER,
-            "calories_burned": NUMBER,
+        {
+            "title": "string",
+            "sets": number | null,
+            "reps": number | null,
+            "duration": number | null,
+            "calories_burned": number,
             "source": "user_message"
-            }
+        }
         ]
 
-        If data is missing, return null for it.
-
-        RETURN ONLY valid JSON in the above format. If no workout information is found, return an empty JSON array: []
+        IMPORTANT:
+        - Return ONLY valid JSON.
+        - If no workout or physical activity is found, return an empty array: [].
 
         Message: "${message}"
-        `;
+    `;
+
+
 
     let gResponse = await queryGemini(prompt);
 
