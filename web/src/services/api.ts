@@ -1,6 +1,29 @@
 import { getSupabase } from './supabase';
 
-const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api';
+// Ensure API base URL ends with /api for consistency
+const getApiBase = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
+  
+  // In development
+  // Only use env URL in production
+  if (import.meta.env.DEV) {
+    return '/api';
+  }
+  
+  // Production: use env URL
+  if (!envUrl) {
+    console.warn('VITE_API_BASE_URL not set in production, falling back to /api');
+    return '/api';
+  }
+  
+  // If it already ends with /api, use as is
+  if (envUrl.endsWith('/api')) return envUrl;
+  
+  // Otherwise append /api
+  return `${envUrl.replace(/\/$/, '')}/api`;
+};
+
+const apiBase = getApiBase();
 
 function extractErrorMessage(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
