@@ -53,7 +53,7 @@ function MiniRecipeCard({
   return (
     <div
       onClick={handleClick}
-      className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shrink-0 w-[280px] h-[380px] cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm transition-all"
+      className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 w-full h-full min-h-[380px] cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm transition-all"
     >
       <div className="relative mb-3">
         {item.image_url ? (
@@ -106,7 +106,7 @@ function MiniContentCard({ item }: { item: ResourceItem }) {
   return (
     <div
       onClick={handleClick}
-      className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 shrink-0 w-[280px] h-[380px] cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm transition-all"
+      className="flex flex-col rounded-lg border border-gray-200 bg-white p-4 w-full h-full min-h-[380px] cursor-pointer hover:border-[#2A4A2D] hover:shadow-sm transition-all"
     >
       <div className="relative mb-3">
         <img
@@ -399,11 +399,11 @@ export function HomePage() {
             ></div>
 
             {/* Content */}
-            <div className="relative px-10 text-white">
-              <h1 className="text-2xl font-bold mb-3">
+            <div className="relative px-6 md:px-10 text-white">
+              <h1 className="text-xl md:text-2xl font-bold mb-3">
                 {timeOfDay.greeting}, {getDisplayName()}!
               </h1>
-              <p className="text-sm mb-4">"{quote}"</p>
+              <p className="text-xs md:text-sm mb-4">"{quote}"</p>
               <button
                 onClick={() => navigate("/progress")}
                 className="px-5 py-1.5 rounded-lg text-sm font-semibold bg-transparent text-white cursor-pointer border border-white/40"
@@ -618,14 +618,14 @@ export function HomePage() {
           </div>
 
           {/* Personalized Picks */}
-          <div className="rounded-lg border border-gray-200 bg-white p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0 mb-4">
               <h2 className="text-lg font-semibold text-gray-900">
                 Recommended by Vita
               </h2>
               <button
                 onClick={() => navigate("/resources")}
-                className="text-sm text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer"
+                className="text-sm text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer self-start sm:self-auto"
               >
                 View more resources →
               </button>
