@@ -445,29 +445,32 @@ export default function ResourcesPage() {
                         );
                       })}
                     </div>
-                    {allTags.length > visibleTagsCount && (
-                      <button
-                        onClick={() => {
-                          setVisibleTagsCount((prev) =>
-                            Math.min(prev + 10, allTags.length)
-                          );
+                    
+                    <div className="mt-3 space-y-2">
+                      {allTags.length > visibleTagsCount && (
+                        <button
+                          onClick={() => {
+                            setVisibleTagsCount((prev) =>
+                              Math.min(prev + 10, allTags.length)
+                            );
+                          }}
+                          className="text-xs text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer"
+                        >
+                          Show more
+                        </button>
+                      )}
+                      {selectedTags.length > 0 && (
+                        <button
+                          onClick={() => {
+                            setSelectedTags([]);
+                            setCurrentPage(1);
                         }}
-                        className="mt-3 text-xs text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer"
-                      >
-                        Show more
-                      </button>
-                    )}
-                    {selectedTags.length > 0 && (
-                      <button
-                        onClick={() => {
-                          setSelectedTags([]);
-                          setCurrentPage(1);
-                        }}
-                        className="mt-4 text-xs text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer"
-                      >
-                        Clear filters
-                      </button>
-                    )}
+                          className="w-full text-xs text-[#2A4A2D] hover:text-[#1A381D] hover:underline font-medium cursor-pointer text-left"
+                        >
+                          Clear filters
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
