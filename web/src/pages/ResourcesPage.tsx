@@ -525,17 +525,17 @@ export default function ResourcesPage() {
               </div>
               {/* Pagination Controls */}
               {!loading && filteredItems.length > 0 && totalPages > 1 && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center md:justify-start gap-1 md:gap-2 overflow-x-auto">
                   <button
                     onClick={() =>
                       setCurrentPage((prev) => Math.max(1, prev - 1))
                     }
                     disabled={currentPage === 1}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     Previous
                   </button>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-0.5 md:gap-1">
                     {Array.from({ length: totalPages }, (_, i) => i + 1).map(
                       (page) => {
                         const showPage =
@@ -549,7 +549,10 @@ export default function ResourcesPage() {
                             page === currentPage + 2
                           ) {
                             return (
-                              <span key={page} className="px-2 text-gray-500">
+                              <span
+                                key={page}
+                                className="px-1 sm:px-2 text-gray-500 shrink-0 text-xs md:text-sm"
+                              >
                                 ...
                               </span>
                             );
@@ -561,7 +564,7 @@ export default function ResourcesPage() {
                           <button
                             key={page}
                             onClick={() => setCurrentPage(page)}
-                            className={`px-3 py-2 text-sm font-medium rounded-md cursor-pointer ${
+                            className={`px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium rounded-md cursor-pointer shrink-0 ${
                               currentPage === page
                                 ? "bg-[#2A4A2D] text-white"
                                 : "text-gray-700 bg-white border border-gray-300 hover:bg-gray-50"
@@ -578,7 +581,7 @@ export default function ResourcesPage() {
                       setCurrentPage((prev) => Math.min(totalPages, prev + 1))
                     }
                     disabled={currentPage === totalPages}
-                    className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="px-2 py-1.5 md:px-3 md:py-2 text-xs md:text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0 whitespace-nowrap"
                   >
                     Next
                   </button>
