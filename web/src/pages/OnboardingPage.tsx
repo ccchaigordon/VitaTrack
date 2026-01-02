@@ -369,7 +369,7 @@ export function OnboardingPage() {
         <div className="mt-8 flex flex-col items-center sm:mt-12">
           <div className="relative flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28">
             <img
-              src="../../src/assets/onboarding/onboarding_success.svg"
+              src="../assets/Onboarding/onboarding_success.svg"
               alt="Success"
             />
           </div>

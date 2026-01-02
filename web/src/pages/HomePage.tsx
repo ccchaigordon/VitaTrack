@@ -9,24 +9,30 @@ import type {
   WellnessResourceResponse,
 } from "../services/resources";
 import motivationalQuotes from "../data/motivationalQuotes.json";
+import morningImage from "../assets/Home/morning.png";
+import afternoonImage from "../assets/Home/afternoon.png";
+import eveningImage from "../assets/Home/evening.png";
+import nightImage from "../assets/Home/night.png";
+import tutorialImage from "../assets/Home/tutorial.jpg";
+import healthImage from "../assets/Home/health.png";
 
 // Get time-based greeting and background image
 function getTimeOfDay() {
   const hour = new Date().getHours();
   if (hour >= 5 && hour < 12) {
-    return { greeting: "Good morning", image: "/src/assets/Home/morning.png" };
+    return { greeting: "Good morning", image: morningImage };
   } else if (hour >= 12 && hour < 17) {
     return {
       greeting: "Good afternoon",
-      image: "/src/assets/Home/afternoon.png",
+      image: afternoonImage,
     };
   } else if (hour >= 17 && hour < 19) {
     return {
       greeting: "Good evening",
-      image: "/src/assets/Home/evening.png",
+      image: eveningImage,
     };
   } else {
-    return { greeting: "Good night", image: "/src/assets/Home/night.png" };
+    return { greeting: "Good night", image: nightImage };
   }
 }
 
@@ -99,9 +105,7 @@ function MiniContentCard({ item }: { item: ResourceItem }) {
   };
 
   const isTutorial = item.badge === "Tutorial";
-  const imageSrc = isTutorial
-    ? "/src/assets/Home/tutorial.jpg"
-    : "/src/assets/Home/health.png";
+  const imageSrc = isTutorial ? tutorialImage : healthImage;
 
   return (
     <div
@@ -688,7 +692,7 @@ export function HomePage() {
           setIsChatClosing(false);
           setIsChatOpen(true);
         }}
-        className="lg:hidden fixed bottom-6 right-[5vw] z-100 w-14 h-14 rounded-full bg-[#34A853] shadow-lg flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
+        className="lg:hidden fixed bottom-6 right-[5vw] z-99 w-14 h-14 rounded-full bg-[#34A853] shadow-lg flex items-center justify-center transition-all hover:scale-110 cursor-pointer"
         aria-label="Open chat"
       >
         <div className="relative">
@@ -703,7 +707,7 @@ export function HomePage() {
 
       {/* Mobile Chat Window */}
       {isChatOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 pointer-events-none">
+        <div className="lg:hidden fixed inset-0 z-99 pointer-events-none">
           {/* Backdrop */}
           <div
             className={`absolute inset-0 bg-black/40 transition-opacity duration-300 pointer-events-auto ${
@@ -717,7 +721,7 @@ export function HomePage() {
 
           {/* Chat Window */}
           <div
-            className={`fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-[90vw] bg-white rounded-2xl shadow-2xl flex flex-col pointer-events-auto ${
+            className={`fixed bottom-24 left-1/2 -translate-x-1/2 w-full max-w-[90vw] bg-white rounded-2xl shadow-2xl flex flex-col pointer-events-auto z-99 ${
               isChatClosing ? "animate-slide-down" : "animate-slide-up"
             }`}
           >
