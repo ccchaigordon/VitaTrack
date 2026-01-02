@@ -512,10 +512,10 @@ export default function ResourcesPage() {
           <div className="flex-1 min-w-0">
             <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">
+                <h1 className="text-2xl text-center sm:text-left font-bold text-gray-900">
                   {activeTab}
                 </h1>
-                <p className="mt-1 text-sm text-gray-600">
+                <p className="mt-1 text-sm text-center sm:text-left text-gray-600">
                   {loading
                     ? "Loading resources..."
                     : `${filteredItems.length} ${
