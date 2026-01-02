@@ -10,7 +10,7 @@ function isGeminiFallback(text) {
     (
       text.startsWith("Oops") ||
       text.includes("trouble thinking") ||
-      text.length < 30 // optional safety
+      text.length < 30
     )
   );
 }
@@ -18,12 +18,16 @@ function isGeminiFallback(text) {
 function isEmptyWorkout(workouts) {
   if (!Array.isArray(workouts) || workouts.length === 0) return true;
 
-  return workouts.every(w =>
-    !w?.title ||
-    Number(w.duration) <= 0 ||
-    (Number(w.sets) <= 0 && Number(w.reps) <= 0) ||
-    Number(w.calories_burned) <= 0
-  );
+  return workouts.every(w => {
+    if (!w?.title) return true;
+
+    const hasDuration = Number(w.duration) > 0;
+    const hasSetsOrReps =
+      Number(w.sets) > 0 || Number(w.reps) > 0;
+
+    // valid workout if it has duration OR sets/reps
+    return !(hasDuration || hasSetsOrReps);
+  });
 }
 
 async function logWorkoutHandler(message, multimodalContext, conversationState, user_id, supabase) {
@@ -45,13 +49,36 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
     if (isEmptyWorkout(workoutData)) {
       const prompt = `
         You are a friendly fitness assistant chatbot.
+
         Context:
-        The user is trying to log a workout.
+        The user is trying to log a workout or physical activity.
+
         Task:
-        Politely inform the user that no valid workout information was found in their message.
-        Ask them to provide details like exercise name, duration, sets, reps, and calories burned.
-        If calories burned is not known, they can provide an estimate by using this link: https://www.calculator.net/calories-burned-calculator.html
-      `;      
+        Politely inform the user that no valid workout or physical activity information could be confidently identified from their message.
+
+        Guidelines:
+        - Be friendly, encouraging, and non-judgmental.
+        - Explain that a workout can be ANY physical activity, including gym exercises, sports, or cardio (e.g. badminton, running, walking).
+        - Ask the user to provide the following to help log the workout accurately (highlight them):
+          - Exercise or activity name
+          - Duration (e.g. minutes or hours)
+          - Sets and reps (for strength exercises, if applicable)
+
+        Additional notes:
+        - Calories burned are optional.
+        - If the user does not know the calories, inform them that the system can estimate calories if duration is provided.
+        - Optionally, they may estimate calories themselves using this link:
+          https://www.calculator.net/calories-burned-calculator.html
+
+        Tone:
+        - Short, clear, and supportive.
+        - Do NOT sound like an error message.
+        - Encourage the user to try again.
+
+        Do NOT extract data.
+        Only respond with a conversational message to the user.
+        `;
+      
       const gResponse = await queryGemini(prompt);
       return {           
         reply: gResponse

@@ -63,43 +63,51 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       allergies
     };    
 
-    // Try rule-based detection from message
-    userGoal = detectUserGoalRuleBased(message);
-
-    // If still unknown, try user profile
-    if (!userGoal || userGoal === "Unknown") {
-        const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();
+    // Fetch user profile goal first
+    const { data: userProfile } = await supabase
+        .from("user_profiles")
+        .select("goals")
+        .eq("user_id", user_id)
+        .single();
     
-        userGoal = detectUserGoalRuleBased(userProfile?.goals);
-    }
+    let goal = userProfile?.goals || "";
+
+    // Try rule-based detection from message
+    userGoal = detectUserGoalRuleBased(goal);
+    console.log("Rule-based detected goal:", userGoal);
+
+    const normalizeGoal = (g) => {
+        if (!g) return null;
+
+        // If it's a stringified array, parse it
+        if (typeof g === "string") {
+            try {
+                const parsed = JSON.parse(g);
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
+                // not a JSON array, continue
+            }
+        }
+        return g;
+    };
 
     // LAST RESORT: Gemini
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = await extractUserGoal(message);
-
-        if (userGoal === "Unknown") {
-            const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();  
-
-            userGoal = await extractUserGoal(userProfile?.goals);
-        }
+    if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+        userGoal = await extractUserGoal(goal);
+        userGoal = normalizeGoal(userGoal);
+        console.log("Gemini-extracted goal:", userGoal);
     }
 
     // Fallback safety
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = "General Health";
+    if (
+        !userGoal ||
+        (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+        (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+    ) {
+        userGoal = "Stay Healthy";
     }
 
-    // append inferred goal to preferences
-    userPreferences.goal = userGoal;
-    console.log("Inferred user goal for recommendation:", userGoal);
+    console.log("Inferred workout goal for recommendation:", userGoal);
 
     mealTime = extractMealTime(message);
     console.log("Inferred meal time for recommendation:", mealTime);
@@ -141,7 +149,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return value
         .toLowerCase()
         .trim()
-        .replace(/s$/, ""); // remove trailing 's' (snacks → snack)
+        .replace(/s$/, "");
     }
 
     function normalizeAllergies(allergies) {
@@ -203,7 +211,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         .filter(Boolean);
 
       // If user only selected "balanced", allow all meals
-      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+      if (userDietTypes.length === 1 && userDietTypes[0] === "balanced") {
         return true;
       }
 
@@ -481,16 +489,12 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         return { reply: parsed.reply, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
       }     
 
-    //console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
-
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
       m.protein,
       m.carbs,
       m.fat
     ]);
-
-    //console.log(vectorsFromMealLibrary);
 
     function normalizeVector(v) {
       const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
@@ -505,10 +509,8 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     }
 
     const normalizedVectorsForMealLogs = vectorsFromMealLogs.map(normalizeVector);
-    //console.log("Normalized Vectors:", normalizedVectors);
 
     const referenceVector = averageVector(normalizedVectorsForMealLogs);
-    //console.log("Reference Vector:", referenceVector);
 
     const normalizedVectorsFromMealLibrary = vectorsFromMealLibrary.map(normalizeVector);
 
@@ -533,8 +535,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       meal: filteredMealsFromMealLibrary[idx],       // original meal object from DB
       similarity: topScores[i]
     }));
-
-    //console.log("Recommendations:", recommendations);
 
     tf.dispose([
       mealTensor,

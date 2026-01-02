@@ -41,7 +41,6 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         userGoal = detectUserGoalRuleBased(goal);
         console.log("Rule-based detected goal:", userGoal);
 
-        // --- Normalize function ---
         const normalizeGoal = (g) => {
             if (!g) return null;
 
@@ -51,7 +50,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
                     const parsed = JSON.parse(g);
                     if (Array.isArray(parsed)) return parsed;
                 } catch {
-                    // Not JSON, keep as string
+                    // not a JSON array, continue
                 }
             }
             return g;

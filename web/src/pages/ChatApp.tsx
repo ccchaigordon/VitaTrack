@@ -8,11 +8,17 @@ import { MealLogForm } from "../components/acm/MealLogForm";
 import { WorkoutLogForm } from "../components/acm/WorkoutLogForm";
 import { ImagePreview } from "../components/acm/ImagePreview";
 import { ConfirmDelete } from "../components/acm/ConfirmDelete";
+import chatbotImg from "../assets/Chatbot/AI.svg";
+import messagesIcon from "../assets/Chatbot/Messages.svg"
+import deleteIcon from "../assets/Chatbot/Delete.svg"
+import chatbotLogo from "../assets/Chatbot/Logo.svg"
+import addIcon from "../assets/Chatbot/Button-add.svg"
+import sendIcon from "../assets/Chatbot/Button-send.svg"
 
 type Message = {
   role: "user" | "assistant";
   text: string;
-  files?: FileItem[]; // For loaded messages from backend
+  files?: FileItem[];
   file_name?: string;
   file_url?: string;
   msg_id?: string;
@@ -54,14 +60,12 @@ export function TypingIndicator() {
 
 const normalizeMessageText = (message: unknown): string => {
   if (typeof message === "string") {
-    // try to parse JSON string
     try {
       const parsed = JSON.parse(message);
       if (parsed && typeof parsed.reply === "string") {
         return parsed.reply;
       }
     } catch {
-      // not JSON → normal text
       return message;
     }
 
@@ -86,7 +90,7 @@ function downloadCSV(filename: string, rows: any[]) {
   const headers = Object.keys(rows[0]);
 
   const csv = [
-    headers.join(","), // header row
+    headers.join(","), 
     ...rows.map((row) =>
       headers
         .map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`)
@@ -116,7 +120,6 @@ function TypingText({
   const finishedRef = useRef(false);
 
   useEffect(() => {
-    // Auto-complete after 7 seconds
     const timeout = setTimeout(() => {
       if (!finishedRef.current) {
         finishedRef.current = true;
@@ -139,7 +142,7 @@ function TypingText({
       speed={80}
       cursor={false}
       wrapper="div"
-      preRenderFirstString={false} // prevent flicker
+      preRenderFirstString={false} 
     />
   );
 }
@@ -199,7 +202,7 @@ function ChatBubble({
         {!isUser && (
           <div className="shrink-0">
             <img
-              src="/src/assets/Chatbot/AI.svg"
+              src={chatbotImg}
               className="w-8 h-8"
               alt="AI Assistant"
             />
@@ -492,7 +495,7 @@ function Avatar({
     console.log("User selected choice:", choice);
     if (!choice) return;
 
-    // No input & no files → open modal
+    // No input & no files, then open modal
     if (!input.trim() && uploads.length === 0) {
       if (choice === "Log meal") {
         setShowMealModal(true);
@@ -568,7 +571,6 @@ function Avatar({
       setActiveChatId(null);
       setMessages([]);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId]);
 
   // Handle auto-send message from query parameter
@@ -591,10 +593,8 @@ function Avatar({
     if (chatId || activeChatId) {
       hasProcessedInitialMessage.current = false;
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  // Internal function to load chat
   const loadChatFromUrl = async (chatId: string) => {
     const data = await apiFetch<{ chat_id: string; messages: TimelineItem[] }>(
       `/loadchat?chat_id=${chatId}`
@@ -677,7 +677,6 @@ function Avatar({
     setMessages(messages);
   };
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -697,9 +696,6 @@ function Avatar({
     if (!file) return;
 
     console.log("Uploaded file:", file);
-
-    // OPTIONAL: upload to backend
-    // uploadFileToServer(file);
 
     setUploads((prev) => [...prev, file]);
   };
@@ -842,7 +838,7 @@ function Avatar({
             });
           }
 
-          // IMPORTANT: only set text if it exists and current text is empty
+          // Only set text if it exists and current text is empty
           if (!existingMsg.text) {
             const normalized = normalizeMessageText(item.message);
             if (normalized) {
@@ -1351,7 +1347,7 @@ function Avatar({
                       >
                         {/* Left: chat icon */}
                         <img
-                          src="/src/assets/Chatbot/Messages.svg"
+                          src={messagesIcon}
                           className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
                           alt="Chat"
                         />
@@ -1381,7 +1377,7 @@ function Avatar({
                             aria-label="Delete chat"
                           >
                             <img
-                              src="/src/assets/Chatbot/Delete.svg"
+                              src={deleteIcon}
                               className="w-4 h-4"
                               alt="Delete"
                             />
@@ -1451,7 +1447,7 @@ function Avatar({
                 >
                   {/* Left: chat icon */}
                   <img
-                    src="/src/assets/Chatbot/Messages.svg"
+                    src={messagesIcon}
                     className="w-5 h-5 mr-2.5 shrink-0 opacity-70"
                     alt="Chat"
                   />
@@ -1479,7 +1475,7 @@ function Avatar({
                       aria-label="Delete chat"
                     >
                       <img
-                        src="/src/assets/Chatbot/Delete.svg"
+                        src={deleteIcon}
                         className="w-4 h-4"
                         alt="Delete"
                       />
@@ -1530,7 +1526,7 @@ function Avatar({
             <div className="flex flex-col items-center justify-center flex-1">
               <div className="flex flex-col items-center gap-4">
                 <img
-                  src="/src/assets/Chatbot/Logo.svg"
+                  src={chatbotLogo}
                   className="w-[180px] opacity-90"
                   alt="VitaTrack Chat"
                 />
@@ -1619,7 +1615,7 @@ function Avatar({
                         aria-label="Remove file"
                       >
                         <img
-                          src="/src/assets/Chatbot/Button-delete.svg"
+                          src={deleteIcon}
                           className="w-4 h-4"
                           alt="Remove"
                         />
@@ -1637,7 +1633,7 @@ function Avatar({
                   aria-label="Attach file"
                 >
                   <img
-                    src="/src/assets/Chatbot/Button-add.svg"
+                    src={addIcon}
                     className="w-5 h-5 opacity-70"
                     alt="Add file"
                   />
@@ -1666,7 +1662,7 @@ function Avatar({
                   aria-label="Send message"
                 >
                   <img
-                    src="/src/assets/Chatbot/Button-send.svg"
+                    src={sendIcon}
                     className="w-5 h-5"
                     alt="Send"
                   />

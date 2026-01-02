@@ -18,6 +18,13 @@ async function extractInfoFromFiles(message, combinedText, images) {
       """${combinedText || "NO_FILE"}"""
 
       Instructions:
+        Definition:
+          - A workout or exercise can be ANY physical activity, including:
+          - Gym exercises (e.g. push-ups, bench press, deadlifts)
+          - Cardio activities (e.g. running, cycling)
+          - Sports and games (e.g. badminton, basketball, football)
+          - General physical activities (e.g. walking, hiking)
+
         Determine the file content first. If it contains meal information, extract the following:
 
             - If multiple meals are present (breakfast, lunch, snack, dinner), extract each meal separately.
@@ -45,27 +52,51 @@ async function extractInfoFromFiles(message, combinedText, images) {
                 }
             ]
         
-        If the file content contains workout/exercise information instead, extract the following:
+        If the file content contains workout/exercise/sports information instead, extract the following:
 
-            - If multiple exercise are present (e.g. push up, pull up, barbell bench press, deadlifts, etc.), extract exercise separately.
-            - Use the actual exercise items as "exercise_name.
-            - Extract sets, reps, duration, calories_burned for each exercise.
-            - Include the original SOURCE tag (e.g., text_file, csv_file, pdf_file) for each exercise.
-            - If any field is missing, set it to null.
-            - Return ONLY valid JSON in the following format:
+            Extraction rules:
+            - If multiple workouts or exercises are present, extract EACH one separately.
+            - Use the actual activity or exercise name as "title".
+            - Extract the following fields for each exercise:
+              - sets
+              - reps
+              - duration (in minutes)
+              - calories_burned (in kcal)
+            - Include the provided SOURCE tag (e.g. text_file, csv_file, pdf_file) as "source".
 
-            workouts: [
+            Field handling rules:
+            - If sets or reps are not applicable (e.g. sports, cardio), set them to null.
+            - Convert hours to minutes if duration is provided in hours.
+            - If duration is missing:
+              - Set "duration" to null
+              - Set "calories_burned" to 0
+            - If duration is present but calories are missing:
+              - Estimate calories based on activity type and duration using reasonable averages.
+            - Do NOT guess duration.
+
+            Output format:
+            Return ONLY valid JSON in the following format:
+
+            
+              workouts: [
                 {
-                    "title": "... exercise name ...",
-                    "sets": NUMBER,
-                    "reps": NUMBER,
-                    "duration": NUMBER,
-                    "calories_burned": NUMBER
-                    "source": "source_tag"
+                  "title": "string",
+                  "sets": number | null,
+                  "reps": number | null,
+                  "duration": number | null,
+                  "calories_burned": number,
+                  "source": "source_tag"
                 }
-            ]
-                  
-        If the file content contains neither meal nor workout information, respond with an empty JSON array: []
+              ]
+            
+
+          IMPORTANT:
+          - If the file content contains NO workout or physical activity information, return:
+            workouts: []
+
+          - If the file content contains NO meal information, return:
+            meals: []
+
     `;
 
     responseForCombinedText = await queryGemini(promptForCombinedText);
@@ -95,7 +126,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
 
       meals: [
         {
-          "meal_name": "... list of items ...",
+          "title": "... list of items ...",
           "protein": NUMBER,
           "carbs": NUMBER,
           "fat": NUMBER,

@@ -25,7 +25,7 @@ function extract(text) {
       return mealTime;
     }
   }
-  return null; // not specified
+  return null;
 }
 
 function extractMealTime(text) {

@@ -1,6 +1,5 @@
 const { queryGemini } = require("../../../services/geminiClient");
 const extractMealInfoFromMsg = require("../Extraction/extractMealInfoFromMsg");
-const recommendationHandlerForMeal = require("./recommendationHandlerForMeal");
 const explainErrorWithGemini = require("../explainErrorWithGemini");
 const { sendNotification } = require('../../../services/notificationClient');
 
@@ -10,7 +9,7 @@ function isGeminiFallback(text) {
     (
       text.startsWith("Oops") ||
       text.includes("trouble thinking") ||
-      text.length < 30 // optional safety
+      text.length < 30
     )
   );
 }
