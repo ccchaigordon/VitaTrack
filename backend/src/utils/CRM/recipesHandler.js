@@ -141,8 +141,8 @@ async function insertRecipes() {
     const transformed = spoonacularData.map(transformRecipe);
 
     // Remove duplicates by source_url (keep first occurrence)
-    const deduplicated = [];
-    const sourceUrlSet = new Set();
+    const deduplicated = [];  
+    const sourceUrlSet = new Set(); // to track seen source_urls
     for (const recipe of transformed) {
       if (recipe.source_url && !sourceUrlSet.has(recipe.source_url)) {
         deduplicated.push(recipe);
