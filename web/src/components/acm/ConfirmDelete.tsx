@@ -1,5 +1,3 @@
-import React from "react";
-
 type ConfirmDeleteProps = {
   title?: string;
   message: string;
