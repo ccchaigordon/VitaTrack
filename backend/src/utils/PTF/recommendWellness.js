@@ -38,7 +38,7 @@ async function recommendWellness(user_id, supabase) {
         userGoal = detectUserGoalRuleBased(goal);
         console.log("Rule-based detected goal:", userGoal);
 
-        // --- Normalize function ---
+        // Normalize function 
         const normalizeGoal = (g) => {
             if (!g) return null;
 
@@ -86,7 +86,6 @@ async function recommendWellness(user_id, supabase) {
           (workoutLogs || []).map(w => normalise(w.exercise_name))
       );
 
-
       console.log("Recent workouts in last 48h:", recentWorkoutSet);
 
       const { data: wellness_resources, error } = await supabase
@@ -99,15 +98,17 @@ async function recommendWellness(user_id, supabase) {
       }
 
       const filteredWorkouts = wellness_resources.filter(workout => {
+        if (recentWorkoutSet.size === 0) return true; 
+        
         const titleNorm = normalise(workout.title);
 
-          if (recentWorkoutSet.has(titleNorm)) return false;
+        if (recentWorkoutSet.has(titleNorm)) return false;
 
-          for (const k of recentWorkoutSet) {
-            if (titleNorm.includes(k) || k.includes(titleNorm)) 
-              return false;
-          }
-          return true;
+        for (const k of recentWorkoutSet) {
+        if (titleNorm.includes(k) || k.includes(titleNorm)) 
+            return false;
+        }
+        return true;
       });
 
       const recommendations = filteredWorkouts;

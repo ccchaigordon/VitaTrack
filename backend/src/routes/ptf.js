@@ -73,13 +73,12 @@ async function extractUserGoal(userId, supabase) {
   }
 }
 
-// ENDPOINT 1: MACROS
+// Endpoint 1: Macros Card
 router.get('/ptf/macros', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
   const days = req.query.days || 7;
 
-  // const { user_id, days = 7 } = req.query;
   const range = Number(days);
   const today = new Date();
   
@@ -132,7 +131,7 @@ router.get('/ptf/macros', async (req, res) => {
   }
 });
 
-// ENDPOINT 2: CALORIES
+// Endpoint 2: Calories Activity Card
 router.get('/ptf/calories', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -140,12 +139,9 @@ router.get('/ptf/calories', async (req, res) => {
   console.log("user_id:", user_id, typeof user_id);
   console.log("days:", days, typeof days);
 
-  // 1. CONVERT INPUT TO WEEK OFFSET
-  const weekOffset = (Number(days) / 7) - 1;
+  const weekOffset = (Number(days) / 7) - 1; // Convert days to week offset
   const today = new Date();
-
-  // 2. FIND MONDAY OF CURRENT WEEK
-  const currentDay = today.getDay();
+  const currentDay = today.getDay(); // Find current day of week (0=Sun, 1=Mon, ..., 6=Sat)
 
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1; 
 
@@ -153,7 +149,7 @@ router.get('/ptf/calories', async (req, res) => {
   currentMonday.setDate(today.getDate() - diffToMonday);
   currentMonday.setHours(0, 0, 0, 0); 
 
-  // 3. CALCULATE TARGET WINDOW (Start Mon - End Sun)
+  // Calculate target window (Start Mon - End Sun)
   const startMonday = new Date(currentMonday);
   startMonday.setDate(currentMonday.getDate() - (weekOffset * 7));
 
@@ -196,7 +192,7 @@ router.get('/ptf/calories', async (req, res) => {
   }
 });
 
-// ENDPOINT 3: WORKOUT
+// Endpoint 3: Workout Progress Card
 router.get('/ptf/workout', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -214,8 +210,7 @@ router.get('/ptf/workout', async (req, res) => {
         dataMap[dateKey] = item.workout_completed ?? 0;
       });
 
-    // Build the 14-Day Series
-    const history = [];
+    const history = []; // Build 14-Day Series
     
     for (let i = 0; i < days; i++) {
       const d = new Date(pastDate);
@@ -237,7 +232,7 @@ router.get('/ptf/workout', async (req, res) => {
     return res.status(500).json({ error: err.message });
 }});
 
-  // ENDPOINT 4: STREAK DAYS
+  // Endpoint 4: Streak Days Card
 router.get('/ptf/streak', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -250,20 +245,20 @@ router.get('/ptf/streak', async (req, res) => {
   }
   });
 
-// ENDPOINT 5: WEEKLY INSIGHTS
+// Endpoint 5: Weekly Insights Card
 router.get('/ptf/insights', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
 
   const today = new Date();
-  const currentDay = today.getDay();   // 0=Sun, 1=Mon, ..., 6=Sat
+  const currentDay = today.getDay(); 
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
   const currentMonday = new Date(today);
   currentMonday.setDate(today.getDate() - diffToMonday);
   currentMonday.setHours(0, 0, 0, 0);
 
-  // Date range for THIS week: Mon ~ today
+  // Date range for THIS week: current Mon ~ today
   const thisWeekStart = new Date(currentMonday);
   const thisWeekEnd = new Date(today);
   thisWeekEnd.setHours(23, 59, 59, 999);
@@ -284,8 +279,8 @@ router.get('/ptf/insights', async (req, res) => {
       calculateStreak(user_id, supabase)
     ]);
 
-    // CALC TOTAL HELPER
     const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
+
     const calcTotals = arr => ({
       calories_burned: sum(arr, 'calories_burned'),
       carbs: sum(arr, 'carbs'),
@@ -293,13 +288,12 @@ router.get('/ptf/insights', async (req, res) => {
       fat: sum(arr, 'fat'),
     });
     
-    // CALC DELTA HELPER
     const calcDeltaPct = (currTotal, prevTotal) => {
       if (!prevTotal || prevTotal === 0) return 0;
       return (((currTotal - prevTotal) / prevTotal) * 100).toFixed(2);
     };
 
-    // TOTALS
+    // Totals
     const thisWeekTotals = calcTotals(thisWeekData);
     const lastWeekTotals = calcTotals(lastWeekData);
 
@@ -357,21 +351,9 @@ router.get('/ptf/insights', async (req, res) => {
 
     let gResponse;
 
-    // to save our gemini token :D
     gResponse = await queryGemini(prompt);
     console.log("Gemini Raw Response:", gResponse);
     gResponse = typeof gResponse === 'object' ? JSON.stringify(gResponse) : gResponse;
-
-    // dummy data for testing :P
-    // gResponse = JSON.stringify({
-    //    summary: [
-    //      `Calories burned ${deltaBurned >= 0 ? 'up' : 'down'} by ${Math.abs(deltaBurned)}% this week! 🔥`,
-    //      `${selectedMacro.name} intake shifted by ${selectedMacro.delta}%.`,
-    //      `Current streak is ${streak} days. Keep it rolling! 🚀`,
-    //      "Tip: Try adding 10 mins of cardio after lifting."
-    //    ],
-    //    nextFocus: "Focus on maintaining your protein intake consistency next week."
-    // });
 
     function parseGeminiResponse(text) {
       if (typeof text !== 'string') {
@@ -389,7 +371,6 @@ router.get('/ptf/insights', async (req, res) => {
     let result = {};
     let isFallback = false;
 
-    // Parse Gemini Response
     try {
       const obj = parseGeminiResponse(gResponse);
       
@@ -406,7 +387,6 @@ router.get('/ptf/insights', async (req, res) => {
       };
       
     } catch (err) { 
-      // Fallback
       isFallback = true;
       const fallbackSummary = [];
 
@@ -446,7 +426,7 @@ router.get('/ptf/insights', async (req, res) => {
   }
 });
 
-// ENDPOINT 6: RECOMMEND RECIPES
+// Endpoint 6: Recipe Recommendations
 router.get('/ptf/recommendationRecipes', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -481,7 +461,7 @@ router.get('/ptf/recommendationRecipes', async (req, res) => {
   }
 });
 
-// ENDPOINT 7: RECOMMEND WELLNESS RESOURCES
+// Endpoint 7: Wellness Resource Recommendations
 router.get('/ptf/recommendationWellness', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -504,7 +484,7 @@ router.get('/ptf/recommendationWellness', async (req, res) => {
   }
 });
 
-// VIEW WORKOUT LOG
+// Endpoint 8: View Workout Log
 router.get('/ptf/workoutLog', async (req, res) => {
 const supabase = getRlsClient(req);
     const user = req.user;
@@ -529,7 +509,7 @@ const supabase = getRlsClient(req);
   }
 });
 
-// VIEW MEAL LOG
+// Endpoint 9: View Meal Log
 router.get('/ptf/mealLog', async (req, res) => {
 const supabase = getRlsClient(req);
     const user = req.user;
@@ -554,7 +534,7 @@ const supabase = getRlsClient(req);
   }
 });
 
-// VIEW SAVED RECOMMENDATIONS
+// Endpoint 10: View Saved Recommendations
 router.get('/ptf/savedRecommendations', async (req, res) => {
   const supabase = getRlsClient(req);
   const user = req.user;

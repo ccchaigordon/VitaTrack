@@ -12,10 +12,12 @@ interface NotificationItem {
 
 export function NotificationPopup({ 
   onClose, 
-  onRead 
+  onRead,
+  onReadAll,
 }: { 
   onClose: () => void, 
-  onRead: () => void 
+  onRead: (unreadCount: number) => void,
+  onReadAll: (unreadCount: number) => void, 
 }) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const navigate = useNavigate();
@@ -30,10 +32,25 @@ export function NotificationPopup({
 
   const handleClick = async (id: string, link?: string) => {
     try {
-      await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' }); // Mark as read
-      onRead();                                                         // Decrease unread count
-      onClose();                                                        // Close popup
-      if (link) navigate(link);                                         // Navigate if link exists
+      setNotifications(prev => 
+        prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+      );
+      const res = await apiFetch<{ unreadCount: number }>(`/notifications/${id}/read`, { method: "PATCH" });
+      onRead(res.unreadCount);  // Decrease unread count
+      window.dispatchEvent(new Event('notificationUpdate'));          
+      onClose();                // Close popup
+      if (link) navigate(link); // Navigate if link exists
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+   const handleMarkAllAsRead = async () => {
+    try {
+      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      const res = await apiFetch<{ unreadCount: number }>(`/notifications/readAll`, { method: "PATCH" });
+      onReadAll(res.unreadCount);
+      window.dispatchEvent(new Event('notificationUpdate'));
     } catch (e) {
       console.error(e);
     }
@@ -43,7 +60,7 @@ export function NotificationPopup({
     <>
       {/* Close popup when clicking outside */}
       <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-0 top-full mt-2 w-80 origin-top-right rounded-xl border border-gray-100 bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
+      <div className="absolute right-0 top-full mt-2 w-80 md:w-72 sm:w-64 origin-top-right rounded-xl border border-gray-100 bg-white shadow-lg ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
         <div className="px-4 py-3 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <h3 className="text-sm font-semibold text-gray-900">Recent Notifications</h3>
         </div>
@@ -65,7 +82,7 @@ export function NotificationPopup({
               >
                 <div className="flex gap-2 justify-between">
                   <div>
-                    <p className={`text-sm ${!n.is_read ? 'font-semibold text-gray-800' : 'text-gray-600'} line-clamp-2`}>
+                    <p className={`text-sm ${!n.is_read ? 'font-semibold text-gray-800' : 'text-gray-600'}`}>
                       {n.message}
                     </p>
                     <p className="text-[10px] text-gray-400 mt-1">
@@ -82,9 +99,15 @@ export function NotificationPopup({
         <div className="border-t border-gray-100 bg-gray-50">
           <button 
             onClick={() => { navigate('/notifications'); onClose(); }}
-            className="w-full py-2 text-sm font-bold text-[#2A4A2D] hover:bg-[#F0FDF4] transition cursor-pointer"
+            className="w-full py-2 text-sm font-bold text-[#2A4A2D] hover:bg-gray-200 transition cursor-pointer border-t border-gray-200 border-solid"
           >
             View All Notifications
+          </button>
+          <button 
+            onClick={() => handleMarkAllAsRead() }
+            className="w-full py-2 text-sm font-bold text-[#2A4A2D] hover:bg-gray-200 transition cursor-pointer border-t border-gray-200 border-solid"
+          >
+            Mark All as Read
           </button>
         </div>
       </div>

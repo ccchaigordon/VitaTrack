@@ -1,3 +1,5 @@
+import Bot from '../../assets/Progress/Bot.svg';
+
 type InsightResponse = {
   summary: string[] | string;
   nextFocus?: string | null;
@@ -19,7 +21,7 @@ export function InsightsCard ({ insight }: Props) {
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-200 min-h-[160px] flex flex-col justify-center border border-gray-50">
       <div className="flex items-left gap-2 mb-3">
-        <img src="./src/assets/Progress/Bot.svg" className="w-6 h-6 mt-[2px]" />
+        <img src={Bot} className="w-6 h-6 mt-[2px]" alt="Bot" />
         <h3 className="text-xl font-bold text-gray-800">Weekly Insights</h3>
       </div>
       

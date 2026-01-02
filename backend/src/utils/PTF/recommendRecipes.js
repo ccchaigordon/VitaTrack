@@ -60,35 +60,47 @@ async function recommendRecipes(user_id, supabase) {
     const userPreferences = {
       diet_type,
       allergies
-    };    
-      
-    const { data: userProfile } = await supabase
-        .from("user_profiles")
-        .select("goals")
-        .eq("user_id", user_id)
-        .single();
-
-    userGoal = detectUserGoalRuleBased(userProfile?.goals);
+    };
     
-    // LAST RESORT: Gemini
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = await extractUserGoal(userProfile?.goals);
+    let goal = p?.goals || "";
 
-        if (userGoal === "Unknown") {
-          const { data: userProfile } = await supabase
-          .from("user_profiles")
-          .select("goals")
-          .eq("user_id", user_id)
-          .single();
+    // Try rule-based detection from message
+    userGoal = detectUserGoalRuleBased(goal);
+    console.log("Rule-based detected goal:", userGoal);
 
-          userGoal = await extractUserGoal(userProfile?.goals);
+    // Normalize function 
+    const normalizeGoal = (g) => {
+        if (!g) return null;
+
+        // If it's a stringified array, parse it
+        if (typeof g === "string") {
+            try {
+                const parsed = JSON.parse(g);
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
+                // Not JSON, keep as string
+            }
         }
+        return g;
+    };
+
+    // LAST RESORT: Gemini
+    if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+        userGoal = await extractUserGoal(goal);
+        userGoal = normalizeGoal(userGoal);
+        console.log("Gemini-extracted goal:", userGoal);
     }
 
     // Fallback safety
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = "General Health";
+    if (
+        !userGoal ||
+        (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+        (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+    ) {
+        userGoal = "Stay Healthy";
     }
+
+    console.log("Inferred workout goal for recommendation:", userGoal);
 
     function inferMealTimeByClock() {
       const hour = new Date().getHours();
@@ -100,10 +112,6 @@ async function recommendRecipes(user_id, supabase) {
 
       return null;
     }
-
-    // append inferred goal to preferences
-    userPreferences.goal = userGoal;
-    console.log("Inferred user goal for recommendation:", userGoal);
 
     mealTime = inferMealTimeByClock();
     console.log("Inferred meal time for recommendation:", mealTime);
@@ -176,7 +184,7 @@ async function recommendRecipes(user_id, supabase) {
         .filter(Boolean);
 
       // If user only selected "balanced", allow all meals
-      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+      if (userDietTypes.length === 1 && userDietTypes[0] === "balanced") {
         return true;
       }
 
@@ -190,30 +198,89 @@ async function recommendRecipes(user_id, supabase) {
     function matchesGoals(meal, goals = []) {
       if (!goals.length) return true;
 
-      // Simple macro-based rules (adjust later)
       return goals.every(goal => {
-        if (goal === "Muscle Gain") {
-          return meal.protein >= 25;
+        switch (goal) {
+          // Muscle & Strength
+          case "Build Muscle":
+            return meal.protein >= 25; // high protein
+          case "Strength":
+          case "Power":
+            return meal.protein >= 20 && meal.carbs >= 30; // protein + energy
+          case "Legs":
+            return meal.carbs >= 30; // energy for leg workouts
+
+          // Cardio & Conditioning
+          case "Cardio":
+          case "Hiit":
+          case "Endurance":
+            return meal.carbs >= 40; // energy for endurance
+
+          // Weight & Health
+          case "Lose Weight":
+            return meal.calories <= 600 && meal.fat <= 20;
+          case "Balanced":
+          case "Stay Healthy":
+          case "Health":
+          case "Fitness":
+            return meal.calories >= 300 && meal.calories <= 700;
+
+          // Nutrition & Diet
+          case "Nutrition":
+          case "Diet":
+          case "Food":
+          case "Cooking":
+          case "Recipes":
+          case "Keto":
+            return true; // no strict macro rules, include all relevant meals
+          case "Supplements":
+            return meal.supplements === true; // flag in meal object
+          case "Water":
+            return meal.isDrink === true && meal.type === "water";
+
+          // Mental & Recovery
+          case "Mental Health":
+          case "Psychology":
+          case "Meditation":
+          case "Sleep":
+          case "Recovery":
+          case "Rehab":
+          case "Pain Relief":
+            return true; // mostly informational, include all
+
+          // Mobility & Posture
+          case "Mobility":
+          case "Posture":
+          case "Yoga":
+            return meal.calories <= 500; // light meals
+
+          // Training Type
+          case "Home":
+          case "Gym":
+          case "Calisthenics":
+          case "Beginner":
+            return true; // general support
+
+          // Lifestyle / Utility
+          case "Lifestyle":
+          case "Habits":
+          case "Activity":
+          case "Time":
+          case "Environment":
+          case "Utility":
+          case "Money":
+          case "Shopping":
+          case "Office":
+          case "Education":
+          case "Science":
+          case "Review":
+          case "Tips":
+          case "Math":
+          case "Clam":
+            return true; // informational, include all
+
+          default:
+            return true; // unknown goals: allow by default
         }
-        if (goal === "Weight Loss") {
-          return meal.calories <= 600 && meal.fat <= 20;
-        }
-        if (goal === "Strength") {
-          return meal.protein >= 20 && meal.carbs >= 30;
-        }
-        if (goal === "Endurance") {
-          return meal.carbs >= 40;
-        }
-        if (goal === "Flexibility") {
-          return meal.fat <= 25;
-        }
-        if (goal === "General Health") {
-          return meal.calories >= 300 && meal.calories <= 700;
-        }        
-        if (goal === "Maintenance") {
-          return meal.calories >= 400 && meal.calories <= 700;
-        }
-        return true;
       });
     }
 

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 interface ChartData {
   label: string;
   val1: number; // Consumed
@@ -37,6 +39,7 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   const totalItemWidth = barWidth * 2 + groupGap;
   const contentWidth = (totalItemWidth * data.length) - groupGap;
   const width = contentWidth + paddingLeft + paddingRight - groupGap; // Total SVG width
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
   const normalised = data.map(d => {
   const v1 = Number(d.val1) || 0;
@@ -49,7 +52,7 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   const yAxisOffset = 30;
   
   return (
-    <div className="w-full h-58 flex items-end justify-center my-6 max-md:justify-start max-md:overflow-x-auto max-md:overflow-y-hidden max-md:my-3 max-md:px-1 max-md:[-webkit-overflow-scrolling:touch]">
+    <div className="w-full h-58 relative absolute z-50 flex items-end justify-center my-6 max-md:justify-start max-md:overflow-x-auto max-md:overflow-y-hidden max-md:my-3 max-md:px-1 max-md:[-webkit-overflow-scrolling:touch]">
       <svg 
         viewBox={`0 0 ${width} ${height}`} 
         style={{ ['--chartW' as any]: width }}
@@ -94,7 +97,7 @@ export function BarChart ({ data }: { data: ChartData[] }) {
           const h2 = Number.isFinite(h2Raw) ? h2Raw : 0;
 
           return (
-            <g key={i} className="group cursor-pointer">
+            <g key={i} className="group cursor-pointer" onMouseEnter={() => setHoveredIdx(i)} onMouseLeave={() => setHoveredIdx(null)}>
               {/* Bar 1: Consumed (Yellow) */}
               <rect 
                 x={xPos} 
@@ -127,26 +130,61 @@ export function BarChart ({ data }: { data: ChartData[] }) {
               >
                 {d.label}
               </text>
-
-              <foreignObject 
-                x={xPos - 15} 
-                y={height - Math.max(h1, h2) - 50} 
-                width="80" 
-                height="50" 
-                className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none overflow-visible"
-              >
-                <div className="flex flex-col items-center justify-center">
-                 <div className="bg-gray-900/90 text-white text-[8px] p-2 rounded-lg text-center shadow-lg backdrop-blur-sm">
-                    <div className="font-bold text-yellow-300">Consumed: {d.val1}</div>
-                    <div className="font-bold text-orange-300">Burned: {d.val2}</div>
-                 </div>
-                 <div className="w-0 h-0 border-l-[4px] border-l-transparent border-r-[4px] border-r-transparent border-t-[4px] border-t-gray-900/90" />
-                 </div>
-              </foreignObject>
             </g>
           );
         })}
 
+      {hoveredIdx !== null && (() => {
+        const d = normalised[hoveredIdx];
+
+        const xPos = paddingLeft + hoveredIdx * totalItemWidth;
+
+        const h1Raw = (d.val1 / maxVal) * height;
+        const h2Raw = (d.val2 / maxVal) * height;
+        const h1 = Number.isFinite(h1Raw) ? h1Raw : 0;
+        const h2 = Number.isFinite(h2Raw) ? h2Raw : 0;
+
+        const topY = height - Math.max(h1, h2);
+
+        const tooltipW = 100;
+        const tooltipH = 40;
+        const arrowH = 6;
+
+        let tx = xPos + barWidth;                
+        let x = tx - tooltipW / 2;
+        let y = topY - tooltipH - arrowH - 6;
+
+        x = Math.max(0, Math.min(x, width - tooltipW));
+        y = Math.max(0, y);
+
+        return (
+          <g pointerEvents="none">
+            {/* tooltip box */}
+            <rect
+              x={x}
+              y={y}
+              width={tooltipW}
+              height={tooltipH}
+              rx={6}
+              fill="rgba(17,24,39,0.9)"
+            />
+
+            {/* text */}
+            <text x={x + tooltipW / 2} y={y + 15} fontSize="9" fontWeight="600" fill="#FCD34D" textAnchor="middle" dominantBaseline="middle">
+              Consumed: {d.val1}
+            </text>
+            <text x={x + tooltipW / 2} y={y + 28} fontSize="9" fontWeight="600" fill="#FB923C" textAnchor="middle" dominantBaseline="middle">
+              Burned: {d.val2}
+            </text>
+
+            {/* arrow */}
+            <path
+              d={`M ${tx - 6} ${y + tooltipH} L ${tx + 6} ${y + tooltipH} L ${tx} ${y + tooltipH + arrowH} Z`}
+              fill="rgba(17,24,39,0.9)"
+            />
+          </g>
+        );
+      })()}
       </svg>
     </div>
   );

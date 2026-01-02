@@ -8,6 +8,12 @@ import { apiFetch } from "../services/api";
 import { WorkoutLog } from '../components/ptf/WorkoutLog';
 import { MealLog } from '../components/ptf/MealLog';
 import { SavedRecommendation } from '../components/ptf/SavedRecommendation';
+import ProgressActive from '../assets/Progress/Progress_active.svg';
+import Progress from '../assets/Progress/Progress.svg';
+import SavedActive from '../assets/Progress/Saved_active.svg';
+import Saved from '../assets/Progress/Saved.svg';
+import Recommendation from '../assets/Progress/Recommendation.svg';
+import Log from '../assets/Progress/Log.svg';
 
 interface CaloriesActivity {
   date: string;
@@ -122,6 +128,17 @@ interface RecommendationItem {
   wellness_resources: WellnessJoin | null;
 }
 
+interface NavContentProps {
+  activeTab: string;
+  recOpen: boolean;
+  logOpen: boolean;
+  onProgress: () => void;
+  onSavedRec: () => void; 
+  onRecToggle: () => void;
+  onLogToggle: () => void;
+  onChildClick: (tab: "recipe" | "wellness" | "meallog" | "workoutlog") => void;
+}
+
 const LoadingPlaceholder = ({ text = "Loading data...", height = "h-full", minHeight = "min-h-[200px]" }: { text?: string, height?: string, minHeight?: string }) => (
   <div className={`flex items-center justify-center ${height} ${minHeight} bg-white rounded-2xl border border-gray-200`}>
     <span className="text-gray-500 font-medium">{text}</span>
@@ -140,17 +157,6 @@ const FallbackCard = ({ title, message }: { title: string, message: string }) =>
   </div>
 );
 
-interface NavContentProps {
-  activeTab: string;
-  recOpen: boolean;
-  logOpen: boolean;
-  onProgress: () => void;
-  onSavedRec: () => void; 
-  onRecToggle: () => void;
-  onLogToggle: () => void;
-  onChildClick: (tab: "recipe" | "wellness" | "meallog" | "workoutlog") => void;
-}
-
 const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,onRecToggle, onLogToggle, onChildClick }: NavContentProps) => {
   const activeBtn = "bg-[#2A4A2D] text-white shadow-sm";
   const inactiveBtn = "text-black hover:bg-gray-50";
@@ -164,8 +170,7 @@ const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,on
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
           activeTab === 'progress' ? activeBtn : inactiveBtn
         }`}>
-        <img src={activeTab === "progress" ? "src/assets/Progress/Progress_active.svg" : 
-          "src/assets/Progress/Progress.svg"} className="w-5 h-5" alt="Progress" />
+        <img src={activeTab === "progress" ? ProgressActive : Progress} className="w-5 h-5" alt="Progress" />
         Progress
       </button>
 
@@ -174,8 +179,7 @@ const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,on
         className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
           activeTab === 'savedRec' ? activeBtn : inactiveBtn
         }`}>
-        <img src={activeTab === "savedRec" ? "src/assets/Progress/Saved_active.svg" : 
-          "src/assets/Progress/Saved.svg"} className="w-5.5 h-5.5" alt="savedRec" />
+        <img src={activeTab === "savedRec" ? SavedActive : Saved} className="w-5.5 h-5.5" alt="savedRec" />
         Saved List
       </button>
 
@@ -186,8 +190,7 @@ const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,on
       >
         <div className="flex items-center gap-3">
           <img
-            src={recSectionActive ? "src/assets/Progress/Recommendation.svg" :
-              "src/assets/Progress/Recommendation.svg"}
+            src={Recommendation}
             className="w-5 h-5" alt="Recommendation" />
           Recommendation
         </div>
@@ -221,7 +224,7 @@ const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,on
       >
         <div className="flex items-center gap-3">
           {/* You can swap this icon for a "List" or "File" icon */}
-          <img src="src/assets/Progress/Log.svg" className="w-6 h-6" alt="Log" />
+          <img src={Log} className="w-6 h-6" alt="Log" />
           View Log
         </div>
         <span className={`text-xl transition-transform ${logOpen ? "rotate-90" : ""}`}>›</span>
@@ -559,7 +562,7 @@ export function ProgressDashboardPage() {
     fetchRecommendations();
   }, [activeTab]);
 
-  // view logs
+  // Fetch 7: Workout Log
   useEffect(() => {
     if (activeTab === 'workoutlog') {
       const fetchLogs = async () => {
@@ -577,6 +580,7 @@ export function ProgressDashboardPage() {
     }
   }, [activeTab]);
 
+  // Fetch 8: Meal Log
   useEffect(() => {
     if (activeTab === 'meallog') {
       const fetchLogs = async () => {
@@ -594,6 +598,7 @@ export function ProgressDashboardPage() {
     }
   }, [activeTab]);
 
+  // Fetch 9: Saved Recommendations
   useEffect(() => {
     if (activeTab === 'savedRec') { 
       const fetchSavedRecs = async () => {
@@ -906,16 +911,16 @@ if (activeTab === 'recipe' || activeTab === 'wellness') {
 }
 
 const INITIAL_METRICS: MetricsResponse = {
-    rangeDays: 7,
-    caloriesActivity: [],
-    macros: {
-      current: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
-      previous: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
-      deltaPercent: { calories: 0, carbs: 0, protein: 0, fat: 0 },
-    },
-    workouts: [],
-    goals: { 
-      hasGoal: false, 
-      calorieGoal: null,
-    },
-  };
+  rangeDays: 7,
+  caloriesActivity: [],
+  macros: {
+    current: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
+    previous: { totalCalories: 0, carbs: 0, protein: 0, fat: 0 },
+    deltaPercent: { calories: 0, carbs: 0, protein: 0, fat: 0 },
+  },
+  workouts: [],
+  goals: { 
+    hasGoal: false, 
+    calorieGoal: null,
+  },
+};

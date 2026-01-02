@@ -176,10 +176,17 @@ export default function Navbar() {
     };
 
     fetchCount();
+
+    const handleGlobalUpdate = () => {
+      fetchCount();
+    };
+    window.addEventListener('notificationUpdate', handleGlobalUpdate);
+
     const interval = setInterval(fetchCount, 60000);
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('notificationUpdate', handleGlobalUpdate);
     };
   }, []);
 
@@ -210,29 +217,38 @@ export default function Navbar() {
               />
             </svg>
           </button>
-          <button
-            onClick={() => nav("/notifications")}
-            className="relative rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          >
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div className="relative">
+            <button
+              onClick={() => setNotifOpen(!notifOpen)}
+              className="relative rounded-full p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+              <svg
+                className="h-6 w-6"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                />
+              </svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#EA4335] text-[10px] font-bold text-white ring-1 ring-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </button>
+            {notifOpen && (
+              <NotificationPopup
+                onClose={() => setNotifOpen(false)}
+                onRead={() => setUnreadCount((prev) => Math.max(0, prev - 1))}
+                onReadAll={() => setUnreadCount(0)}
               />
-            </svg>
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-[#EA4335] text-[10px] font-bold text-white ring-1 ring-white">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
             )}
-          </button>
+          </div>
         </div>
 
         <ul className="hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 transform items-center space-x-3 xl:space-x-6 lg:mx-auto lg:flex lg:w-auto">
@@ -317,7 +333,14 @@ export default function Navbar() {
             {notifOpen && (
               <NotificationPopup
                 onClose={() => setNotifOpen(false)}
-                onRead={() => setUnreadCount((prev) => Math.max(0, prev - 1))}
+                onRead={(newCount?: number) => {
+                if (typeof newCount === "number") setUnreadCount(newCount);
+                else setUnreadCount((prev) => Math.max(0, prev - 1));
+              }}
+                onReadAll={(newCount?: number) => {
+                  if (typeof newCount === "number") setUnreadCount(newCount);
+                  else setUnreadCount(0);
+              }}
               />
             )}
           </div>

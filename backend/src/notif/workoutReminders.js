@@ -2,6 +2,10 @@ const cron = require('node-cron');
 const supabase = require('../services/supabaseClient'); 
 const { sendNotification } = require('../services/notificationClient');
 
+console.log('Now:', new Date().toString());
+console.log('Now ISO:', new Date().toISOString());
+console.log('TZ offset minutes:', new Date().getTimezoneOffset());
+
 // Run every day at 8:00 PM
 cron.schedule('0 20 * * *', async () => {
   console.log(`[WorkoutReminder] Checking for missed workouts...`);
@@ -21,13 +25,25 @@ cron.schedule('0 20 * * *', async () => {
     todayEnd.setHours(23, 59, 59, 999);
 
     for (const user of users) {
-      const { data: metrics } = await supabase
+      const { data: metrics, error: metricsError } = await supabase
         .from('daily_metrics')
         .select('workout_completed')
         .eq('user_id', user.user_id)
         .gte('created_at', todayStart.toISOString())
         .lte('created_at', todayEnd.toISOString())
-        .maybeSingle(); // Returns null if no row exists
+        .limit(1)
+        .maybeSingle(); 
+
+      console.log('Fetched metrics:', metrics, 'for user:', user.user_id);
+
+      if (metricsError) {
+        console.error(
+          'daily_metrics query error:', metricsError, 
+          'user:', user.user_id, 
+          'todayStart:', todayStart.toISOString(),
+          'todayEnd:', todayEnd.toISOString());
+        continue;
+      }
 
       const hasWorkedOut = metrics && metrics.workout_completed > 0;
 
@@ -35,7 +51,7 @@ cron.schedule('0 20 * * *', async () => {
         await sendNotification(
           user.user_id,
           'reminder', 
-          "💪 You haven't logged a workout yet today. Keep your streak alive!", 
+          "You haven't logged a workout yet today. Keep your streak alive! 💪", 
           '/chatbot' 
         );
         console.log(`Sent workout reminder to ${user.user_id}`);
