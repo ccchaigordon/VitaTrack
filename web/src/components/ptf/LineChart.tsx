@@ -10,37 +10,34 @@ export function LineChart ({ data }: { data: WorkoutData[] }) {
   const paddingX = 40;
   const paddingY = 30;
 
-  // 1. Calculate Y-Axis Scale 
   const maxVal = Math.max(5, ...data.map(d => d.count));
   
-  // Helper: Value to Y-Coordinate
+  // Scale
   const getY = (val: number) => {
-    // 0 sits at bottom (height - paddingY), Max sits at top (paddingY)
     const availableHeight = height - (paddingY * 2);
     const percent = val / maxVal;
     return height - paddingY - (percent * availableHeight);
   };
 
-  // Helper: Index to X-Coordinate
   const getX = (index: number) => {
     const availableWidth = width - (paddingX * 2);
     const step = availableWidth / (data.length - 1);
     return paddingX + (index * step);
   };
 
-  // 2. Generate Line Path
+  // Line Path
   const points = data
     .map((d, i) => `${getX(i)},${getY(d.count)}`)
     .join(" ");
 
   return (
-    <div className="w-full h-full min-h-[200px] flex items-center justify-center">
+    <div className="w-full h-full min-h-[200px] flex items-center justify-center max-md:justify-start max-md:overflow-x-auto max-md:[-webkit-overflow-scrolling:touch]">
       <svg 
         viewBox={`0 0 ${width} ${height}`} 
-        className="w-full h-full overflow-visible"
+        className="w-full h-full overflow-visible max-md:min-w-[800px]"
         preserveAspectRatio="none"
       >
-        {/* GRID LINES (Y-Axis) */}
+        {/* Grid Lines (Y-Axis) */}
         {[0, 0.5, 1].map((tick) => {
           const val = Math.round(maxVal * tick);
           const yPos = getY(val);
@@ -67,7 +64,7 @@ export function LineChart ({ data }: { data: WorkoutData[] }) {
           );
         })}
 
-        {/* TREND LINE */}
+        {/* Trend Line */}
         <polyline
           points={points}
           fill="none"
@@ -78,7 +75,7 @@ export function LineChart ({ data }: { data: WorkoutData[] }) {
           className="drop-shadow-sm"
         />
 
-        {/* DATA POINTS & INTERACTION */}
+        {/* Data Points & Interaction */}
         {data.map((d, i) => {
           const x = getX(i);
           const y = getY(d.count);
@@ -111,7 +108,7 @@ export function LineChart ({ data }: { data: WorkoutData[] }) {
                 {d.label}
               </text>
 
-              {/* TOOLTIP (hover effect) */}
+              {/* Tooltip */}
               <foreignObject
                 x={x - 40}
                 y={y - 50} 

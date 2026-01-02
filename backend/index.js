@@ -5,6 +5,7 @@ const udmRoutes = require('./src/routes/udm');
 const acmRoutes = require('./src/routes/acm');
 const crmRoutes = require('./src/routes/crm');
 const ptfRoutes = require('./src/routes/ptf');
+const notifRoutes = require('./src/routes/notif');
 
 const app = express();
 
@@ -36,6 +37,13 @@ app.use('/api', supabaseAuth, crmRoutes);
 
 // User & Data Management APIs (auth-required)
 app.use('/api', supabaseAuth, udmRoutes);
+
+// Notification APIs
+app.use('/api', supabaseAuth, notifRoutes);
+
+require('./src/notif/mealReminders');
+
+require('./src/notif/workoutReminders');
 
 const PORT = process.env.PORT || 4000;
 

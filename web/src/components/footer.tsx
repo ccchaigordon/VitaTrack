@@ -6,7 +6,7 @@ export default function Footer() {
       <div className="z-50 bg-gray-100">
         <div className="max-w-7xl mt-4 md:mt-10 px-4 sm:px-6 text-gray-800 grid grid-cols-2 md:grid-cols-4 mx-auto">
           <div className="p-3 sm:p-5 col-span-2 md:col-span-1">
-            <a href="/dashboard">
+            <a href="/home">
               <img src={NavLogo} alt="VitaTrack" className="h-6 sm:h-8" />
             </a>
             <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-500">
@@ -19,9 +19,9 @@ export default function Footer() {
             </div>
             <a
               className="my-2 sm:my-3 block text-xs sm:text-sm text-gray-600 hover:text-[#34A853] transition-colors"
-              href="/dashboard"
+              href="/home"
             >
-              Dashboard
+              Home
             </a>
             <a
               className="my-2 sm:my-3 block text-xs sm:text-sm text-gray-600 hover:text-[#34A853] transition-colors"

@@ -28,38 +28,49 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         let userGoal = "";
         let gResponse = "";
 
-        // Try rule-based detection from message
-        userGoal = detectUserGoalRuleBased(message);
+        // Fetch user profile goal first
+        const { data: userProfile } = await supabase
+            .from("user_profiles")
+            .select("goals")
+            .eq("user_id", user_id)
+            .single();
         
-         // If still unknown, try user profile
-        if (!userGoal || userGoal === "Unknown") {
-            const { data: userProfile } = await supabase
-                .from("user_profiles")
-                .select("goals")
-                .eq("user_id", user_id)
-                .single();
+        let goal = userProfile?.goals || "";
 
-            userGoal = detectUserGoalRuleBased(userProfile?.goals);
-        }
+        // Try rule-based detection from message
+        userGoal = detectUserGoalRuleBased(goal);
+        console.log("Rule-based detected goal:", userGoal);
+
+        // --- Normalize function ---
+        const normalizeGoal = (g) => {
+            if (!g) return null;
+
+            // If it's a stringified array, parse it
+            if (typeof g === "string") {
+                try {
+                    const parsed = JSON.parse(g);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch {
+                    // Not JSON, keep as string
+                }
+            }
+            return g;
+        };
 
         // LAST RESORT: Gemini
-        if (!userGoal || userGoal === "Unknown") {
-            userGoal = await extractUserGoal(message);
-
-            if (userGoal === "Unknown") {
-                const { data: userProfile } = await supabase
-                .from("user_profiles")
-                .select("goals")
-                .eq("user_id", user_id)
-                .single();
-
-                userGoal = await extractUserGoal(userProfile?.goals);
-            }
+        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+            userGoal = await extractUserGoal(goal);
+            userGoal = normalizeGoal(userGoal);
+            console.log("Gemini-extracted goal:", userGoal);
         }
 
         // Fallback safety
-        if (!userGoal || userGoal === "Unknown") {
-            userGoal = "General Health";
+        if (
+            !userGoal ||
+            (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+            (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+        ) {
+            userGoal = "Stay Healthy";
         }
 
         console.log("Inferred workout goal for recommendation:", userGoal);
@@ -87,10 +98,21 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
 
         console.log("Recent workouts in last 48h:", recentWorkoutSet);
 
+        let userGoals = Array.isArray(userGoal) ? userGoal : [userGoal];
+
+        // Check if it's a JSON string inside an array
+        if (userGoals.length === 1 && typeof userGoals[0] === "string" && userGoals[0].startsWith("[")) {
+            try {
+                userGoals = JSON.parse(userGoals[0]);
+            } catch (e) {
+                console.error("Failed to parse userGoals JSON", e);
+            }
+        }
+
         const { data: wellness_resources, error } = await supabase
             .from("wellness_resources")
             .select("*")
-            .contains("category_tags", [userGoal]);    
+            .overlaps("category_tags", userGoals);    
 
         if (error || !wellness_resources.length) {
             conversationState.set(user_id, {
@@ -102,13 +124,63 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
                 `You are a friendly fitness assistant chatbot.
 
                 Context:
-                The user requested a workout/exercise recommendation, but no suitable workout/exercise match the criteria. Ask the user what their workout goal is (e.g. strength, cardio, fat loss).
+                The user requested a workout/exercise recommendation.
 
-                Workout/exercise goal: ${userGoal || "any"}`;
+                Workout/exercise goal: ${goal || "any"}
+                
+                Inform the user that you know their goal but there are no suitable workout/exercise in the library.
+                Suggest the user to change their goal or log more workouts/exercises to get better recommendations.
+                Suggest some workouts/exercises categories they can try with examples/explanations.
+
+                Important: 
+                - If you suggest some workout/exercise, return ONLY valid JSON in the following format:
+                    workouts: [
+                        {
+                            "title": "... exercise name ...",
+                            "sets": NUMBER,
+                            "reps": NUMBER,
+                            "duration": NUMBER,
+                            "calories_burned": NUMBER
+                            "source": "ai assistant"
+                        }
+                    ]
+
+                Keep it friendly.
+                
+                Return in JSON format including the response and any suggestions. For example:
+                {
+                    "reply": "Your friendly response here. Some explanations/full guide about the workouts/exercises you suggested.",
+                    "workout": [ ... ]
+                }`;               
 
             gResponse = await queryGemini(prompt);
 
-            return { reply: gResponse };
+            let parsed;
+
+            try {
+                const cleanText = gResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+                parsed = JSON.parse(cleanText);
+            } catch (err) {
+                console.error("Failed to parse Gemini output:", err);
+                gResponse = `I'm sorry, I encountered an error while processing your request. Could you please try again later?`;
+                res.json({ chat_id: finalChatId, reply: gResponse, choices: choices }) 
+            };
+
+            const workout = Array.isArray(parsed.workout) ? parsed.workout : [];
+            const firstWorkout = workout.length > 0 ? [workout[0]] : [];
+
+            conversationState.set(user_id, {
+                state: "SHOWING_RESULTS",
+                type: "WORKOUT",
+                recommended: workout,
+                multimodalContext: {
+                    meals: [],
+                    workouts: firstWorkout
+                },
+                selectedIndex: 0
+            });
+
+            return { reply: parsed.reply, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation"]};
         }
 
         const filteredWorkouts = wellness_resources.filter(workout => {
@@ -127,14 +199,6 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
 
         console.log("Filtered workout recommendations:", recommendations);
 
-        // Store conversation state
-        conversationState.set(user_id, {
-            state: "SHOWING_RESULTS",
-            type: "WORKOUT",
-            recommended: recommendations,
-            selectedIndex: 0
-        });  
-
         const top = recommendations[0];
         console.log("Top workout recommendation:", top);
 
@@ -143,18 +207,22 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         const prompt = `
             You are a friendly fitness assistant chatbot.
 
+            User goal:
+            ${goal}
+
             Context:
             The user is browsing workout/exercise recommendations.
 
             Recommended workout details:
-            - Name: ${workout.title}
+            - Title: ${workout.title}
             - Description: ${workout.description}
             - Source: ${workout.source_url}
             - Category: ${workout.category_tags}
 
             Task:
             Write a short, friendly response:
-            - Suggest the recommended workout details
+            - Tell the user that you know their goals.
+            - Suggest the recommended workout details based on their goals ${goal}.
             - Mention the workout description, source url and category
             - Can add any extra explanation if needed
             - Ask if the user wants more recommendation
@@ -163,7 +231,18 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         
         gResponse = await queryGemini(prompt);
 
-        return { reply: gResponse };
+        conversationState.set(user_id, {
+            state: "SHOWING_RESULTS",
+            type: "WORKOUT",
+            recommended: workout,
+            multimodalContext: {
+                meals: [],
+                workouts: workout ? [workout] : []
+            },
+            selectedIndex: 0
+        });
+
+        return { reply: gResponse, choices: ["Select recommendation", "More recommendation", "Log meal", "Log this workout?", "View meals log", "Log workout", "View workouts log", "Meal recommendation"] };
 
     } catch (error) {
         console.error("Unexpected error in recommendationHandlerForWorkout:", error);

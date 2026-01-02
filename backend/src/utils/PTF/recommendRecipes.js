@@ -163,17 +163,28 @@ async function recommendRecipes(user_id, supabase) {
     }
 
     function matchesDietType(dietaryTags, dietTypeText) {
+      // If user did not specify diet preference, allow all
       if (!dietTypeText) return true;
-      if (!dietaryTags) return false;
 
-      // Split user input into individual diet types, trim and normalize
-      const userDietTypes = dietTypeText.split(",").map(d => d.trim().toLowerCase());
+      // If meal has no dietary tags, it cannot match
+      if (!Array.isArray(dietaryTags) || dietaryTags.length === 0) return false;
+
+      // Normalize user-selected diet types
+      const userDietTypes = dietTypeText
+        .split(",")
+        .map(d => d.trim().toLowerCase())
+        .filter(Boolean);
+
+      // If user only selected "balanced", allow all meals
+      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+        return true;
+      }
 
       // Normalize meal dietary tags
       const mealTags = dietaryTags.map(t => t.trim().toLowerCase());
 
-      // Return true if **all** user diet types are in the meal tags
-      return userDietTypes.every(tag => mealTags.includes(tag));
+      // UNION logic: match if ANY user diet type exists in meal tags
+      return userDietTypes.some(tag => mealTags.includes(tag));
     }
 
     function matchesGoals(meal, goals = []) {
@@ -287,10 +298,8 @@ async function recommendRecipes(user_id, supabase) {
     }
 
     const normalizedVectorsForMealLogs = vectorsFromMealLogs.map(normalizeVector);
-    //console.log("Normalized Vectors:", normalizedVectors);
 
     const referenceVector = averageVector(normalizedVectorsForMealLogs);
-    //console.log("Reference Vector:", referenceVector);
 
     const normalizedVectorsFromMealLibrary = vectorsFromMealLibrary.map(normalizeVector);
 

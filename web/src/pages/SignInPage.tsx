@@ -36,7 +36,7 @@ export function SignInPage() {
     }
 
     const me = await apiFetch<MeResponse>("/me");
-    nav(me.profileComplete ? "/dashboard" : "/onboarding", { replace: true });
+    nav(me.profileComplete ? "/home" : "/onboarding", { replace: true });
   }
 
   async function onSubmit(e: React.FormEvent) {

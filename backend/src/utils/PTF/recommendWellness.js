@@ -19,40 +19,58 @@ const tokenize = (s) =>
     .filter(Boolean)
     .map(singularize);
 
-const canonical = (s) => tokenize(s).join("");
+const normalise = (s) => tokenize(s).join("");
 
-async function recommendWorkouts(user_id, supabase) {
+async function recommendWellness(user_id, supabase) {
   try {   
       let userGoal = "";
       
-      const { data: userProfile } = await supabase
-          .from("user_profiles")
-          .select("goals")
-          .eq("user_id", user_id)
-          .single();
-
-      userGoal = detectUserGoalRuleBased(userProfile?.goals);
-      
-      // LAST RESORT: Gemini
-      if (!userGoal || userGoal === "Unknown") {
-          userGoal = await extractUserGoal(userProfile?.goals);
-
-          if (userGoal === "Unknown") {
-            const { data: userProfile } = await supabase
+      // Fetch user profile goal first
+        const { data: userProfile } = await supabase
             .from("user_profiles")
             .select("goals")
             .eq("user_id", user_id)
             .single();
+        
+        let goal = userProfile?.goals || "";
 
-            userGoal = await extractUserGoal(userProfile?.goals);
-          }
-      }
+        // Try rule-based detection from message
+        userGoal = detectUserGoalRuleBased(goal);
+        console.log("Rule-based detected goal:", userGoal);
 
-      // Fallback safety
-      if (!userGoal || userGoal === "Unknown") {
-          userGoal = "General Health";
-      }
-      console.log("Inferred workout goal for recommendation:", userGoal);
+        // --- Normalize function ---
+        const normalizeGoal = (g) => {
+            if (!g) return null;
+
+            // If it's a stringified array, parse it
+            if (typeof g === "string") {
+                try {
+                    const parsed = JSON.parse(g);
+                    if (Array.isArray(parsed)) return parsed;
+                } catch {
+                    // Not JSON, keep as string
+                }
+            }
+            return g;
+        };
+
+        // LAST RESORT: Gemini
+        if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+            userGoal = await extractUserGoal(goal);
+            userGoal = normalizeGoal(userGoal);
+            console.log("Gemini-extracted goal:", userGoal);
+        }
+
+        // Fallback safety
+        if (
+            !userGoal ||
+            (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+            (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+        ) {
+            userGoal = "Stay Healthy";
+        }
+
+        console.log("Inferred workout goal for recommendation:", userGoal);
 
       const { data: workoutLogs, error: logError } = await supabase
           .from("workout_logs")
@@ -65,7 +83,7 @@ async function recommendWorkouts(user_id, supabase) {
       }
           
       const recentWorkoutSet = new Set(
-          (workoutLogs || []).map(w => canonical(w.exercise_name))
+          (workoutLogs || []).map(w => normalise(w.exercise_name))
       );
 
 
@@ -81,7 +99,7 @@ async function recommendWorkouts(user_id, supabase) {
       }
 
       const filteredWorkouts = wellness_resources.filter(workout => {
-        const titleNorm = canonical(workout.title);
+        const titleNorm = normalise(workout.title);
 
           if (recentWorkoutSet.has(titleNorm)) return false;
 
@@ -99,9 +117,9 @@ async function recommendWorkouts(user_id, supabase) {
       return { recommendations };
 
   } catch (error) {
-      console.error("Error in recommendWorkouts:", error);
+      console.error("Error in recommendWellness:", error);
       throw error;
   }
 }
 
-module.exports = recommendWorkouts;
+module.exports = recommendWellness;

@@ -9,6 +9,8 @@ async function extractInfoFromFiles(message, combinedText, images) {
     const promptForCombinedText = `
       You are an information extraction model.
 
+      Current local time: ${new Date().toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
+
       User message:
       "${message}"
 
@@ -21,13 +23,19 @@ async function extractInfoFromFiles(message, combinedText, images) {
             - If multiple meals are present (breakfast, lunch, snack, dinner), extract each meal separately.
             - Use the actual food items as "meal_name", not "Breakfast", "Lunch", etc.
             - Extract protein, carbs, fat, calories and meal time (breakfast, lunch, snack, dinner) for each meal.
+            - If meal time is missing, it must be inferred STRICTLY based on the current local time using the following rules:
+              - 05:00-10:59 → Breakfast
+              - 11:00-14:59 → Lunch
+              - 15:00-17:59 → Snack
+              - 18:00-22:59 → Dinner
+              - Otherwise → Snack
             - Include the original SOURCE tag (e.g., text_file, csv_file, pdf_file) for each meal.
             - If any field is missing, set it to null.
             - Return ONLY valid JSON in the following format:
 
             meals: [
                 {
-                "meal_name": "... list of items ...",
+                "title": "... list of items ...",
                 "protein": NUMBER,
                 "carbs": NUMBER,
                 "fat": NUMBER,
@@ -48,7 +56,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
 
             workouts: [
                 {
-                    "exercise_name": "... exercise name ...",
+                    "title": "... exercise name ...",
                     "sets": NUMBER,
                     "reps": NUMBER,
                     "duration": NUMBER,
@@ -67,15 +75,22 @@ async function extractInfoFromFiles(message, combinedText, images) {
     const promptForImages = `
       You are an information extraction model.
 
+      Current local time: ${new Date().toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
+
       User message:
       "${message}"
 
       Instructions:
+      Determine the image content first. If it contains meal information, extract the following:
       - If multiple images are present analyze each image separately.
       - Extract protein, carbs, fat, calories and meal time (Breakfast, Lunch, Snack, Dinner) for each meal.
+      - Meal time must be inferred STRICTLY based on the current local time using the following rules:
+        - 05:00-10:59 → Breakfast
+        - 11:00-14:59 → Lunch
+        - 15:00-17:59 → Snack
+        - 18:00-22:59 → Dinner
+        - Otherwise → Snack
       - Include the original SOURCE tag (e.g., image_file).
-      - If user didn't provide any meal time on the image, infer it based on current time. (e.g., if current time is 8am, infer breakfast) Follow Malaysia time.
-      - If any field is missing, set it to null.
       - Return ONLY valid JSON in the following format:
 
       meals: [
@@ -89,6 +104,11 @@ async function extractInfoFromFiles(message, combinedText, images) {
           "source": "source_tag"
         }
       ]
+
+      If the image content does not contains meal information, respond with any answer according to your knowledge. Return in valid JSON format as below: 
+      {
+        "reply": ".... your response ...."
+      }
     `;
 
     responseForImages = await queryGeminiWithImages(promptForImages, images);

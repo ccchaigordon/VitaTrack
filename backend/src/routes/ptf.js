@@ -1,8 +1,9 @@
 const express = require('express');
 const supabaseServer = require('../services/supabaseClient');
 const { queryGemini } = require('../services/geminiClient');
-const recommendWorkouts = require('../utils/PTF/recommendWorkouts');
+const recommendWellness = require('../utils/PTF/recommendWellness');
 const recommendRecipes = require('../utils/PTF/recommendRecipes');
+const calculateStreak = require('../utils/PTF/calculateStreak'); 
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -240,62 +241,13 @@ router.get('/ptf/workout', async (req, res) => {
 router.get('/ptf/streak', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
-  const today = new Date();
-  const pastDate = new Date(today);
-
-  // max streak 30 days
-  pastDate.setDate(pastDate.getDate() - 30); 
 
   try {
-    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
-
-    // Using Local Time to match user's day boundary
-    const activeDates = new Set();
-    workoutData.forEach(item => {
-      if (item.workout_completed > 0) {
-        const d = new Date(item.created_at);
-        const key = d.toLocaleDateString('en-CA');
-        activeDates.add(key);
-      }
-    });
-
-    let streak = 0;
-    let checkDate = new Date(); // Start checking from today
-
-    const todayKey = checkDate.toLocaleDateString('en-CA');
-    const yesterdayDate = new Date(checkDate);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
-
-    // If Today has data, streak includes today.
-    // If Today NO data, but Yesterday HAS data, streak count starts from yesterday).
-    // If neither, streak is 0.
-    if (activeDates.has(todayKey)) {
-      // Streak continues from Today
-    } else if (activeDates.has(yesterdayKey)) {
-      // Streak continues from Yesterday
-      checkDate.setDate(checkDate.getDate() - 1);
-    } else {
-      // Streak 0
-      return res.json({ streakDays: 0 });
-    }
-
-    while (true) {
-      const key = checkDate.toLocaleDateString('en-CA');
-      
-      if (activeDates.has(key)) {
-        streak++;
-        checkDate.setDate(checkDate.getDate() - 1); // Go to previous day
-      } else {
-        break;
-      }
-    }
-
+    const streak = await calculateStreak(user_id, supabase);
     return res.json({ streakDays: streak });
-
-    } catch (err) {
-      return res.status(500).json({ error: err.message });
-    }
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
   });
 
 // ENDPOINT 5: WEEKLY INSIGHTS
@@ -311,15 +263,10 @@ router.get('/ptf/insights', async (req, res) => {
   currentMonday.setDate(today.getDate() - diffToMonday);
   currentMonday.setHours(0, 0, 0, 0);
 
-  // weekday index 1..7 (Mon..Sun) for "this week"
-  const weekdayIndex = currentDay === 0 ? 7 : currentDay; 
-
   // Date range for THIS week: Mon ~ today
   const thisWeekStart = new Date(currentMonday);
   const thisWeekEnd = new Date(today);
   thisWeekEnd.setHours(23, 59, 59, 999);
-  console.log("This Week Start:", thisWeekStart);
-  console.log("This Week End:", thisWeekEnd);
 
   // Date range for LAST week: previous Mon ~ previous Sun
   const lastWeekStart = new Date(currentMonday);
@@ -330,14 +277,11 @@ router.get('/ptf/insights', async (req, res) => {
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1); // Sunday before currentMonday
   lastWeekEnd.setHours(23, 59, 59, 999);
 
-  const streakStart = new Date(today);
-  streakStart.setDate(streakStart.getDate() - 60);
-
   try {
-    const [thisWeekData, lastWeekData, streakData] = await Promise.all([
+    const [thisWeekData, lastWeekData, streak] = await Promise.all([
       fetchMetricsData(user_id, thisWeekStart, thisWeekEnd, supabase),
       fetchMetricsData(user_id, lastWeekStart, lastWeekEnd, supabase),
-      fetchMetricsData(user_id, streakStart, thisWeekEnd, supabase) 
+      calculateStreak(user_id, supabase)
     ]);
 
     // CALC TOTAL HELPER
@@ -359,15 +303,10 @@ router.get('/ptf/insights', async (req, res) => {
     const thisWeekTotals = calcTotals(thisWeekData);
     const lastWeekTotals = calcTotals(lastWeekData);
 
-    // AVERAGE
-    const daysThisWeekSoFar = weekdayIndex;  // Mon–today
-    const avgBurnedThisWeek = daysThisWeekSoFar > 0 ? thisWeekTotals.calories_burned / daysThisWeekSoFar : 0;
-    const avgBurnedLastWeek = lastWeekTotals.calories_burned / 7;
+    const totalBurnedThisWeek = thisWeekTotals.calories_burned;
+    const totalBurnedLastWeek = lastWeekTotals.calories_burned;
+    const deltaBurned = calcDeltaPct(totalBurnedThisWeek, totalBurnedLastWeek);
 
-    // 1) Calories Burned Delta based on AVERAGES
-    const deltaBurned = calcDeltaPct(avgBurnedThisWeek, avgBurnedLastWeek);
-
-    // 2) Macro deltas based on TOTALS
     const macroDeltas = [
       {
         name: 'Protein',
@@ -392,39 +331,10 @@ router.get('/ptf/insights', async (req, res) => {
     let selectedMacro = macroDeltas.find(m => m.delta < -10) || 
                         macroDeltas.reduce((max, m) => Math.abs(m.delta) > Math.abs(max.delta) ? m : max);
 
-    const activeDates = new Set();
-    streakData.forEach(item => {
-      if (item.workout_completed > 0) {
-        activeDates.add(new Date(item.created_at).toLocaleDateString('en-CA'));
-      }
-    });
-
-    let streak = 0;
-    let checkDate = new Date();
-    const todayKey = checkDate.toLocaleDateString('en-CA');
-    const yesterdayDate = new Date(checkDate);
-    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
-
-    if (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
-       // Streak includes today
-    } else {
-       checkDate.setDate(checkDate.getDate() - 1); // Check yesterday
-       if (!activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
-         checkDate = null; // Streak broken
-       }
-    }
-    if (checkDate) {
-      while (activeDates.has(checkDate.toLocaleDateString('en-CA'))) {
-          streak++;
-          checkDate.setDate(checkDate.getDate() - 1);
-      }
-    }
-
     const prompt = 
     `You are a Fitness Trainer. Analyze this user's fitness data for the current week vs last week and generate a summary.
     Data profile:
-    - Average Calories Burned: ${avgBurnedThisWeek.toFixed(0)} (Change: ${deltaBurned}%)
+    - Total Calories Burned: ${totalBurnedThisWeek.toFixed(0)} (Change: ${deltaBurned}%)
     - Key Macronutrient Change: ${selectedMacro.name} (${selectedMacro.delta}% change)
     - Current Workout Streak: ${streak} days
     - Workout: ${thisWeekData.filter(d => d.workout_completed > 0).length} sessions
@@ -543,7 +453,6 @@ router.get('/ptf/recommendationRecipes', async (req, res) => {
 
   try {
     const result = await recommendRecipes(user_id, supabase);
-    // console.log("Recipe Recommendations Result:", result);
     const formattedRecipes = result.recommendations.map(item => {
       const r = item.meal;
       return{
@@ -572,26 +481,152 @@ router.get('/ptf/recommendationRecipes', async (req, res) => {
   }
 });
 
-// ENDPOINT 7: RECOMMEND WORKOUTS
-router.get('/ptf/recommendationWorkouts', async (req, res) => {
+// ENDPOINT 7: RECOMMEND WELLNESS RESOURCES
+router.get('/ptf/recommendationWellness', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
 
   try {
-    const result = await recommendWorkouts(user_id, supabase);
-    const formattedWorkouts = result.recommendations.map(w => ({
+    const result = await recommendWellness(user_id, supabase);
+    const formattedWellness = result.recommendations.map(w => ({
       id: w.resource_id,
       title: w.title,
-      summary: w.description || "Great workout for you.",
-      badge: "Workout", 
+      summary: w.description || "Great wellness resource for you.",
+      badge: "Wellness", 
       link: w.source_url,
       isRecipe: false,
-      category: "Fitness",
-      image_url: null 
+      category: "Wellness"
     }));
 
-    return res.json({ recommendations: formattedWorkouts });
+    return res.json({ recommendations: formattedWellness });
   } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// VIEW WORKOUT LOG
+router.get('/ptf/workoutLog', async (req, res) => {
+const supabase = getRlsClient(req);
+    const user = req.user;
+
+    try {
+    const { data: userWorkoutData, error } = await supabase
+      .from("workout_logs")
+      .select("created_at, exercise_name, sets, reps, duration, calories_burned")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Error fetching workout logs", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json(userWorkoutData || []);
+  } catch (err) {
+    console.error("Error in workoutLog", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// VIEW MEAL LOG
+router.get('/ptf/mealLog', async (req, res) => {
+const supabase = getRlsClient(req);
+    const user = req.user;
+
+    try {
+    const { data: userMealData, error } = await supabase
+      .from("meal_logs")
+      .select("created_at, meal_name, calories, protein, carbs, fat, meal_time")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (error) {
+      console.error("Error fetching meal logs", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json(userMealData || []);
+  } catch (err) {
+    console.error("Error in mealLog", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// VIEW SAVED RECOMMENDATIONS
+router.get('/ptf/savedRecommendations', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user = req.user;
+
+  try {
+    const { data, error } = await supabase
+      .from("recommendation_history")
+      .select(`
+        rec_id,
+        type,
+        created_at,
+        recipe_id,
+        resource_id,
+        recipes (
+          title
+        ),
+        wellness_resources (
+          title,
+          source_url
+        )
+      `)
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      console.error("Error fetching saved recommendations", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    return res.json(data || []);
+  } catch (err) {
+    console.error("Error in savedRecommendations", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// TODAY AT A GLANCE (HOME PAGE)
+router.get('/ptf/today', async (req, res) => {
+  const supabase = getRlsClient(req);
+  const user_id = req.user?.id || req.user?.user_id;
+
+  try {
+    const today = new Date();
+    const startOfToday = new Date(today);
+    startOfToday.setHours(0, 0, 0, 0);
+    
+    const endOfToday = new Date(today);
+    endOfToday.setHours(23, 59, 59, 999);
+
+    const todayData = await fetchMetricsData(user_id, startOfToday, endOfToday, supabase);
+
+    const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
+    
+    const calories = sum(todayData, 'calories_in');
+    const protein = sum(todayData, 'protein');
+    const carbs = sum(todayData, 'carbs');
+    const fat = sum(todayData, 'fat');
+    const caloriesBurned = sum(todayData, 'calories_burned');
+    const workoutCount = sum(todayData, 'workout_completed') || 0;
+    const burnGoal = await extractUserGoal(user_id, supabase);
+
+    return res.json({
+      calories,
+      protein,
+      carbs,
+      fat,
+      caloriesBurned,
+      workoutCount,
+      burnGoal
+    });
+  } catch (err) {
+    console.error('Error fetching today metrics:', err);
     return res.status(500).json({ error: err.message });
   }
 });

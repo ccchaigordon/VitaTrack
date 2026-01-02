@@ -6,7 +6,7 @@ import { ScrollToTop } from "./components/ScrollToTop";
 import { DocumentTitle } from "./components/DocumentTitle";
 import { UserProvider } from "./contexts/UserContext";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
-import { DashboardPage } from "./pages/DashboardPage";
+import { HomePage } from "./pages/HomePage";
 import { OnboardingPage } from "./pages/OnboardingPage";
 import { ProfileSettingsPage } from "./pages/ProfileSettingsPage";
 import { ProfileEditPage } from "./pages/ProfileEditPage";
@@ -22,6 +22,7 @@ import { PrivacyPolicyPage } from "./pages/PrivacyPolicyPage";
 import Navbar from "./components/navbar";
 import Footer from "./components/footer";
 import { LandingPage } from "./pages/LandingPage";
+import { NotificationsPage } from "./pages/NotificationsPage";
 
 function AuthenticatedLayout({
   children,
@@ -95,11 +96,11 @@ export function App() {
           }
         />
         <Route
-          path="/dashboard"
+          path="/home"
           element={
             <RequireAuth>
               <AuthenticatedLayout showFooter>
-                <DashboardPage />
+                <HomePage />
               </AuthenticatedLayout>
             </RequireAuth>
           }
@@ -162,7 +163,7 @@ export function App() {
           path="/progress"
           element={
             <RequireAuth>
-              <AuthenticatedLayout>
+              <AuthenticatedLayout showFooter>
                 <ProgressDashboardPage />
               </AuthenticatedLayout>
             </RequireAuth>
@@ -195,6 +196,16 @@ export function App() {
             <RequireAuth>
               <AuthenticatedLayout showFooter>
                 <PrivacyPolicyPage />
+              </AuthenticatedLayout>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/notifications"
+          element={
+            <RequireAuth>
+              <AuthenticatedLayout showFooter>
+                <NotificationsPage />
               </AuthenticatedLayout>
             </RequireAuth>
           }

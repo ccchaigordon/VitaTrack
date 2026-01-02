@@ -1,7 +1,8 @@
 const { queryGemini } = require("../../../services/geminiClient");
 const extractWorkoutInfoFromMsg = require('../Extraction/extractWorkoutInfoFromMsg');
-const recommendationHandlerForWorkout = require("./recommendationHandlerForWorkout");
 const explainErrorWithGemini = require("../explainErrorWithGemini");
+const calculateStreak = require('../../PTF/calculateStreak'); 
+const { sendNotification } = require('../../../services/notificationClient');
 
 function isGeminiFallback(text) {
   return (
@@ -14,13 +15,14 @@ function isGeminiFallback(text) {
   );
 }
 
-function isEmptyWorkout(workout) {
-  if (!workout || typeof workout !== "object") return true;
+function isEmptyWorkout(workouts) {
+  if (!Array.isArray(workouts) || workouts.length === 0) return true;
 
-  const requiredFields = ["exercise_name", "duration", "sets", "reps","calories_burned"];
-
-  return requiredFields.every(
-    key => workout[key] === null || workout[key] === undefined || workout[key] === ""
+  return workouts.every(w =>
+    !w?.title ||
+    Number(w.duration) <= 0 ||
+    (Number(w.sets) <= 0 && Number(w.reps) <= 0) ||
+    Number(w.calories_burned) <= 0
   );
 }
 
@@ -60,12 +62,12 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       const { data, error } = await supabase
         .from("workout_logs")
         .insert({
-          exercise_name: workout.exercise_name,
+          exercise_name: workout.title,
           sets: workout.sets,
           reps: workout.reps,
           duration: workout.duration,
           calories_burned: workout.calories_burned,
-          source: workout.source,
+          source: workout.source || "ai assistant",
           user_id: user_id,
           created_at: new Date()
         });
@@ -80,15 +82,23 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
           })
         };
       } 
-    }
-
-    // Fetch user goal from user profile
-    const { data: userProfile, error: profileError } = await supabase
-      .from("user_profiles")
-      .select("goals")
-      .eq("user_id", user_id)
-      .single();
+    }   
     
+    try {
+      const newStreak = await calculateStreak(user_id, supabase);
+      console.log(`User ${user_id} new workout streak: ${newStreak}`);
+
+      if ([1, 3, 7, 14, 21, 30].includes(newStreak)) {
+         await sendNotification(
+           user_id,
+           'success',
+           `On fire! You hit a ${newStreak}-day workout streak 🔥! Keep it up! 💪`,
+           '/progress'
+         );
+      }
+    } catch (streakError) {
+      console.error("Streak calculation failed:", streakError);
+    }
 
     const prompt = `
       You are a friendly fitness assistant chatbot.

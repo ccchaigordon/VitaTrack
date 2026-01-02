@@ -5,6 +5,9 @@ import { MacroCard } from '../components/ptf/MacroCard';
 import { InsightsCard } from '../components/ptf/InsightsCard';
 import { LineChart } from '../components/ptf/LineChart'; 
 import { apiFetch } from "../services/api";
+import { WorkoutLog } from '../components/ptf/WorkoutLog';
+import { MealLog } from '../components/ptf/MealLog';
+import { SavedRecommendation } from '../components/ptf/SavedRecommendation';
 
 interface CaloriesActivity {
   date: string;
@@ -81,13 +84,42 @@ interface CaloriesResponse {
   goal: number | null;
 }
 
-interface NotificationItem {
-  id: string;
-  message: string;
+interface WorkoutLogItem {
   created_at: string;
-  is_read: boolean;
-  action_link?: string;
-  type: 'alert' | 'info' | 'success' | 'reminder';
+  exercise_name: string;
+  sets: number | null;
+  reps: number | null;
+  duration: number | null;
+  calories_burned: number | null;
+}
+
+interface MealLogItem {
+  created_at: string;
+  meal_name: string;
+  calories: number | null;
+  protein: number | null;
+  carbs: number | null;
+  fat: number | null;
+  meal_time: string | null;
+}
+
+interface RecipeJoin {
+  title: string;
+}
+
+interface WellnessJoin {
+  title: string;
+  source_url: string;
+}
+
+interface RecommendationItem {
+  rec_id: number;
+  type: 'MEAL' | 'WORKOUT' | string;
+  created_at: string;
+  recipe_id: string | null;
+  resource_id: string | null;
+  recipes: RecipeJoin | null; 
+  wellness_resources: WellnessJoin | null;
 }
 
 const LoadingPlaceholder = ({ text = "Loading data...", height = "h-full", minHeight = "min-h-[200px]" }: { text?: string, height?: string, minHeight?: string }) => (
@@ -111,16 +143,19 @@ const FallbackCard = ({ title, message }: { title: string, message: string }) =>
 interface NavContentProps {
   activeTab: string;
   recOpen: boolean;
+  logOpen: boolean;
   onProgress: () => void;
+  onSavedRec: () => void; 
   onRecToggle: () => void;
-  onChildClick: (tab: "recipe" | "workout") => void;
+  onLogToggle: () => void;
+  onChildClick: (tab: "recipe" | "wellness" | "meallog" | "workoutlog") => void;
 }
 
-const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildClick }: NavContentProps) => {
+const SidebarContent = ({ activeTab, recOpen, logOpen, onProgress, onSavedRec,onRecToggle, onLogToggle, onChildClick }: NavContentProps) => {
   const activeBtn = "bg-[#2A4A2D] text-white shadow-sm";
   const inactiveBtn = "text-black hover:bg-gray-50";
-  const recSectionActive = activeTab === "recommendation" || activeTab === "recipe" || activeTab === "workout";
-  const recParentSelected = activeTab === "recommendation";
+  const recSectionActive = ["recommendation", "recipe", "workout"].includes(activeTab);
+  const logSectionActive = ["viewlog", "meallog", "workoutlog"].includes(activeTab);
 
   return (
     <nav className="space-y-4">
@@ -134,10 +169,20 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
         Progress
       </button>
 
+      <button 
+        onClick={onSavedRec}
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium cursor-pointer ${
+          activeTab === 'savedRec' ? activeBtn : inactiveBtn
+        }`}>
+        <img src={activeTab === "savedRec" ? "src/assets/Progress/Saved_active.svg" : 
+          "src/assets/Progress/Saved.svg"} className="w-5.5 h-5.5" alt="savedRec" />
+        Saved List
+      </button>
+
       <button
         onClick={onRecToggle}
         className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium cursor-pointer 
-          ${recParentSelected ? activeBtn : recSectionActive ? "text-black" : inactiveBtn}`}
+          ${activeTab === 'recommendation' ? activeBtn : recSectionActive ? "text-black" : inactiveBtn}`}
       >
         <div className="flex items-center gap-3">
           <img
@@ -161,11 +206,31 @@ const SidebarContent = ({ activeTab, recOpen, onProgress, onRecToggle, onChildCl
           </button>
 
           <button
-            onClick={() => onChildClick("workout")}
+            onClick={() => onChildClick("wellness")}
             className={`w-full flex items-center gap-2 font-medium rounded-lg px-3 py-2 cursor-pointer 
-              ${activeTab === "workout" ? activeBtn : inactiveBtn}`}
-          >Workout
+              ${activeTab === "wellness" ? activeBtn : inactiveBtn}`}
+          >Wellness
           </button>
+        </div>
+      )}
+
+      <button
+        onClick={onLogToggle}
+        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg font-medium cursor-pointer 
+          ${activeTab === 'view-log' ? activeBtn : logSectionActive ? "text-black" : inactiveBtn}`}
+      >
+        <div className="flex items-center gap-3">
+          {/* You can swap this icon for a "List" or "File" icon */}
+          <img src="src/assets/Progress/Log.svg" className="w-6 h-6" alt="Log" />
+          View Log
+        </div>
+        <span className={`text-xl transition-transform ${logOpen ? "rotate-90" : ""}`}>›</span>
+      </button>
+
+      {logOpen && (
+        <div className="pl-12 space-y-2">
+          <button onClick={() => onChildClick("meallog")} className={`w-full text-left font-medium rounded-lg px-3 py-2 ${activeTab === "meallog" ? activeBtn : inactiveBtn }`}>Meal Log</button>
+          <button onClick={() => onChildClick("workoutlog")} className={`w-full text-left font-medium rounded-lg px-3 py-2 ${activeTab === "workoutlog" ? activeBtn : inactiveBtn }`}>Workout Log</button>
         </div>
       )}
     </nav>
@@ -315,8 +380,10 @@ export function ProgressDashboardPage() {
   const [metrics, setMetrics] = useState<MetricsResponse>(INITIAL_METRICS);
   const [insight, setInsight] = useState<InsightResponse | null>(null);
   const [recRecipes, setRecRecipes] = useState<ResourceItem[]>([]);
-  const [recWorkouts, setRecWorkouts] = useState<ResourceItem[]>([]);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [recWellness, setRecWellness] = useState<ResourceItem[]>([]);
+  const [workoutLog, setWorkoutLogs] = useState<WorkoutLogItem[]>([]);
+  const [mealLog, setMealLogs] = useState<MealLogItem[]>([]);
+  const [savedRec, setSavedRec] = useState<RecommendationItem[]>([]);
 
   // Pagination States
   const [currentPage, setCurrentPage] = useState(1);
@@ -329,12 +396,15 @@ export function ProgressDashboardPage() {
   // Navigation States
   const [activeTab, setActiveTab] = useState('progress');
   const [recOpen, setRecOpen] = useState(false);
+  const [logOpen, setLogOpen] = useState(false);
 
   // Loading States
   const [loadingMacros, setLoadingMacros] = useState(true);
   const [loadingCalories, setLoadingCalories] = useState(true);
   const [loadingInsights, setLoadingInsights] = useState(true);
   const [loadingRecs, setLoadingRecs] = useState(false);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [loadingSavedRec, setLoadingSavedRec] = useState(false);
 
   // Mobile Menu States
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -360,18 +430,32 @@ export function ProgressDashboardPage() {
     if (mobileOpen) closeMobileMenu();
   };
 
+  const handleSavedRec = () => {
+    setActiveTab("savedRec");
+    setRecOpen(false);
+    if (mobileOpen) closeMobileMenu();
+  }
+
   const handleRecommendation = () => {
     setRecOpen((prev) => !prev);
-    if (!recOpen) setActiveTab("progress");
   };
 
-  const handleChild = (tab: "recipe" | "workout") => {
+  const handleLogToggle = () => {
+    setLogOpen((prev) => !prev);
+  };
+
+  const handleChild = (tab: any) => {
     setActiveTab(tab);
-    setRecOpen(true);
-    if (mobileOpen) closeMobileMenu();
+    
+    if (tab === "recipe" || tab === "workout") {
+      setRecOpen(true);
+      setLogOpen(false);
+    } else if (tab === "meallog" || tab === "workoutlog") {
+      setLogOpen(true);
+      setRecOpen(false);
+    }
   };
 
-  // Data Fetching  
   // Fetch 1: Macronutrients
   useEffect(() => {
     const fetchMacros = async () => {
@@ -464,18 +548,70 @@ export function ProgressDashboardPage() {
         } catch (e) { console.error(e); } finally { setLoadingRecs(false); }
       }
       
-      if (activeTab === 'workout' && recWorkouts.length === 0) {
+      if (activeTab === 'wellness' && recWellness.length === 0) {
         setLoadingRecs(true);
         try {
-          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendationWorkouts');
-          setRecWorkouts(res.recommendations);
+          const res = await apiFetch<{ recommendations: ResourceItem[] }>('/ptf/recommendationWellness');
+          setRecWellness(res.recommendations);
         } catch (e) { console.error(e); } finally { setLoadingRecs(false); }
       }
     };
     fetchRecommendations();
   }, [activeTab]);
 
-  const currentItems = activeTab === 'recipe' ? recRecipes : recWorkouts;
+  // view logs
+  useEffect(() => {
+    if (activeTab === 'workoutlog') {
+      const fetchLogs = async () => {
+        setLoadingLogs(true);
+        try {
+          const data = await apiFetch<WorkoutLogItem[]>('/ptf/workoutLog');
+          setWorkoutLogs(data);
+        } catch (err) {
+          console.error("Failed to fetch logs", err);
+        } finally {
+          setLoadingLogs(false);
+        }
+      };
+      fetchLogs();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'meallog') {
+      const fetchLogs = async () => {
+        setLoadingLogs(true);
+        try {
+          const data = await apiFetch<MealLogItem[]>('/ptf/mealLog');
+          setMealLogs(data);
+        } catch (err) {
+          console.error("Failed to fetch logs", err);
+        } finally {
+          setLoadingLogs(false);
+        }
+      };
+      fetchLogs();
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'savedRec') { 
+      const fetchSavedRecs = async () => {
+        setLoadingSavedRec(true);
+        try {
+          const data = await apiFetch<RecommendationItem[]>('/ptf/savedRecommendations');
+          setSavedRec(data);
+        } catch (err) {
+          console.error("Failed to fetch saved recommendations", err);
+        } finally {
+          setLoadingSavedRec(false);
+        }
+      };
+      fetchSavedRecs();
+    }
+  }, [activeTab]);
+
+  const currentItems = activeTab === 'recipe' ? recRecipes : recWellness;
   const totalPages = Math.ceil(currentItems.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedItems = currentItems.slice(startIndex, startIndex + itemsPerPage);
@@ -538,8 +674,47 @@ export function ProgressDashboardPage() {
       );
     }
 
-    if (activeTab === 'recipe' || activeTab === 'workout') {
-      const currentItems = activeTab === 'recipe' ? recRecipes : recWorkouts;
+    if (activeTab === 'workoutlog') {
+      return (
+        <section className="h-full">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Workout History</h2>
+          {loadingLogs ? (
+            <LoadingPlaceholder text="Loading workout history..." height="h-96" />
+          ) : (
+            <WorkoutLog logs={workoutLog} />
+          )}
+        </section>
+      );
+    }
+
+    if (activeTab === 'meallog') {
+      return (
+        <section className="h-full">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Meal History</h2>
+          {loadingLogs ? (
+            <LoadingPlaceholder text="Loading meal history..." height="h-96" />
+          ) : (
+            <MealLog logs={mealLog} />
+          )}
+        </section>
+      );
+    }
+
+    if (activeTab === 'savedRec') {
+      return (
+        <section className="h-full">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6">Saved Recommendations</h2>
+          {loadingSavedRec ? (
+            <LoadingPlaceholder text="Loading saved recommendations..." height="h-96" />
+          ) : (
+            <SavedRecommendation data={savedRec} />
+          )}
+        </section>
+      );
+    }
+
+if (activeTab === 'recipe' || activeTab === 'wellness') {
+  const currentItems = activeTab === 'recipe' ? recRecipes : recWellness;
       
       return (
         <div>
@@ -651,13 +826,13 @@ export function ProgressDashboardPage() {
             className="flex cursor-pointer items-center rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
           >
             <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <h1 className="text-2xl font-bold text-gray-800">
             {activeTab === 'progress' ? 'Progress Dashboard' :
              activeTab === 'recipe' ? 'Recipe Recommendations' :
-             activeTab === 'workout' ? 'Workout Recommendations' : 'Dashboard'}
+             activeTab === 'wellness' ? 'Wellness Recommendations' : 'Recommendations'}
           </h1>
         </div>
 
@@ -667,8 +842,11 @@ export function ProgressDashboardPage() {
             <SidebarContent
               activeTab={activeTab}
               recOpen={recOpen}
+              logOpen={logOpen}
               onProgress={handleProgress}
+              onSavedRec={handleSavedRec}
               onRecToggle={handleRecommendation}
+              onLogToggle={handleLogToggle}
               onChildClick={handleChild}
             />
           </div>
@@ -707,8 +885,11 @@ export function ProgressDashboardPage() {
               <SidebarContent
                 activeTab={activeTab}
                 recOpen={recOpen}
+                logOpen={logOpen}
                 onProgress={handleProgress}
+                onSavedRec={handleSavedRec}
                 onRecToggle={handleRecommendation}
+                onLogToggle={handleLogToggle}
                 onChildClick={handleChild}
               />
             </nav>

@@ -49,10 +49,11 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   const yAxisOffset = 30;
   
   return (
-    <div className="w-full h-58 flex items-end justify-center my-6">
+    <div className="w-full h-58 flex items-end justify-center my-6 max-md:justify-start max-md:overflow-x-auto max-md:overflow-y-hidden max-md:my-3 max-md:px-1 max-md:[-webkit-overflow-scrolling:touch]">
       <svg 
         viewBox={`0 0 ${width} ${height}`} 
-        className="w-full h-full overflow-visible"
+        style={{ ['--chartW' as any]: width }}
+        className="w-full h-full overflow-visible max-md:w-[calc(var(--chartW)*1px)] max-md:max-w-none"
         preserveAspectRatio="xMidYMid meet" 
       >
 

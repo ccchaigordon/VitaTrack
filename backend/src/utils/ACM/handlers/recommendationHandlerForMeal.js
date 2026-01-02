@@ -118,16 +118,19 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough past meal data.
 
             Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
+            Politely tell the user that you know their preferences and explain that you need more logged meals to give accurate recommendations based on their preferences.
             Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
+      return { reply: gResponse, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
     }
 
     console.log("User profile preferences:", userPreferences);
@@ -187,48 +190,119 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     }
 
     function matchesDietType(dietaryTags, dietTypeText) {
+      // If user did not specify diet preference, allow all
       if (!dietTypeText) return true;
-      if (!dietaryTags) return false;
 
-      // Split user input into individual diet types, trim and normalize
-      const userDietTypes = dietTypeText.split(",").map(d => d.trim().toLowerCase());
+      // If meal has no dietary tags, it cannot match
+      if (!Array.isArray(dietaryTags) || dietaryTags.length === 0) return false;
+
+      // Normalize user-selected diet types
+      const userDietTypes = dietTypeText
+        .split(",")
+        .map(d => d.trim().toLowerCase())
+        .filter(Boolean);
+
+      // If user only selected "balanced", allow all meals
+      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+        return true;
+      }
 
       // Normalize meal dietary tags
       const mealTags = dietaryTags.map(t => t.trim().toLowerCase());
 
-      // Return true if **all** user diet types are in the meal tags
-      return userDietTypes.every(tag => mealTags.includes(tag));
+      // UNION logic: match if ANY user diet type exists in meal tags
+      return userDietTypes.some(tag => mealTags.includes(tag));
     }
 
     function matchesGoals(meal, goals = []) {
       if (!goals.length) return true;
 
-      // Simple macro-based rules (adjust later)
       return goals.every(goal => {
-        if (goal === "Muscle Gain") {
-          return meal.protein >= 25;
+        switch (goal) {
+          // Muscle & Strength
+          case "Build Muscle":
+            return meal.protein >= 25; // high protein
+          case "Strength":
+          case "Power":
+            return meal.protein >= 20 && meal.carbs >= 30; // protein + energy
+          case "Legs":
+            return meal.carbs >= 30; // energy for leg workouts
+
+          // Cardio & Conditioning
+          case "Cardio":
+          case "Hiit":
+          case "Endurance":
+            return meal.carbs >= 40; // energy for endurance
+
+          // Weight & Health
+          case "Lose Weight":
+            return meal.calories <= 600 && meal.fat <= 20;
+          case "Balanced":
+          case "Stay Healthy":
+          case "Health":
+          case "Fitness":
+            return meal.calories >= 300 && meal.calories <= 700;
+
+          // Nutrition & Diet
+          case "Nutrition":
+          case "Diet":
+          case "Food":
+          case "Cooking":
+          case "Recipes":
+          case "Keto":
+            return true; // no strict macro rules, include all relevant meals
+          case "Supplements":
+            return meal.supplements === true; // flag in meal object
+          case "Water":
+            return meal.isDrink === true && meal.type === "water";
+
+          // Mental & Recovery
+          case "Mental Health":
+          case "Psychology":
+          case "Meditation":
+          case "Sleep":
+          case "Recovery":
+          case "Rehab":
+          case "Pain Relief":
+            return true; // mostly informational, include all
+
+          // Mobility & Posture
+          case "Mobility":
+          case "Posture":
+          case "Yoga":
+            return meal.calories <= 500; // light meals
+
+          // Training Type
+          case "Home":
+          case "Gym":
+          case "Calisthenics":
+          case "Beginner":
+            return true; // general support
+
+          // Lifestyle / Utility
+          case "Lifestyle":
+          case "Habits":
+          case "Activity":
+          case "Time":
+          case "Environment":
+          case "Utility":
+          case "Money":
+          case "Shopping":
+          case "Office":
+          case "Education":
+          case "Science":
+          case "Review":
+          case "Tips":
+          case "Math":
+          case "Clam":
+            return true; // informational, include all
+
+          default:
+            return true; // unknown goals: allow by default
         }
-        if (goal === "Weight Loss") {
-          return meal.calories <= 600 && meal.fat <= 20;
-        }
-        if (goal === "Strength") {
-          return meal.protein >= 20 && meal.carbs >= 30;
-        }
-        if (goal === "Endurance") {
-          return meal.carbs >= 40;
-        }
-        if (goal === "Flexibility") {
-          return meal.fat <= 25;
-        }
-        if (goal === "General Health") {
-          return meal.calories >= 300 && meal.calories <= 700;
-        }        
-        if (goal === "Maintenance") {
-          return meal.calories >= 400 && meal.calories <= 700;
-        }
-        return true;
       });
     }
+
 
     // Filter by rules 
     function filterMealsByTime(meals, mealTime) {
@@ -251,16 +325,19 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough past meal data.
 
             Task:
-            Politely explain that you need more logged meals to give accurate recommendations.
+            Politely tell the user that you know their preferences and explain that you need more logged meals to give accurate recommendations based on their preferences.
             Encourage the user to log a meal first.
-            Keep it friendly and under 2 sentences.`;
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
-      return { reply: gResponse };
+      return { reply: gResponse, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
     }
 
     const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
@@ -282,12 +359,15 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       });
 
       const prompt = `You are a friendly fitness assistant chatbot.
+            User preferences:
+            ${JSON.stringify(userPreferences)}
+
             Context:
             The user asked for a meal recommendation, but there is not enough library meal data.
 
             Task:
-            Politely explain that you do not have enough library meal data to give accurate recommendations.
-            Keep it friendly and under 2 sentences.`;
+            Politely tell the user that you know their preferences and explain that you do not have enough library meal data to give accurate recommendations based on their preferences.
+            Keep it friendly.`;
 
       const gResponse = await queryGemini(prompt);
       return { reply: gResponse };
@@ -335,16 +415,73 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         });
 
         const prompt = `You are a friendly fitness assistant chatbot.
+          User preferences:
+          ${JSON.stringify(userPreferences)}
+
           Context:
-          The user requested a meal recommendation, but no suitable meals match the criteria.
+          The user requested a meal recommendation, but no suitable meals match the criteria. Acknowledge user preferences.
 
-          Meal time: ${mealTime || "any"}`;
+          Task:
+          Politely inform the user that you know their preferences but no meals could be found matching their dietary preferences, allergies, or goals.
+          Encourage them to adjust their preferences or log more meals.
+          Suggest some meals they can try with examples/explanations.
 
-        const gResponse = await queryGemini(prompt);
-        return { reply: gResponse };
+                Important: 
+                - If you suggest some meals, return ONLY valid JSON in the following format:
+                    meals: [
+                        {
+                            "recipe_id": "... recipe id ...",
+                            "title": "... meal title ...",
+                            "ingredients": [ "... ingredient 1 ...", "... ingredient 2 ..." ],
+                            "dietary_tags": [ "... tag 1 ...", "... tag 2 ..." ],
+                            "procedure": "... cooking procedure ...",
+                            "cooking_time": NUMBER,
+                            "calories": NUMBER,
+                            "protein": NUMBER,
+                            "carbs": NUMBER,
+                            "fat": NUMBER,
+                            "source_url": "source_url"
+                        }
+                    ]
+
+                Keep it friendly.
+                
+                Return in JSON format including the response and any suggestions. For example:
+                {
+                    "reply": "Your friendly response here. Some explanations/full guide to prepare about the meals you suggested.",
+                    "meals": [ ... ]
+                }`;               
+
+            gResponse = await queryGemini(prompt);
+
+            let parsed;
+
+            try {
+                const cleanText = gResponse.replace(/```json/g, "").replace(/```/g, "").trim();
+                parsed = JSON.parse(cleanText);
+            } catch (err) {
+                console.error("Failed to parse Gemini output:", err);
+                gResponse = `I'm sorry, I encountered an error while processing your request. Could you please try again later?`;
+                res.json({ chat_id: finalChatId, reply: gResponse, choices: choices }) 
+            };
+
+            const meals = Array.isArray(parsed.meals) ? parsed.meals : [];
+            const firstMeal = meals.length > 0 ? [meals[0]] : [];
+
+            conversationState.set(user_id, {
+                state: "SHOWING_RESULTS",
+                type: "MEAL",
+                recommended: meals,
+                multimodalContext: {
+                    meals: firstMeal,
+                    workouts: []
+                },
+                selectedIndex: 0
+            });
+        return { reply: parsed.reply, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
       }     
 
-    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
+    //console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
@@ -407,15 +544,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       indices
     ]);
 
-    // Save to conversation state
-    conversationState.set(user_id, {
-        state: "SHOWING_RESULTS",
-        type: "MEAL",
-        recommended: recommendations,
-        selectedIndex: 0,
-        referenceVector
-    });
-
     const top = recommendations[0];
 
     if (!top) {
@@ -426,6 +554,19 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
 
         return { reply: "Sorry, I couldn't find a suitable meal recommendation." };
     }
+
+    // Save to conversation state
+    conversationState.set(user_id, {
+        state: "SHOWING_RESULTS",
+        type: "MEAL",
+        recommended: recommendations, 
+        multimodalContext: {
+            meals: top ? [top.meal] : [], 
+            workouts: []
+        },
+        selectedIndex: 0,
+        referenceVector
+    });
 
     const m = top.meal;
 
@@ -445,11 +586,13 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       - Procedure: ${m.procedure}
       - Cooking time: ${m.cooking_time} minutes
     
-      Tell the user that, for more information can browse the source link: ${m.source_url}
+      Tell the user that, for more information can browse the source link.
+      Include a **clickable Markdown link** to the recipe using the format[View recipe](/resources/recipes/${m.recipe_id})
 
       Task:
       Write a short, friendly response:
       - Suggest the recommended meal details
+      - Tell the user that you know their preferences
       - Mention calories
       - Ask if the user wants more recommendation
       - Use emojis naturally
@@ -457,7 +600,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     
     const gResponse = await queryGemini(prompt);
 
-    return { reply: gResponse };
+    return { reply: gResponse, choices: ["Select recommendation", "More recommendation", "Log meal", "Log this meal?", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
 }
 
 module.exports = recommendationHandlerForMeal;
