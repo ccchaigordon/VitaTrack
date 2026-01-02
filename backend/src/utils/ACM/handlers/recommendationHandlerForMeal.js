@@ -63,43 +63,52 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       allergies
     };    
 
-    // Try rule-based detection from message
-    userGoal = detectUserGoalRuleBased(message);
-
-    // If still unknown, try user profile
-    if (!userGoal || userGoal === "Unknown") {
-        const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();
+    // Fetch user profile goal first
+    const { data: userProfile } = await supabase
+        .from("user_profiles")
+        .select("goals")
+        .eq("user_id", user_id)
+        .single();
     
-        userGoal = detectUserGoalRuleBased(userProfile?.goals);
-    }
+    let goal = userProfile?.goals || "";
+
+    // Try rule-based detection from message
+    userGoal = detectUserGoalRuleBased(goal);
+    console.log("Rule-based detected goal:", userGoal);
+
+    // --- Normalize function ---
+    const normalizeGoal = (g) => {
+        if (!g) return null;
+
+        // If it's a stringified array, parse it
+        if (typeof g === "string") {
+            try {
+                const parsed = JSON.parse(g);
+                if (Array.isArray(parsed)) return parsed;
+            } catch {
+                // Not JSON, keep as string
+            }
+        }
+        return g;
+    };
 
     // LAST RESORT: Gemini
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = await extractUserGoal(message);
-
-        if (userGoal === "Unknown") {
-            const { data: userProfile } = await supabase
-            .from("user_profiles")
-            .select("goals")
-            .eq("user_id", user_id)
-            .single();  
-
-            userGoal = await extractUserGoal(userProfile?.goals);
-        }
+    if (!userGoal || (Array.isArray(userGoal) && userGoal.includes("Unknown"))) {
+        userGoal = await extractUserGoal(goal);
+        userGoal = normalizeGoal(userGoal);
+        console.log("Gemini-extracted goal:", userGoal);
     }
 
     // Fallback safety
-    if (!userGoal || userGoal === "Unknown") {
-        userGoal = "General Health";
+    if (
+        !userGoal ||
+        (Array.isArray(userGoal) && userGoal.some(g => g.trim() === "Unknown")) ||
+        (typeof userGoal === "string" && userGoal.trim() === "Unknown")
+    ) {
+        userGoal = "Stay Healthy";
     }
 
-    // append inferred goal to preferences
-    userPreferences.goal = userGoal;
-    console.log("Inferred user goal for recommendation:", userGoal);
+    console.log("Inferred workout goal for recommendation:", userGoal);
 
     mealTime = extractMealTime(message);
     console.log("Inferred meal time for recommendation:", mealTime);
@@ -203,7 +212,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         .filter(Boolean);
 
       // If user only selected "balanced", allow all meals
-      if (userDietTypes.length === 1 && userDietTypes[0] === "Balanced") {
+      if (userDietTypes.length === 1 && userDietTypes[0] === "balanced") {
         return true;
       }
 
