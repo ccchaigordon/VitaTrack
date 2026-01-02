@@ -52,10 +52,10 @@ export default function RecipeDetailPage() {
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Oops!</h2>
           <p className="text-gray-600 mb-6">{error || "Recipe not found"}</p>
           <button
-            onClick={() => navigate("/resources/recipes")}
+            onClick={() => navigate(-1)}
             className="px-6 py-2 bg-[#2A4A2D] text-white rounded-md hover:bg-[#1A381D] transition"
           >
-            Back to Resources
+            Back
           </button>
         </div>
       </div>
@@ -111,10 +111,10 @@ export default function RecipeDetailPage() {
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <button
-          onClick={() => navigate("/resources/recipes")}
+          onClick={() => navigate(-1)}
           className="mb-6 inline-flex items-center text-[#2A4A2D] hover:text-[#1A381D] font-medium text-sm hover:underline cursor-pointer"
         >
-          ← Back to Recipes
+          ← Back
         </button>
 
         <div className="max-w-6xl mx-auto">
