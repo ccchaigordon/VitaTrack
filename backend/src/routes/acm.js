@@ -64,8 +64,6 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   console.log("Final chat id after check:", finalChatId);
 
-  // Update chat title
-  // Get the chat
   const { data: chatData, error: chatError } = await supabase
     .from("chats")
     .select("*")
@@ -214,7 +212,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   const goal = await detectGoal(message);
   console.log("Goal:", goal);
 
-  // if goal is not equal to empty string, replace the existing goal in user profile
+  // If goal is not equal to empty string, replace the existing goal in user profile
   if (goal) {
     const { data: userProfile, error: profileError } = await supabase
       .from("user_profiles")
@@ -303,10 +301,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -373,10 +369,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -423,10 +417,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -490,10 +482,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -540,10 +530,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -591,10 +579,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
     
@@ -734,10 +720,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let stateObj = {};
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -873,10 +857,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let stateObj = {};
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -930,10 +912,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -1022,7 +1002,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     });
     console.log('Gemini response for select recommendation:', gResponse);
 
-    // save recommendation to recommendation_history
+    // Save recommendation to recommendation_history
     await supabase.from("recommendation_history").insert({
       user_id: user.id,
       recipe_id: recipe_id,
@@ -1044,7 +1024,6 @@ router.post("/chat", upload.any(), async (req, res) => {
   if (intent === 'chat') {
     console.log('Querying Gemini for message:', message);
     
-    // Build prompt with conversation context
     let prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
 
     Your role:
@@ -1181,9 +1160,6 @@ router.post("/chat", upload.any(), async (req, res) => {
     console.log("Meal analysis:", meal_analysis);
     console.log("Workout analysis:", workout_analysis);
 
-    // console.log("Meal analysis from Gemini:", meal_analysis);
-    // console.log("Workout analysis from Gemini:", workout_analysis);
-
     let multimodalContext =
       conversationState.get(user.id)?.multimodalContext || {
         meals: [],
@@ -1242,10 +1218,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     let state = conversationState.get(user.id);
 
     if (state instanceof Map) {
-      // Map → Object
       stateObj = Object.fromEntries(state);
     } else if (state && typeof state === "object") {
-      // Already an object
       stateObj = state;
     }
 
@@ -1253,9 +1227,9 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     if (state instanceof Map) {
       state.set("multimodalContext", multimodalContext);
-      conversationState.set(user.id, state); // Map updated
+      conversationState.set(user.id, state);
     } else {
-      conversationState.set(user.id, stateObj); // Object updated
+      conversationState.set(user.id, stateObj);
     }
 
     console.log("State object to save:", stateObj);
@@ -1382,7 +1356,7 @@ router.get("/loadchat", async (req, res) => {
     console.log("Loading chat for user:", user.id);
     console.log("Requested chat_id:", chat_id);
 
-    // 1. Fetch messages for this chat
+    // Fetch messages for this chat
     const { data: messages } = await supabase
       .from("chat_history")
       .select("msg_id, role, message, log_data, created_at")
@@ -1395,7 +1369,7 @@ router.get("/loadchat", async (req, res) => {
     const { data: allFiles } = await supabase.from("chat_files").select("*").limit(10);
     console.log("All files in DB:", allFiles);
 
-    // 2. Fetch files for these messages
+    // Fetch files for these messages
     const { data: files } = await supabase
       .from("chat_files")
       .select("file_url, file_name, file_type, uploaded_at, msg_id")
@@ -1403,7 +1377,7 @@ router.get("/loadchat", async (req, res) => {
 
     console.log("Fetched files from DB:", files);
 
-    // 3. Generate signed URLs for files
+    // Generate signed URLs for files
     const filesWithUrls = await Promise.all(
       (files || []).map(async (f) => {
         const { data } = await supabase.storage
@@ -1424,7 +1398,7 @@ router.get("/loadchat", async (req, res) => {
 
     console.log("Fetched files with URLs:", filesWithUrls);
 
-    // 4. Merge messages and files in timeline
+    // Merge messages and files in timeline
     const timeline = [
       ...messages.map(m => ({
         role: m.role,

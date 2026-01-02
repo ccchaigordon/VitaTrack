@@ -76,7 +76,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     userGoal = detectUserGoalRuleBased(goal);
     console.log("Rule-based detected goal:", userGoal);
 
-    // --- Normalize function ---
     const normalizeGoal = (g) => {
         if (!g) return null;
 
@@ -86,7 +85,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
                 const parsed = JSON.parse(g);
                 if (Array.isArray(parsed)) return parsed;
             } catch {
-                // Not JSON, keep as string
+                // not a JSON array, continue
             }
         }
         return g;
@@ -150,7 +149,7 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       return value
         .toLowerCase()
         .trim()
-        .replace(/s$/, ""); // remove trailing 's' (snacks → snack)
+        .replace(/s$/, "");
     }
 
     function normalizeAllergies(allergies) {
@@ -490,16 +489,12 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
         return { reply: parsed.reply, choices: ["Log meal", "View meals log", "Log workout", "View workouts log", "Workout recommendation"] };
       }     
 
-    //console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
-
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,
       m.protein,
       m.carbs,
       m.fat
     ]);
-
-    //console.log(vectorsFromMealLibrary);
 
     function normalizeVector(v) {
       const norm = Math.sqrt(v.reduce((sum, x) => sum + x*x, 0));
@@ -514,10 +509,8 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
     }
 
     const normalizedVectorsForMealLogs = vectorsFromMealLogs.map(normalizeVector);
-    //console.log("Normalized Vectors:", normalizedVectors);
 
     const referenceVector = averageVector(normalizedVectorsForMealLogs);
-    //console.log("Reference Vector:", referenceVector);
 
     const normalizedVectorsFromMealLibrary = vectorsFromMealLibrary.map(normalizeVector);
 
@@ -542,8 +535,6 @@ async function recommendationHandlerForMeal(message, user_id, conversationState,
       meal: filteredMealsFromMealLibrary[idx],       // original meal object from DB
       similarity: topScores[i]
     }));
-
-    //console.log("Recommendations:", recommendations);
 
     tf.dispose([
       mealTensor,

@@ -10,7 +10,7 @@ function isGeminiFallback(text) {
     (
       text.startsWith("Oops") ||
       text.includes("trouble thinking") ||
-      text.length < 30 // optional safety
+      text.length < 30
     )
   );
 }
@@ -78,7 +78,7 @@ async function processUploadedFilesHandler(message, files) {
           .map(item => item.trim())
           .filter(Boolean);
       }
-      // Fallback: convert to string and split
+      // Convert to string and split
       return String(mealName)
         .split(/\s*(?:,|;|\band\b)\s*/i)
         .map(item => item.trim())

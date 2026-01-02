@@ -10,7 +10,7 @@ function isGeminiFallback(text) {
     (
       text.startsWith("Oops") ||
       text.includes("trouble thinking") ||
-      text.length < 30 // optional safety
+      text.length < 30
     )
   );
 }
