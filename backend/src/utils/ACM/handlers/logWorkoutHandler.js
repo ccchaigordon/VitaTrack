@@ -119,7 +119,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
          await sendNotification(
            user_id,
            'success',
-           `On fire! You hit a ${newStreak}-day workout streak 🔥! Keep it up! 💪`,
+           `On fire! You hit a ${newStreak}-day workout streak! 🔥 Keep it up! 💪`,
            '/progress'
          );
       }

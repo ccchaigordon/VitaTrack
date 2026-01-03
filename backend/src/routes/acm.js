@@ -11,6 +11,7 @@ const recommendationHandlerForMeal = require('../utils/ACM/handlers/recommendati
 const recommendationHandlerForWorkout = require('../utils/ACM/handlers/recommendationHandlerForWorkout');
 
 const processUploadedFilesHandler = require('../utils/ACM/handlers/processUploadedFilesHandler');
+const { mul } = require('@tensorflow/tfjs');
 
 let conversationState = new Map();
 let multimodalContext = null;
@@ -323,7 +324,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       await supabase.from("chat_context").insert({
         user_id: user.id,
         chat_id: finalChatId,
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj
       });
     }
@@ -379,7 +380,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const { data, error, count } = await supabase
       .from("chat_context")
       .update({
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj,
         updated_at: new Date()
       })
@@ -391,7 +392,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       await supabase.from("chat_context").insert({
         user_id: user.id,
         chat_id: finalChatId,
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj
       });
     }
@@ -427,7 +428,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const { data, error, count } = await supabase
       .from("chat_context")
       .update({
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj,
         updated_at: new Date()
       })
@@ -439,7 +440,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       await supabase.from("chat_context").insert({
         user_id: user.id,
         chat_id: finalChatId,
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj
       });
     }
@@ -492,7 +493,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const { data, error, count } = await supabase
       .from("chat_context")
       .update({
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj,
         updated_at: new Date()
       })
@@ -504,7 +505,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       await supabase.from("chat_context").insert({
         user_id: user.id,
         chat_id: finalChatId,
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj
       });
     }
@@ -585,7 +586,16 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
     
     if (stateObj?.multimodalContext?.workouts?.length > 0) {
-      choices.push("Log this workout?");
+      const hasLoggableWorkout = stateObj.multimodalContext.workouts.some(w => {
+        const type = w.type?.trim().toLowerCase();
+        return type !== 'article' && type !== 'video';
+      });
+      console.log("Workout type in multimodalContext:", stateObj.multimodalContext.workouts.map(w => w.type));
+      console.log("Has loggable workout:", hasLoggableWorkout);
+
+      if (hasLoggableWorkout) {
+        choices.push("Log this workout?");
+      }
     }
 
     console.log("State object to save:", stateObj);
@@ -620,7 +630,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const state = conversationState.get(user.id);
 
     if (!hasRecommendations(state)) {
-      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to show more of. Please ask for a recommendation first.";
 
       await supabase.from("chat_history").insert({
@@ -637,9 +647,10 @@ router.post("/chat", upload.any(), async (req, res) => {
     const nextIndex = currentIndex + 1;
 
     if (!state || !state.get("recommended")[nextIndex]) {
+      const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
       const gResponse = await queryGemini(prompt);
-      return res.json({ reply: gResponse });
+      return res.json({ reply: gResponse , choices: choices });
     }
 
     state.set("selectedIndex", nextIndex);
@@ -647,7 +658,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const item = state.get("recommended")[nextIndex];
     let prompt = "";
-    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    const choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
     if (state.get("type") === "MEAL") {
       const meal = item.meal;
@@ -760,7 +771,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const state = conversationState.get(user.id);
 
     if (!hasRecommendations(state)) {
-      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to show previous of. Please ask for a recommendation first.";
 
       await supabase.from("chat_history").insert({
@@ -778,9 +789,10 @@ router.post("/chat", upload.any(), async (req, res) => {
     const prevIndex = currentIndex - 1;
 
     if (!state || !state.get("recommended")[prevIndex]) {
+      const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const prompt = `There is no more recommendation available. Please inform the user in a friendly manner. Stay under 2 sentences.`;
       const gResponse = await queryGemini(prompt);
-      return res.json({ reply: gResponse });
+      return res.json({ reply: gResponse, choices: choices });
     }
 
     state.set("selectedIndex", prevIndex);
@@ -788,7 +800,7 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const item = state.get("recommended")[prevIndex];
     let prompt = "";
-    let choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    let choices = ["Select recommendation", "More recommendation", "Previous recommendation", "Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
     if (state.get("type") === "MEAL") {
       const meal = item.meal;
@@ -898,7 +910,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     console.log("State at select recommendation:", state);
 
     if (!hasRecommendations(state)) {
-      const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+      const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to select. Please ask for a recommendation first.";
 
       await supabase.from("chat_history").insert({
@@ -1012,7 +1024,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       created_at: new Date(),
     });
 
-    const choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
     return res.json({
       chat_id: finalChatId,
@@ -1054,6 +1066,9 @@ router.post("/chat", upload.any(), async (req, res) => {
     - If user ask for meal or workout recommendations, please tell them to use the dedicated buttons for better experience ("Meal recommendation" or "Workout recommendation").
     - If user ask to log meal or workout, please tell them to use the dedicated buttons for better experience ("Log meal" or "Log workout").
     - If user ask for more recommendations, previous or select recommendation, please use the dedicated buttons for better experience ("More recommendations", "Previous recommendation", "Select recommendation"). However, if previous recommendations are not available, you can tell them to choose "Meal recommendation" or "Workout recommendation" first.
+    - Do NOT include instructions about using the 'Previous recommendation' button unless the user explicitly asks to see past recommendations. 
+    - Do NOT include instructions about using the 'Select recommendation' button unless the user explicitly asks to select a recommendation.
+    - Do NOT include instructions about using the 'More recommendation' button unless the user explicitly asks for more recommendations.
     - If user ask for viewing meal or workout logs, please use the dedicated buttons for better experience ("View meals log" or "View workouts log").
     - Other than above, you can answer normally. 
     - If user ask for goal, analyze their goals based on ${userProfile?.goals || 'not specified'} and provide further insights.
@@ -1069,7 +1084,8 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     IMPORTANT RULE (MUST FOLLOW):
 
-    Remember you are not logging the meal, just analyzing the nutrition details or workout details.
+    - If the user asks to log a meal or workout, you **should still provide nutrition or workout analysis** based on the user message, but **also remind them to use the dedicated buttons** ("Log meal" or "Log workout"). 
+    - You are **not logging anything yourself** — just analyzing.
 
     Before responding, you MUST check whether your final reply (including your own suggestions)
     mentions ANY nutrition details (e.g. meal components, calories, macros, food items).
@@ -1139,7 +1155,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       "workout_analysis": [ ... ]
     }`;
 
-    let choices = ["Log meal", "Log workout", "Meal recommendation", "Workout recommendation"];
+    let choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
 
     const gResponse = await queryGemini(prompt);
     console.log('Gemini response:', gResponse);
@@ -1207,8 +1223,36 @@ router.post("/chat", upload.any(), async (req, res) => {
         selectedIndex: 0
       });
 
-      choices = ["Log meal", "Log this meal?", "View meals log", "Log workout", "Log this workout?", "View workouts log", "Meal recommendation", "Workout recommendation"];
+      
+
+      console.log("Updated multimodalContext:", multimodalContext);
     }
+
+    let updated_state = conversationState.get(user.id);
+    let updated_stateObj = updated_state instanceof Map ? Object.fromEntries(updated_state) : updated_state;
+
+    if (updated_stateObj?.multimodalContext?.workouts?.length > 0) {
+        const hasLoggableWorkout = updated_stateObj.multimodalContext.workouts.some(w => {
+          const type = w.type?.trim().toLowerCase();
+          return type !== 'article' && type !== 'video';
+        });
+        console.log("Workout type in multimodalContext:", updated_stateObj.multimodalContext.workouts.map(w => w.type));
+        console.log("Has loggable workout:", hasLoggableWorkout);
+
+        if (hasLoggableWorkout) {
+          choices = ["Log meal", "View meals log", "Log workout", "Log this workout?", "View workouts log", "Meal recommendation", "Workout recommendation"];
+        }
+      }
+
+      if (updated_stateObj?.multimodalContext?.meals?.length > 0) {        
+        choices = ["Log meal", "Log this meal?", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];        
+      }
+
+      console.log("Recommended in state object:", updated_stateObj?.recommended);
+
+      if (updated_stateObj?.recommended?.length > 0) {
+        choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation", "More recommendation", "Previous recommendation", "Select recommendation"];
+      }
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
