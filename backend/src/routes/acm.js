@@ -1232,27 +1232,46 @@ router.post("/chat", upload.any(), async (req, res) => {
     let updated_stateObj = updated_state instanceof Map ? Object.fromEntries(updated_state) : updated_state;
 
     if (updated_stateObj?.multimodalContext?.workouts?.length > 0) {
-        const hasLoggableWorkout = updated_stateObj.multimodalContext.workouts.some(w => {
-          const type = w.type?.trim().toLowerCase();
-          return type !== 'article' && type !== 'video';
-        });
-        console.log("Workout type in multimodalContext:", updated_stateObj.multimodalContext.workouts.map(w => w.type));
-        console.log("Has loggable workout:", hasLoggableWorkout);
+      const hasLoggableWorkout = updated_stateObj.multimodalContext.workouts.some(w => {
+        const type = w.type?.trim().toLowerCase();
+        return type !== 'article' && type !== 'video';
+      });
+      console.log("Workout type in multimodalContext:", updated_stateObj.multimodalContext.workouts.map(w => w.type));
+      console.log("Has loggable workout:", hasLoggableWorkout);
 
-        if (hasLoggableWorkout) {
-          choices = ["Log meal", "View meals log", "Log workout", "Log this workout?", "View workouts log", "Meal recommendation", "Workout recommendation"];
-        }
+      if (hasLoggableWorkout) {
+        choices = ["Log meal", "View meals log", "Log workout", "Log this workout?", "View workouts log", "Meal recommendation", "Workout recommendation"];
       }
+    }
 
-      if (updated_stateObj?.multimodalContext?.meals?.length > 0) {        
-        choices = ["Log meal", "Log this meal?", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];        
+    if (updated_stateObj?.multimodalContext?.meals?.length > 0) {        
+      choices = ["Log meal", "Log this meal?", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];        
+    }
+
+    console.log("Recommended in state object:", updated_stateObj?.recommended);
+
+    if (updated_stateObj?.recommended?.length > 1) {
+      const isAIOnly = updated_stateObj.recommended.every(
+        r => r.source === "ai assistant"
+      );
+
+      choices = [
+        "Log meal",
+        "View meals log",
+        "Log workout",
+        "View workouts log",
+        "Meal recommendation",
+        "Workout recommendation",
+      ];
+
+      if (!isAIOnly) {
+        choices.push(
+          "More recommendation",
+          "Previous recommendation",
+          "Select recommendation"
+        );
       }
-
-      console.log("Recommended in state object:", updated_stateObj?.recommended);
-
-      if (updated_stateObj?.recommended?.length > 0) {
-        choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation", "More recommendation", "Previous recommendation", "Select recommendation"];
-      }
+    }
 
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
