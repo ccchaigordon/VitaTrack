@@ -8,7 +8,7 @@ import { MealLogForm } from "../components/acm/MealLogForm";
 import { WorkoutLogForm } from "../components/acm/WorkoutLogForm";
 import { ImagePreview } from "../components/acm/ImagePreview";
 import { ConfirmDelete } from "../components/acm/ConfirmDelete";
-import chatbotImg from "../assets/Chatbot/AI.svg";
+import chatbotImg from "../../public/vita.png";
 import messagesIcon from "../assets/Chatbot/Messages.svg"
 import deleteIcon from "../assets/Chatbot/Delete.svg"
 import chatbotLogo from "../assets/Chatbot/Logo.svg"
@@ -204,7 +204,7 @@ function ChatBubble({
           <div className="shrink-0 sm:block hidden">
             <img
               src={chatbotImg}
-              className="w-8 h-8"
+              className="w-10 h-10"
               alt="AI Assistant"
             />
           </div>
@@ -933,6 +933,7 @@ function Avatar({
       // Clear UI immediately
       setMessages([]);
       setActiveChatId(null);
+      
 
       // Create empty chat
       const data = await apiFetch<{ chat_id: string }>("/newchat", {

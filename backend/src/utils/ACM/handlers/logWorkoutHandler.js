@@ -130,6 +130,8 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
     const prompt = `
       You are a friendly fitness assistant chatbot.
 
+      User Message: "${message}"
+
       Context:
       The user is logging workout.
 
@@ -140,7 +142,13 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       Write a short, friendly response. Can use emojis naturally.
       - Acknowledge the logged workout
       - Mention calories burned
-      - Ask if they need anything else`
+      - Ask if they need anything else
+        
+      Important:
+      - If user mention about reps or sets for sports exercises (e.g. basketball, badminton, etc.), gently correct them by saying sets/reps usually do not apply for sports activities.
+      - If you had to estimate calories based on duration, inform the user about it in a friendly manner.  Tell them that 0 calories is not logical for activities with duration.
+        
+        `;
       
     
     const gResponse = await queryGemini(prompt);

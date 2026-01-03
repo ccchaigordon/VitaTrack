@@ -19,9 +19,12 @@ async function extractWorkoutInfoFromMsg(message) {
         - reps (number of repetitions, if applicable)
         - duration (in minutes)
         - calories_burned (in kcal)
+        - If sets, reps, or calories are given as 0 for a workout where they do not logically apply, treat them as invalid.
+
 
         Calories estimation rules:
         - If calories are explicitly stated, use that value.
+        - If a sport or cardio activity has a valid duration but calories are given as 0, ignore the stated value and estimate calories. Tell the user that you have estimated the calories based on duration.
         - If calories are not stated:
         - Estimate calories ONLY if duration is provided.
         - Use reasonable average values for a typical adult.
