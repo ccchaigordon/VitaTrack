@@ -311,7 +311,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     const { data, error, count } = await supabase
       .from("chat_context")
       .update({
-        multimodal_context: multimodalContext,
+        multimodal_context: null,
         conversation_state: stateObj,
         updated_at: new Date()
       })
@@ -1037,7 +1037,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     ${conversationContext ? `Previous conversation context:\n${conversationContext}\n\n` : ''}Current user message: "${message}"
     ${
       conversationState.get(user.id)?.multimodalContext
-        ? `Context extracted from uploaded files (images / documents):
+        ? `Context extracted from uploaded files (images / documents) or messages:
       ${JSON.stringify(conversationState.get(user.id).multimodalContext, null, 2)}\n\n`
         : ''
     }
@@ -1088,6 +1088,9 @@ router.post("/chat", upload.any(), async (req, res) => {
     - If exact values are unknown, you MUST still provide reasonable estimates.
       You are explicitly ALLOWED to infer typical values based on common fitness standards.
       This is NOT considered guessing.
+    
+    If nutrition details are mentioned in user message, include your analysis of the nutrition details in the meal_analysis array. Include all items, with reasonable estimates if exact values are unknown.
+    If workout or exercise details are mentioned in user message, include your analysis of the workout details in the workout_analysis array. Include all exercises, with reasonable estimates if exact values are unknown.
 
     If NO workout is mentioned at all, return an empty workout_analysis array.
     If NO nutrition details are mentioned at all, return an empty meal_analysis array.
@@ -1111,7 +1114,7 @@ router.post("/chat", upload.any(), async (req, res) => {
           "fat": NUMBER,
           "calories": NUMBER,
           "meal_time": "... inferred meal time ...",
-          "source": "source_tag"
+          "source": "source_tag" || "user_message" || "ai assistant"
         }
       ]
 
@@ -1123,7 +1126,7 @@ router.post("/chat", upload.any(), async (req, res) => {
           "reps": NUMBER,
           "duration": NUMBER,
           "calories_burned": NUMBER,
-          "source": "source_tag"
+          "source": "source_tag" || "user_message" || "ai assistant"
         }
       ]
 
