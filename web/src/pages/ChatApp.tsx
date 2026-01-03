@@ -14,6 +14,7 @@ import deleteIcon from "../assets/Chatbot/Delete.svg"
 import chatbotLogo from "../assets/Chatbot/Logo.svg"
 import addIcon from "../assets/Chatbot/Button-add.svg"
 import sendIcon from "../assets/Chatbot/Button-send.svg"
+import deleteButton from "../assets/Chatbot/Button-delete.svg"
 
 type Message = {
   role: "user" | "assistant";
@@ -200,7 +201,7 @@ function ChatBubble({
         }`}
       >
         {!isUser && (
-          <div className="shrink-0">
+          <div className="shrink-0 sm:block hidden">
             <img
               src={chatbotImg}
               className="w-8 h-8"
@@ -208,7 +209,10 @@ function ChatBubble({
             />
           </div>
         )}
-        {isUser && <Avatar src={avatarUrl} letter={avatarLetter} size="sm" />}
+        {isUser &&   
+          <div className="hidden sm:block">
+            <Avatar src={avatarUrl} letter={avatarLetter} size="sm" />
+          </div>}
         <div className="flex flex-col gap-2">
           {files.length > 0 && (
             <div
@@ -241,11 +245,11 @@ function ChatBubble({
           )}
 
           <div
-            className={`px-4 py-2.5 text-sm
+            className={`px-4 py-2.5 sm:text-sm text-xs
                 ${
                   isUser
                     ? "bg-[#2A4A2D] text-white rounded-tl-2xl rounded-bl-2xl rounded-tr-2xl whitespace-pre-line"
-                    : "bg-gray-50 text-gray-800 border border-gray-100 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl"
+                    : "bg-gray-50 text-gray-800 border border-gray-100 rounded-tr-2xl rounded-bl-2xl rounded-br-2xl px-0 py-0"
                 }`}
           >
             {isUser ? (
@@ -307,22 +311,22 @@ function ChatBubble({
                       </pre>
                     ),
                     h1: ({ children }) => (
-                      <h1 className="text-lg font-bold mb-2 mt-3 first:mt-0 text-gray-900">
+                      <h1 className="sm:text-lg text-xs font-bold mb-2 mt-3 first:mt-0 text-gray-900">
                         {children}
                       </h1>
                     ),
                     h2: ({ children }) => (
-                      <h2 className="text-base font-bold mb-2 mt-3 first:mt-0 text-gray-900">
+                      <h2 className="sm:text-base text-xs font-bold mb-2 mt-3 first:mt-0 text-gray-900">
                         {children}
                       </h2>
                     ),
                     h3: ({ children }) => (
-                      <h3 className="text-sm font-bold mb-2 mt-2 first:mt-0 text-gray-900">
+                      <h3 className="sm:text-sm text-xs font-bold mb-2 mt-2 first:mt-0 text-gray-900">
                         {children}
                       </h3>
                     ),
                     h4: ({ children }) => (
-                      <h4 className="text-sm font-semibold mb-1 mt-2 first:mt-0 text-gray-900">
+                      <h4 className="sm:text-sm text-xs font-semibold mb-1 mt-2 first:mt-0 text-gray-900">
                         {children}
                       </h4>
                     ),
@@ -393,7 +397,7 @@ function ChatBubble({
                     {choices.map((choice, idx) => (
                       <button
                         key={idx}
-                        className="bg-[#2A4A2D] text-white px-3 py-1.5 rounded-lg hover:bg-[#1A381D] text-sm"
+                        className="bg-[#2A4A2D] text-white px-3 py-1.5 rounded-lg hover:bg-[#1A381D] lg:text-sm text-xs w-auto lg:w-32"
                         onClick={() => onChoiceClick?.(choice)}
                       >
                         {choice}
@@ -417,7 +421,7 @@ function Avatar({
 }: {
   src: string | null;
   letter: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "hidden";
 }) {
   const [imgError, setImgError] = useState(false);
 
@@ -426,6 +430,8 @@ function Avatar({
       ? "h-9 w-9 text-sm"
       : size === "lg"
       ? "h-12 w-12 text-base"
+      : size === "hidden"
+      ? "hidden"
       : "h-10 w-10 text-sm";
 
   if (src && !imgError) {
@@ -1227,28 +1233,6 @@ function Avatar({
   return (
     <div className="bg-[#F5F7FA] flex-1 min-h-0 overflow-hidden flex flex-col">
       <div className="flex p-8 sm:px-6 lg:px-8 gap-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 overflow-hidden items-stretch">
-        {/* Mobile Menu */}
-        <div className="lg:hidden flex items-center justify-start gap-4 mb-150">
-          <button
-            type="button"
-            onClick={openMobileMenu}
-            className="flex cursor-pointer  rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
-          >
-            <svg
-              className="h-6 w-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                d="M4 6h16M4 12h16M4 18h16"
-              />
-            </svg>
-          </button>
-        </div>
 
         {/* Mobile Sidebar */}
         {mobileOpen && (
@@ -1265,7 +1249,7 @@ function Avatar({
 
             {/* Sidebar Panel */}
             <nav
-              className={`fixed bottom-0 left-0 top-0 flex w-[300px] flex-col overflow-y-auto bg-white shadow-2xl rounded-r-2xl p-4 transition-transform duration-300 ease-out ${
+              className={`fixed bottom-0 left-0 top-0 flex w-[250px] flex-col overflow-y-auto bg-white shadow-2xl rounded-r-2xl p-4 transition-transform duration-300 ease-out ${
                 mobileAnimating ? "translate-x-0" : "-translate-x-full"
               }`}
             >
@@ -1296,7 +1280,10 @@ function Avatar({
                 </h1>
 
                 <button
-                  onClick={newChat}
+                   onClick={() => {
+                      newChat();         
+                      closeMobileMenu(); 
+                    }}
                   className="bg-[#2A4A2D] hover:bg-[#1A381D] text-white text-sm font-medium px-4 py-2.5 w-full rounded-xl cursor-pointer transition-colors"
                 >
                   + New Chat
@@ -1315,6 +1302,7 @@ function Avatar({
                         setCancelText("Cancel");
                         setConfirmAction(() => clearAllChats);
                         setShowConfirmModal(true);
+                        closeMobileMenu();
                       }}
                       className="cursor-pointer hover:text-red-600 text-xs transition-colors"
                     >
@@ -1373,6 +1361,7 @@ function Avatar({
                                 () => () => deleteChat(chat.chat_id)
                               );
                               setShowConfirmModal(true);
+                              closeMobileMenu();
                             }}
                             aria-label="Delete chat"
                           >
@@ -1488,11 +1477,33 @@ function Avatar({
         </div>
 
         {/* MAIN CHAT AREA */}
-        <div className="bg-white flex-1 rounded-3xl p-8 flex flex-col min-h-0 border border-gray-200 overflow-hidden">
+        <div className="bg-white flex-1 rounded-3xl sm:p-8 p-4 flex flex-col min-h-0 border border-gray-200 overflow-hidden relative">
+          {/* Mobile Menu */}
+          <div className="lg:hidden flex items-center justify-start gap-4 mb-2 sticky z-50">
+            <button
+              type="button"
+              onClick={openMobileMenu}
+              className="flex cursor-pointer  rounded-lg p-2 text-gray-600 bg-white border border-gray-200 shadow-sm transition-colors hover:bg-lime-50"
+            >
+              <svg
+                className="h-6 w-6"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
+              </svg>
+            </button>
+          </div>
           {messages.length > 0 && (
             <div
               ref={messagesContainerRef}
-              className="flex flex-col w-full gap-4 pr-2 flex-1 min-h-0 overflow-y-auto scroll-smooth thin-scrollbar"
+              className="flex flex-col lg:w-full gap-4 pr-2 flex-1 min-h-0 overflow-y-auto scroll-smooth thin-scrollbar"
             >
               {messages.map((msg, index) => (
                 <ChatBubble
@@ -1527,13 +1538,13 @@ function Avatar({
               <div className="flex flex-col items-center gap-4">
                 <img
                   src={chatbotLogo}
-                  className="w-[180px] opacity-90"
+                  className="sm:w-[180px] w-[100px] opacity-90"
                   alt="VitaTrack Chat"
                 />
-                <h2 className="text-2xl font-semibold text-gray-700">
+                <h2 className="sm:text-2xl text-xl font-semibold text-gray-700">
                   Hi! How can I help you today?
                 </h2>
-                <p className="text-sm text-gray-500 text-center max-w-md">
+                <p className="sm:text-sm text-xs text-gray-500 text-center max-w-md">
                   Ask me anything about fitness, nutrition, or wellness. I can
                   help you log meals, track workouts, and provide personalized
                   recommendations.
@@ -1586,7 +1597,7 @@ function Avatar({
 
           <div className="w-full flex justify-center mt-4">
             {/* Input Box */}
-            <div className="flex flex-col bg-white rounded-2xl px-4 py-1.5 w-full max-w-3xl border border-gray-200">
+            <div className="flex flex-col bg-white rounded-2xl sm:px-4 py-1.5 w-full max-w-3xl border border-gray-200">
               {/* Uploaded Files */}
               {uploads.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
@@ -1615,8 +1626,8 @@ function Avatar({
                         aria-label="Remove file"
                       >
                         <img
-                          src={deleteIcon}
-                          className="w-4 h-4"
+                          src={deleteButton}
+                          className="w-4 h-4 cursor-pointer"
                           alt="Remove"
                         />
                       </button>
@@ -1626,7 +1637,7 @@ function Avatar({
               )}
 
               {/* Input Row */}
-              <div className="flex items-center w-full gap-3">
+              <div className="flex items-center w-full sm:gap-3 gap-1">
                 <button
                   onClick={handleOpenFilePicker}
                   className="cursor-pointer p-2 hover:bg-gray-50 rounded-lg transition-colors"
@@ -1652,8 +1663,8 @@ function Avatar({
                   onKeyDown={(e) =>
                     e.key === "Enter" && !e.shiftKey && sendMessage()
                   }
-                  className="flex-1 min-w-0 outline-none text-gray-700 text-sm bg-transparent placeholder:text-gray-400"
-                  placeholder="Type your message..."
+                  className="flex-1 min-w-0 outline-none text-gray-700 sm:text-sm text-xs bg-transparent placeholder:text-gray-400"
+                  placeholder="Ask Vita..."
                 />
                 <button
                   className="cursor-pointer p-2 hover:bg-[#2A4A2D]/10 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
