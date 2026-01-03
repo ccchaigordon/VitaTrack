@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiFetch } from "../services/api";
 import { getErrorMessage } from "../utils/errors";
 import NavLogo from "../assets/NavLogo.png";
+import onboardingSuccess from "../assets/Onboarding/onboarding_success.svg";
 import DIET_TYPES_DATA from "../data/dietTypes.json";
 
 type MeResponse = {
@@ -404,7 +405,7 @@ export function OnboardingPage() {
         <div className="mt-8 flex flex-col items-center sm:mt-12">
           <div className="relative flex h-20 w-20 items-center justify-center sm:h-28 sm:w-28">
             <img
-              src="../assets/Onboarding/onboarding_success.svg"
+              src={onboardingSuccess}
               alt="Success"
             />
           </div>
