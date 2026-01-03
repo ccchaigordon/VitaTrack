@@ -35,16 +35,36 @@ function extractErrorMessage(payload: unknown): string | null {
 
 async function getAccessToken(): Promise<string> {
   const supabase = getSupabase();
-  const { data, error } = await supabase.auth.getSession();
+  
+  // Try to get the current session first
+  const { data: sessionData, error } = await supabase.auth.getSession();
+  
   if (error) throw new Error(error.message);
-  const token = data.session?.access_token;
+  
+  // If session exists but might be expired, refresh it
+  let data = sessionData;
+  if (data?.session) {
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = data.session.expires_at;
+    
+    // If token expires in less than 60 seconds, refresh it
+    if (expiresAt && expiresAt - now < 60) {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession(data.session);
+      if (!refreshError && refreshData.session) {
+        data = refreshData;
+      }
+    }
+  }
+  
+  const token = data?.session?.access_token;
   if (!token) throw new Error('No session token');
   return token;
 }
 
 export async function apiFetch<T>(
   path: string,
-  options: RequestInit & { json?: unknown | FormData } = {}
+  options: RequestInit & { json?: unknown | FormData } = {},
+  retryCount = 0
 ): Promise<T> {
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
@@ -77,6 +97,22 @@ export async function apiFetch<T>(
   }
 
   if (!res.ok) {
+    // If we get an "Invalid token" error and haven't retried yet, try refreshing the session
+    if (res.status === 401 && retryCount === 0) {
+      const supabase = getSupabase();
+      const { data: sessionData } = await supabase.auth.getSession();
+      
+      if (sessionData.session) {
+        // Try to refresh the session
+        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession(sessionData.session);
+        
+        // If refresh succeeded, retry the request once
+        if (!refreshError && refreshData.session) {
+          return apiFetch<T>(path, options, retryCount + 1);
+        }
+      }
+    }
+    
     const msg = extractErrorMessage(payload) ?? `Request failed: ${res.status}`;
     throw new Error(msg);
   }

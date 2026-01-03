@@ -115,9 +115,27 @@ export function OnboardingPage() {
 
   useEffect(() => {
     let mounted = true;
-    apiFetch<MeResponse>("/me")
-      .then((me) => {
+
+    async function loadOnboardingData() {
+      try {
+        // Ensure we have a valid session first
+        const { getSupabase } = await import("../services/supabase");
+        const supabase = getSupabase();
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError || !sessionData.session) {
+          if (!mounted) return;
+          setErrorMsg("Session expired. Please sign in again.");
+          setTimeout(() => {
+            nav("/", { replace: true });
+          }, 2000);
+          return;
+        }
+
+        const me = await apiFetch<MeResponse>("/me");
         if (!mounted) return;
+
         if (me.profileComplete) {
           nav("/home", { replace: true });
           return;
@@ -145,11 +163,28 @@ export function OnboardingPage() {
           if (me.profile.workout_days_per_week != null)
             setWorkoutDaysPerWeek(String(me.profile.workout_days_per_week));
         }
-      })
-      .catch((e) => {
+      } catch (e) {
         if (!mounted) return;
-        setErrorMsg(getErrorMessage(e, "Failed to load onboarding"));
-      });
+        const errorMsg = getErrorMessage(e, "Failed to load onboarding");
+
+        // If it's an authentication error, redirect to sign in
+        if (
+          errorMsg.toLowerCase().includes("token") ||
+          errorMsg.toLowerCase().includes("session") ||
+          errorMsg.toLowerCase().includes("unauthorized")
+        ) {
+          setErrorMsg("Session expired. Redirecting to sign in...");
+          setTimeout(() => {
+            nav("/", { replace: true });
+          }, 2000);
+        } else {
+          setErrorMsg(errorMsg);
+        }
+      }
+    }
+
+    loadOnboardingData();
+
     return () => {
       mounted = false;
     };
