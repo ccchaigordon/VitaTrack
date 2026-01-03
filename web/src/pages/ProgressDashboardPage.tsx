@@ -834,10 +834,14 @@ if (activeTab === 'recipe' || activeTab === 'wellness') {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <h1 className="text-2xl font-bold text-gray-800">
-            {activeTab === 'progress' ? 'Progress Dashboard' :
-             activeTab === 'recipe' ? 'Recipe Recommendations' :
-             activeTab === 'wellness' ? 'Wellness Recommendations' : 'Recommendations'}
+            <h1 className="text-2xl font-bold text-gray-800">
+            {activeTab === 'progress' ? 'Progress Tracker' :
+             activeTab === 'recipe' ? '' :
+             activeTab === 'wellness' ? '' :
+             activeTab === 'meallog' ? 'Meal Log' :
+             activeTab === 'workoutlog' ? 'Workout Log' :
+             activeTab === 'savedRec' ? '' :
+             ''}
           </h1>
         </div>
 
