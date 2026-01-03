@@ -241,7 +241,7 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
             selectedIndex: 0
         });
 
-        return { reply: gResponse, choices: ["Select recommendation", "More recommendation", "Log meal", "Log this workout?", "View meals log", "Log workout", "View workouts log", "Meal recommendation"] };
+        return { reply: gResponse, choices: ["Select recommendation", "More recommendation", "Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation"] };
 
     } catch (error) {
         console.error("Unexpected error in recommendationHandlerForWorkout:", error);
