@@ -193,7 +193,7 @@ async function getPersonalizedFeed(
     if (type === "recipes" || type === "all") {
       let query = client.from("recipes").select("*");
 
-      const isBalanced = userProfile.diet_type === "balanced";
+      const isBalanced = userProfile.diet_type === "Balanced";
 
       // Check if diet_type is set and not Balanced
       // 1. Apply diet type filters
