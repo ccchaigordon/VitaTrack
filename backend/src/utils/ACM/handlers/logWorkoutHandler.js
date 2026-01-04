@@ -33,10 +33,17 @@ function isEmptyWorkout(workouts) {
 async function logWorkoutHandler(message, multimodalContext, conversationState, user_id, supabase) {
   try {
     let messageToReturn;
+    console.log("logWorkoutHandler called with message:", message);
 
-    const workoutData = multimodalContext
-      ? multimodalContext
-      : await extractWorkoutInfoFromMsg(message);
+   if (
+      multimodalContext &&
+      Array.isArray(multimodalContext.workouts) &&
+      multimodalContext.workouts.length > 0
+    ) {
+      workoutData = multimodalContext.workouts;
+    } else {
+      workoutData = await extractWorkoutInfoFromMsg(message);
+    }
 
     console.log("Workout extraction result:", workoutData);
 

@@ -1163,7 +1163,11 @@ function Avatar({
       calories_burned: string;
     }) => {
       console.log("Workout data submitted:", workoutData);
-      const workoutMessage = `I did ${workoutData.sets} sets of ${workoutData.reps} reps of ${workoutData.exercise_name}, lasting ${workoutData.duration} minutes and burning ${workoutData.calories_burned} calories.`;
+      const workoutMessage =
+        Number(workoutData.sets) > 0 && Number(workoutData.reps) > 0
+          ? `I did ${workoutData.sets} sets of ${workoutData.reps} reps of ${workoutData.exercise_name}, lasting ${workoutData.duration} minutes and burning ${workoutData.calories_burned} calories.`
+          : `I did ${workoutData.exercise_name} for ${workoutData.duration} minutes, burning ${workoutData.calories_burned} calories.`;
+
       const messageText = workoutMessage;
       console.log("Submitting workout message:", workoutMessage);
 
