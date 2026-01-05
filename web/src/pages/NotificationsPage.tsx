@@ -105,7 +105,7 @@ export function NotificationsPage() {
                         {n.message}
                       </p>
                       <span className="text-xs text-gray-400">
-                        {new Date(n.created_at).toLocaleString()}
+                        {new Date(n.created_at).toLocaleString('en-MY', { timeZone: 'UTC' })}
                       </span>
                     </div>
                   </li>

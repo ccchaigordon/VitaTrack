@@ -17,11 +17,15 @@ async function fetchMetricsData(userId, startDate, endDate, supabase) {
     .from('daily_metrics')
     .select('created_at, calories_in, calories_burned, protein, carbs, fat, workout_completed')
     .eq('user_id', userId)
-    .gte('created_at', startDate.toISOString())
-    .lte('created_at', endDate.toISOString());
+    .gte('created_at', startDate)
+    .lte('created_at', endDate);
 
   if (error) throw error;
   return data;
+}
+
+function toDateOnlyMY(date) {
+  return date.toLocaleDateString('en-CA'); 
 }
 
 async function extractUserGoal(userId, supabase) {
@@ -81,6 +85,8 @@ router.get('/ptf/macros', async (req, res) => {
 
   const range = Number(days);
   const today = new Date();
+  today.setHours(today.getHours() + 8);
+  console.log('today', today);
   
   const pastDate = new Date(today);
   pastDate.setDate(pastDate.getDate() - (range - 1));
@@ -88,8 +94,11 @@ router.get('/ptf/macros', async (req, res) => {
   const prevPastDate = new Date(pastDate);
   prevPastDate.setDate(prevPastDate.getDate() - range);
 
+  const today_MY = toDateOnlyMY(today);
+  const prevPastDate_MY = toDateOnlyMY(prevPastDate);
+
   try {
-    const rawData = await fetchMetricsData(user_id, prevPastDate, today, supabase);
+    const rawData = await fetchMetricsData(user_id, prevPastDate_MY, today_MY, supabase);
 
     const currentPeriod = rawData.filter(d => new Date(d.created_at) >= pastDate);
     const prevPeriod = rawData.filter(d => new Date(d.created_at) < pastDate);
@@ -141,6 +150,7 @@ router.get('/ptf/calories', async (req, res) => {
 
   const weekOffset = (Number(days) / 7) - 1; // Convert days to week offset
   const today = new Date();
+  today.setHours(today.getHours() + 8);
   const currentDay = today.getDay(); // Find current day of week (0=Sun, 1=Mon, ..., 6=Sat)
 
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1; 
@@ -157,9 +167,12 @@ router.get('/ptf/calories', async (req, res) => {
   endSunday.setDate(startMonday.getDate() + 6);
   endSunday.setHours(23, 59, 59, 999); 
 
+  const startMonday_MY = toDateOnlyMY(startMonday);
+  const endSunday_MY = toDateOnlyMY(endSunday);
+
   try {
     const [currentPeriod, burnGoal] = await Promise.all([
-      fetchMetricsData(user_id, startMonday, endSunday, supabase),
+      fetchMetricsData(user_id, startMonday_MY, endSunday_MY, supabase),
       extractUserGoal(user_id, supabase)
     ]);
     console.log("Extracted Burn Goal:", burnGoal);
@@ -198,15 +211,20 @@ router.get('/ptf/workout', async (req, res) => {
   const user_id = req.user?.id || req.user?.user_id;
   const days = 14;
   const today = new Date();
+  today.setHours(today.getHours() + 8);
   const pastDate = new Date(today);
   pastDate.setDate(pastDate.getDate() - (days - 1));
 
+  const pastDate_MY = toDateOnlyMY(pastDate);
+  const today_MY = toDateOnlyMY(today);
+
   try {
-    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
+    const workoutData = await fetchMetricsData(user_id, pastDate_MY, today_MY, supabase);
 
     const dataMap = {};
       workoutData.forEach(item => {
-        const dateKey = new Date(item.created_at).toISOString().slice(0, 10);
+        if (!item.created_at) return;
+        const dateKey = item.created_at;
         dataMap[dateKey] = item.workout_completed ?? 0;
       });
 
@@ -216,9 +234,9 @@ router.get('/ptf/workout', async (req, res) => {
       const d = new Date(pastDate);
       d.setDate(d.getDate() + i);
       
-      const dateKey = d.toISOString().slice(0, 10);
+      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       
-      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
       history.push({
         date: dateKey,       
@@ -251,6 +269,7 @@ router.get('/ptf/insights', async (req, res) => {
   const user_id = req.user?.id || req.user?.user_id;
 
   const today = new Date();
+  today.setHours(today.getHours() + 8);
   const currentDay = today.getDay(); 
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
@@ -272,10 +291,15 @@ router.get('/ptf/insights', async (req, res) => {
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1); // Sunday before currentMonday
   lastWeekEnd.setHours(23, 59, 59, 999);
 
+  const lastWeekStart_MY = toDateOnlyMY(lastWeekStart);
+  const lastWeekEnd_MY = toDateOnlyMY(lastWeekEnd);
+  const thisWeekStart_MY = toDateOnlyMY(thisWeekStart);
+  const thisWeekEnd_MY = toDateOnlyMY(thisWeekEnd);
+
   try {
     const [thisWeekData, lastWeekData, streak] = await Promise.all([
-      fetchMetricsData(user_id, thisWeekStart, thisWeekEnd, supabase),
-      fetchMetricsData(user_id, lastWeekStart, lastWeekEnd, supabase),
+      fetchMetricsData(user_id, thisWeekStart_MY, thisWeekEnd_MY, supabase),
+      fetchMetricsData(user_id, lastWeekStart_MY, lastWeekEnd_MY, supabase),
       calculateStreak(user_id, supabase)
     ]);
 
@@ -349,6 +373,25 @@ router.get('/ptf/insights', async (req, res) => {
     3. Consistency/Streak: Celebration of streak OR encouragement if 0.
     4. Actionable Tip: A specific behavioral tip based on the data (e.g., "Try to hit 20g protein post-workout").`;
 
+    const sessionsThisWeek = thisWeekData.filter(d => d.workout_completed > 0).length;
+
+    const hasAnyInsightsData =
+      streak > 0 ||
+      sessionsThisWeek > 0 ||
+      thisWeekTotals.calories_burned > 0 ||
+      thisWeekTotals.protein > 0 ||
+      thisWeekTotals.carbs > 0 ||
+      thisWeekTotals.fat > 0;
+
+    if (!hasAnyInsightsData) {
+      return res.json({
+        summary: [],
+        nextFocus: null,
+        isFallback: true,
+        isEmpty: true, // <-- important
+      });
+    }
+
     let gResponse;
 
     gResponse = await queryGemini(prompt);
@@ -418,6 +461,7 @@ router.get('/ptf/insights', async (req, res) => {
       summary: result.summary,
       nextFocus: result.nextFocus,
       isFallback: isFallback,
+      isEmpty: false,
     };
 
     res.json(insight);
@@ -578,6 +622,7 @@ router.get('/ptf/today', async (req, res) => {
 
   try {
     const today = new Date();
+    today.setHours(today.getHours() + 8);
     const startOfToday = new Date(today);
     startOfToday.setHours(0, 0, 0, 0);
     

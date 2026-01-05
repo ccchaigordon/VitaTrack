@@ -86,7 +86,7 @@ export function NotificationPopup({
                       {n.message}
                     </p>
                     <p className="text-[10px] text-gray-400 mt-1">
-                      {new Date(n.created_at).toLocaleDateString()}
+                      {new Date(n.created_at).toLocaleDateString('en-MY', { timeZone: 'UTC' })}
                     </p>
                   </div>
                   {!n.is_read && <div className="h-2 w-2 mt-1.5 rounded-full bg-[#34A853] shrink-0" />}

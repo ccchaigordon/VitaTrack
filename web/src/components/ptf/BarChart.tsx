@@ -34,8 +34,8 @@ export function BarChart ({ data }: { data: ChartData[] }) {
   const height = 180;
   const barWidth = 18; 
   const groupGap = 18; 
-  const paddingLeft = 50; 
-  const paddingRight = 10; 
+  const paddingLeft = 30; 
+  const paddingRight = 20; 
   const totalItemWidth = barWidth * 2 + groupGap;
   const contentWidth = (totalItemWidth * data.length) - groupGap;
   const width = contentWidth + paddingLeft + paddingRight - groupGap; // Total SVG width
