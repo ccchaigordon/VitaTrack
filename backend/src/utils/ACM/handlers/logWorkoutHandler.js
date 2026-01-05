@@ -37,10 +37,10 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
 
    if (
       multimodalContext &&
-      Array.isArray(multimodalContext.workouts) &&
-      multimodalContext.workouts.length > 0
+      Array.isArray(multimodalContext) &&
+      multimodalContext.length > 0
     ) {
-      workoutData = multimodalContext.workouts;
+      workoutData = multimodalContext;
     } else {
       workoutData = await extractWorkoutInfoFromMsg(message);
     }
@@ -92,6 +92,9 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       };
     }
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     for(const workout of workoutData) {
       const { data, error } = await supabase
         .from("workout_logs")
@@ -103,7 +106,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
           calories_burned: workout.calories_burned,
           source: workout.source || "ai assistant",
           user_id: user_id,
-          created_at: new Date()
+          created_at: date
         });
 
       if (error) {

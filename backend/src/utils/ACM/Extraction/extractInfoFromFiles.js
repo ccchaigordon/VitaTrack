@@ -1,6 +1,10 @@
 const { queryGemini, queryGeminiWithImages } = require('../../../services/geminiClient');
 
 async function extractInfoFromFiles(message, combinedText, images) {
+  const date = new Date();
+  date.setHours(date.getHours() + 8); 
+  
+  console.log("Current local time (Asia/Kuala_Lumpur):", date.toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" }));
 
   let responseForCombinedText = "";
   let responseForImages = "";
@@ -9,7 +13,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
     const promptForCombinedText = `
       You are an information extraction model.
 
-      Current local time: ${new Date().toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
+      Current local time: ${date.toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
 
       User message:
       "${message}"
@@ -106,7 +110,7 @@ async function extractInfoFromFiles(message, combinedText, images) {
     const promptForImages = `
       You are an information extraction model.
 
-      Current local time: ${new Date().toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
+      Current local time: ${date.toLocaleString("en-MY", { timeZone: "Asia/Kuala_Lumpur" })}
 
       User message:
       "${message}"

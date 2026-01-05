@@ -71,6 +71,8 @@ async function logMealHandler(message, multimodalContext, conversationState, use
         mealTime = "Breakfast";
       }
 
+      const date = new Date();
+      date.setHours(date.getHours() + 8);
 
       for (const mealDataItem of mealData) {
         const { data, error } = await supabase
@@ -84,7 +86,7 @@ async function logMealHandler(message, multimodalContext, conversationState, use
             source: mealDataItem.source || "ai assistant",
             meal_time: mealDataItem.meal_time || mealTime,
             user_id: user_id,
-            created_at: new Date()
+            created_at: date
           });
 
           if (error) {
@@ -99,8 +101,10 @@ async function logMealHandler(message, multimodalContext, conversationState, use
           }      
       }
 
+      
+
       try {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = date.toISOString().split('T')[0];
 
         const { data: dailyMetric, error: metricError } = await supabase
           .from('daily_metrics')
