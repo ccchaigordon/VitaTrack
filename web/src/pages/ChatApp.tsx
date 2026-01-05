@@ -15,6 +15,28 @@ import chatbotLogo from "../assets/Chatbot/Logo.svg"
 import addIcon from "../assets/Chatbot/Button-add.svg"
 import sendIcon from "../assets/Chatbot/Button-send.svg"
 import deleteButton from "../assets/Chatbot/Button-delete.svg"
+interface MealLog {
+  meal_name: string;
+  calories: number;
+  carbs: number;
+  fat: number;
+  protein: number;
+  meal_time: string;
+  source: "ai assistant" | "user_message" | "image_file" | "pdf_file" | "text_file";
+  created_at: string; // ISO timestamp
+}
+
+interface WorkoutLog {
+  exercise_name: string;
+  calories_burned: number;
+  duration: number; // minutes
+  sets: number | null;
+  reps: number | null;
+  source: "user_message" | "ai assistant" | "image_file" | "pdf_file" | "text_file";
+  created_at: string; // ISO timestamp
+}
+
+type ChatData = MealLog | WorkoutLog;
 
 type Message = {
   role: "user" | "assistant";
@@ -25,7 +47,7 @@ type Message = {
   msg_id?: string;
   isTyping?: boolean;
   choices?: string[];
-  data?: any[];
+  data?: ChatData[];
 };
 
 type TimelineItem = {
@@ -35,7 +57,7 @@ type TimelineItem = {
   file_type: string | null;
   message: string | null;
   msg_id: string;
-  log_data: any[] | null;
+  log_data: ChatData[] | null;
   role: "user" | "ai";
 };
 
@@ -167,7 +189,7 @@ function ChatBubble({
   onTypingEnd?: () => void;
   choices?: string[];
   onChoiceClick?: (choice: string) => void;
-  data?: any[];
+  data?: ChatData[];
   isLast?: boolean;
   onImageClick?: (src: string) => void;
 }) {
@@ -616,7 +638,7 @@ function Avatar({
           role: "user" | "assistant";
           text: string;
           files: FileItem[];
-          data?: any[];
+          data?: ChatData[];
         }>,
         item: TimelineItem
       ) => {
@@ -752,7 +774,7 @@ function Avatar({
         chat_id: string;
         reply: string;
         choices: string[];
-        data: any[];
+        data: ChatData[];
       }>("/chat", {
         method: "POST",
         json: formData,
@@ -826,7 +848,7 @@ function Avatar({
           role: "user" | "assistant";
           text: string;
           files: FileItem[];
-          data?: any[];
+          data?: ChatData[];
         }>,
         item: TimelineItem
       ) => {
@@ -1105,7 +1127,7 @@ function Avatar({
       formData.append("choice", "Log meal");
 
       try {
-        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: ChatData[] }>("/chat", {
           method: "POST",
           json: formData,
         });
@@ -1185,7 +1207,7 @@ function Avatar({
       formData.append("choice", "Log workout");
 
       try {
-        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: any[] }>("/chat", {
+        const data = await apiFetch<{ chat_id: string; reply: string, choices: string[], data: ChatData[] }>("/chat", {
           method: "POST",
           json: formData,
         });
