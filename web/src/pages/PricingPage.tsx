@@ -1,5 +1,8 @@
+import { useState, useEffect } from "react";
 import { useUser } from "../contexts/UserContext";
 import { SettingsSidebar } from "../components/SettingsSidebar";
+import { apiFetch } from "../services/api";
+import { getErrorMessage } from "../utils/errors";
 
 const CheckIcon = () => (
   <svg
@@ -60,9 +63,71 @@ const features: Feature[] = [
   { name: "Early Access to New Features", free: false, pro: true },
 ];
 
+type Plan = {
+  plan_id: string;
+  plan_name: string;
+  plan_description: string | null;
+  plan_price: number;
+  is_default: boolean;
+  is_active: boolean;
+};
+
 export default function PricingPage() {
-  const { me } = useUser();
+  const { me, refetch } = useUser();
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [updatingPlanId, setUpdatingPlanId] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const currentPlan = me?.plan?.plan_name?.toLowerCase() || "free";
+  const freePlan = plans.find((p) => p.plan_name.toLowerCase() === "free");
+  const proPlan = plans.find((p) => p.plan_name.toLowerCase() === "pro");
+
+  useEffect(() => {
+    async function fetchPlans() {
+      try {
+        const data = await apiFetch<{ plans: Plan[] }>("/plans");
+        setPlans(data.plans);
+      } catch (err) {
+        console.error("Failed to fetch plans:", err);
+      }
+    }
+    fetchPlans();
+  }, []);
+
+  async function handlePlanChange(planId: string, planName: string) {
+    if (updatingPlanId) return; // Prevent multiple clicks
+
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setUpdatingPlanId(planId);
+    setLoading(true);
+
+    try {
+      await apiFetch("/me/plan", {
+        method: "POST",
+        json: { plan_id: planId },
+      });
+
+      // Refresh user data to get updated plan
+      await refetch();
+
+      setSuccessMsg(
+        `Successfully ${planName.toLowerCase() === "free" ? "downgraded" : "upgraded"} to ${planName} plan!`
+      );
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMsg(null);
+      }, 3000);
+    } catch (err) {
+      setErrorMsg(getErrorMessage(err, "Failed to update plan"));
+    } finally {
+      setLoading(false);
+      setUpdatingPlanId(null);
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#FAFBFC]">
@@ -80,6 +145,18 @@ export default function PricingPage() {
             </p>
           </div>
 
+          {/* Success/Error Messages */}
+          {successMsg && (
+            <div className="max-w-4xl mx-auto mb-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
+              {successMsg}
+            </div>
+          )}
+          {errorMsg && (
+            <div className="max-w-4xl mx-auto mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Pricing Cards */}
           <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto mb-16 sm:mb-20">
             {/* Free Plan */}
@@ -94,7 +171,7 @@ export default function PricingPage() {
               <div className="mb-6">
                 <div className="flex items-baseline">
                   <span className="text-4xl sm:text-5xl font-bold text-[#1A381D]">
-                    RM0
+                    RM{freePlan?.plan_price.toFixed(2) || "0.00"}
                   </span>
                   <span className="text-gray-500 ml-2">/month</span>
                 </div>
@@ -140,14 +217,19 @@ export default function PricingPage() {
               </ul>
 
               <button
-                disabled={currentPlan === "free"}
+                onClick={() => freePlan && handlePlanChange(freePlan.plan_id, freePlan.plan_name)}
+                disabled={currentPlan === "free" || loading || updatingPlanId === freePlan?.plan_id}
                 className={`w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 ${
                   currentPlan === "free"
                     ? "bg-gray-100 text-gray-500 cursor-not-allowed"
-                    : "bg-[#1A381D]/10 text-[#1A381D] hover:bg-[#1A381D]/20 cursor-pointer"
+                    : "bg-[#1A381D]/10 text-[#1A381D] hover:bg-[#1A381D]/20 cursor-pointer disabled:opacity-50"
                 }`}
               >
-                {currentPlan === "free" ? "Current Plan" : "Downgrade to Free"}
+                {updatingPlanId === freePlan?.plan_id
+                  ? "Updating..."
+                  : currentPlan === "free"
+                  ? "Current Plan"
+                  : "Downgrade to Free"}
               </button>
             </div>
 
@@ -169,7 +251,7 @@ export default function PricingPage() {
               <div className="mb-6">
                 <div className="flex items-baseline">
                   <span className="text-4xl sm:text-5xl font-bold">
-                    RM39.99
+                    RM{proPlan?.plan_price.toFixed(2) || "39.99"}
                   </span>
                   <span className="text-white/70 ml-2">/month</span>
                 </div>
@@ -224,14 +306,19 @@ export default function PricingPage() {
               </ul>
 
               <button
-                disabled={currentPlan === "pro"}
+                onClick={() => proPlan && handlePlanChange(proPlan.plan_id, proPlan.plan_name)}
+                disabled={currentPlan === "pro" || loading || updatingPlanId === proPlan?.plan_id}
                 className={`w-full py-3 px-6 rounded-xl font-semibold transition-all duration-200 ${
                   currentPlan === "pro"
                     ? "bg-white/20 text-white/70 cursor-not-allowed"
-                    : "bg-white text-[#1A381D] hover:bg-gray-100 shadow-lg cursor-pointer"
+                    : "bg-white text-[#1A381D] hover:bg-gray-100 shadow-lg cursor-pointer disabled:opacity-50"
                 }`}
               >
-                {currentPlan === "pro" ? "Current Plan" : "Upgrade to Pro"}
+                {updatingPlanId === proPlan?.plan_id
+                  ? "Updating..."
+                  : currentPlan === "pro"
+                  ? "Current Plan"
+                  : "Upgrade to Pro"}
               </button>
             </div>
           </div>
