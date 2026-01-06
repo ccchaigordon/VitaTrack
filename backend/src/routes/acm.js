@@ -46,6 +46,9 @@ router.post("/chat", upload.any(), async (req, res) => {
 
   console.log("final chat id at start:", finalChatId);
 
+  const date = new Date();
+  date.setHours(date.getHours() + 8);
+
   // Create chat if new
   if (!finalChatId) {
     const { data: chat, error } = await supabase
@@ -53,8 +56,8 @@ router.post("/chat", upload.any(), async (req, res) => {
       .insert({
         user_id: user.id,
         title: message.slice(0, 30) || "New chat",
-        created_at: new Date(),
-        updated_at: new Date()
+        created_at: date,
+        updated_at: date
       })
       .select()
       .single();
@@ -80,7 +83,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   if (chatData.title === "New chat") {
     const { error: updateError } = await supabase
       .from("chats")
-      .update({ title: message, updated_at: new Date() })
+      .update({ title: message, updated_at: date })
       .eq("chat_id", finalChatId)
       .select()
       .single();
@@ -97,7 +100,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     .insert({
       chat_id: finalChatId,
       role: "user",
-      message
+      message,
+      created_at: date
     })
     .select()
     .single();
@@ -144,13 +148,16 @@ router.post("/chat", upload.any(), async (req, res) => {
 
       if (signedUrlError) throw signedUrlError;
 
+      const date = new Date();
+      date.setHours(date.getHours() + 8);
+
       const { error: insertError } =
         await supabase.from("chat_files").insert({
           msg_id: finalMsgId,
           file_url: path,
           file_name: file.originalname,
           file_type: file.mimetype,
-          uploaded_at: new Date()
+          uploaded_at: date
         });
 
       if (insertError) {
@@ -267,6 +274,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     case 'Log this workout?':
       if (state.get('multimodalContext')?.workouts?.length > 0) {
         multimodalContext = state.get('multimodalContext');
+        console.log("Multimodal context in state for logging workout:", multimodalContext);
         intent = 'log_workout';
       } else {
         console.log("No workout available to log.");
@@ -291,11 +299,14 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -314,7 +325,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: null,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -358,12 +369,15 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
       log_data: userMealData,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -382,7 +396,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: null,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -407,11 +421,14 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -430,7 +447,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: null,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -471,12 +488,15 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const responseMessage = typeof response === 'string' ? response : response.reply || JSON.stringify(response);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
       log_data: userWorkoutData,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -495,7 +515,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: null,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -520,11 +540,14 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const responseMessage = typeof reply === 'string' ? reply : reply.reply || JSON.stringify(reply);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -543,7 +566,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -569,11 +592,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     
     const responseMessage = typeof reply === 'string' ? reply : reply.reply || JSON.stringify(reply);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: responseMessage,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -605,7 +631,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -633,11 +659,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to show more of. Please ask for a recommendation first.";
 
+      const date = new Date();
+      date.setHours(date.getHours() + 8);
+
       await supabase.from("chat_history").insert({
         chat_id: finalChatId,
         role: "ai",
         message: responseMessage,
-        created_at: new Date(),  
+        created_at: date,  
       });
 
       return res.json({ reply: responseMessage, choices: choices });
@@ -721,11 +750,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     
     const gResponse = await queryGemini(prompt);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: gResponse,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -743,7 +775,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -774,11 +806,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to show previous of. Please ask for a recommendation first.";
 
+      const date = new Date();
+      date.setHours(date.getHours() + 8);
+
       await supabase.from("chat_history").insert({
         chat_id: finalChatId,
         role: "ai",
         message: responseMessage,
-        created_at: new Date(),  
+        created_at: date,  
       });
 
       return res.json({ reply: responseMessage, choices: choices });
@@ -859,11 +894,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     
     const gResponse = await queryGemini(prompt);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: gResponse,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -881,7 +919,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -913,11 +951,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
       const responseMessage = "There is no recommendation to select. Please ask for a recommendation first.";
 
+      const date = new Date();
+      date.setHours(date.getHours() + 8);
+
       await supabase.from("chat_history").insert({
         chat_id: finalChatId,
         role: "ai",
         message: responseMessage,
-        created_at: new Date(),  
+        created_at: date,  
       });
 
       let stateObj = {};
@@ -936,7 +977,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -1006,11 +1047,14 @@ router.post("/chat", upload.any(), async (req, res) => {
     }
     const gResponse = await queryGemini(prompt);
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: gResponse,
-      created_at: new Date(),  
+      created_at: date,  
     });
     console.log('Gemini response for select recommendation:', gResponse);
 
@@ -1021,7 +1065,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       resource_id: resource_id,
       rec_text: gResponse,
       type: type,
-      created_at: new Date(),
+      created_at: date,
     });
 
     const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
@@ -1191,14 +1235,8 @@ router.post("/chat", upload.any(), async (req, res) => {
     if (newMeals.length > 0 || newWorkouts.length > 0) {
       multimodalContext = {
         ...multimodalContext,
-        meals: [
-          ...(multimodalContext.meals || []),
-          ...newMeals
-        ],
-        workouts: [
-          ...(multimodalContext.workouts || []),
-          ...newWorkouts
-        ]
+        meals: newMeals.length > 0 ? newMeals : [],
+        workouts: newWorkouts.length > 0 ? newWorkouts : []
       };
 
       let state = conversationState.get(user.id);
@@ -1273,11 +1311,14 @@ router.post("/chat", upload.any(), async (req, res) => {
       }
     }
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     await supabase.from("chat_history").insert({
       chat_id: finalChatId,
       role: "ai",
       message: reply,
-      created_at: new Date(),  
+      created_at: date,  
     });
 
     let stateObj = {};
@@ -1305,7 +1346,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       .update({
         multimodal_context: multimodalContext,
         conversation_state: stateObj,
-        updated_at: new Date()
+        updated_at: date
       })
       .eq("user_id", user.id)
       .eq("chat_id", finalChatId)
@@ -1359,7 +1400,7 @@ router.post("/chat", upload.any(), async (req, res) => {
     chat_id: finalChatId,
     role: "ai",
     message: gResponse,
-    created_at: new Date(),  
+    created_at: date,  
   });
 
   return res.json({ chat_id: finalChatId, reply: gResponse });
@@ -1369,13 +1410,16 @@ router.post("/newchat", async (req, res) => {
   const supabase = getRlsClient(req);
   const user = req.user;
 
+  const date = new Date();
+  date.setHours(date.getHours() + 8);
+
   const { data, error } = await supabase
     .from("chats")
     .insert({
       user_id: user.id,
       title: "New chat",
-      created_at: new Date(),
-      updated_at: new Date()
+      created_at: date,
+      updated_at: date
     })
     .select()
     .single();

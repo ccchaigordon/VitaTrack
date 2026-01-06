@@ -33,10 +33,17 @@ function isEmptyWorkout(workouts) {
 async function logWorkoutHandler(message, multimodalContext, conversationState, user_id, supabase) {
   try {
     let messageToReturn;
+    console.log("logWorkoutHandler called with message:", message);
 
-    const workoutData = multimodalContext
-      ? multimodalContext
-      : await extractWorkoutInfoFromMsg(message);
+   if (
+      multimodalContext &&
+      Array.isArray(multimodalContext) &&
+      multimodalContext.length > 0
+    ) {
+      workoutData = multimodalContext;
+    } else {
+      workoutData = await extractWorkoutInfoFromMsg(message);
+    }
 
     console.log("Workout extraction result:", workoutData);
 
@@ -85,6 +92,9 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       };
     }
 
+    const date = new Date();
+    date.setHours(date.getHours() + 8);
+
     for(const workout of workoutData) {
       const { data, error } = await supabase
         .from("workout_logs")
@@ -96,7 +106,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
           calories_burned: workout.calories_burned,
           source: workout.source || "ai assistant",
           user_id: user_id,
-          created_at: new Date()
+          created_at: date
         });
 
       if (error) {
