@@ -216,7 +216,6 @@ export default function ResourcesPage() {
             protein: recipe.protein,
             carbs: recipe.carbs,
             fat: recipe.fat,
-            category: recipe.dietary_tags?.join(", ") || "Recipe",
             content: recipe.procedure,
             cooking_time: recipe.cooking_time,
             ingredients: recipe.ingredients,
