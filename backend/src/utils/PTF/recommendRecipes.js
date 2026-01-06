@@ -294,7 +294,6 @@ async function recommendRecipes(user_id, supabase) {
     }
 
     const filteredMealsFromMealLogs = filterMealsByTime(meals, mealTime);
-    console.log("Filtered Meals from Logs:", filteredMealsFromMealLogs);
 
     const vectorsFromMealLogs = filteredMealsFromMealLogs.map(m => [
       m.calories,
@@ -343,7 +342,17 @@ async function recommendRecipes(user_id, supabase) {
       // goals
       .filter(meal => matchesGoals(meal, goalsArray));
 
-    console.log("Filtered Meals from Library:", filteredMealsFromMealLibrary);
+    if (filteredMealsFromMealLogs.length === 0) {
+      allmealsFromMealLibrary = filteredMealsFromMealLibrary;
+
+      // create default recommendations with similarity scores
+      const defaultRecommendations = filteredMealsFromMealLibrary.map(meal => ({
+        meal,
+        similarity: 1 // or whatever default you want
+      }));
+
+      return { recommendations: defaultRecommendations };
+    }
 
     const vectorsFromMealLibrary = filteredMealsFromMealLibrary.map(m => [    
       m.calories,

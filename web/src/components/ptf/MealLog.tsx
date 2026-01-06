@@ -50,10 +50,6 @@ return (
         </thead>
         <tbody className="divide-y divide-gray-100">
           {logs.map((log, index) => {
-            const dateLabel = new Date(log.created_at).toLocaleDateString('en-GB', {
-              day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit'
-            });
-
             return (
               <tr key={index} className="hover:bg-gray-50 transition-colors">
 
@@ -63,7 +59,15 @@ return (
 
                 {/* Date */}
                 <td className="py-3 px-4 text-sm text-gray-500 whitespace-nowrap">
-                  {dateLabel}
+                  {new Date(log.created_at).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: 'UTC', 
+                  }).replace(',', '')}
                 </td>
                 
                 {/* Meal Time */}

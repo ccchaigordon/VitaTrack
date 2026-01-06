@@ -1,13 +1,24 @@
 const supabase = require('./supabaseClient'); 
 
-async function sendNotification(userId, type, message, link = null) {
+function now_MY() {
+  const d = new Date(Date.now() + 8 * 60 * 60 * 1000);
+  return d;
+}
+
+async function sendNotification(userId, type, message, link = null, dedupeKey = null) {
 try {
-  const { error } = await supabase.from('notifications').insert({
-    user_id: userId,
-    type: type,
-    message: message,
-    action_link: link
-  });
+  const payload = {
+      user_id: userId,
+      type,
+      message,
+      action_link: link,
+      dedupe_key: dedupeKey,
+      created_at: now_MY(),
+    };
+
+  const { error } = dedupeKey
+      ? await supabase.from('notifications').upsert(payload, { onConflict: 'dedupe_key', ignoreDuplicates: true })
+      : await supabase.from('notifications').insert(payload);
 
   if (error) {
     console.error("Failed to create notification:", error.message);

@@ -1,47 +1,62 @@
 const cron = require('node-cron');
-const supabase = require('../services/supabaseClient'); 
+const supabase = require('../services/supabaseClient');
 const { sendNotification } = require('../services/notificationClient');
 
 const TZ = 'Asia/Kuala_Lumpur';
 
+if (process.env.ENABLE_CRON !== 'true') {
+  console.log('[MealReminder] CRON disabled (ENABLE_CRON!=true). pid=', process.pid);
+  return;
+}
+
+if (global.__meal_reminder_cron_started) {
+  console.log('[MealReminder] Cron already started, skipping. pid=', process.pid);
+  return;
+}
+global.__meal_reminder_cron_started = true;
+
+function mytDateKey(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); 
+}
+
+function mytToUtcIso(dateKey, hour, min = 0, sec = 0, ms = 0) {
+  const [yy, mm, dd] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(yy, mm - 1, dd, hour - 8, min, sec, ms)).toISOString();
+}
+
 const MEAL_SCHEDULES = [
-  { 
-    name: 'Breakfast', 
-    windowStart: 7,  // 7:00 AM
-    windowEnd: 11,   // 11:00 AM
-  },
-  { 
-    name: 'Lunch', 
-    windowStart: 11, // 11:00 AM
-    windowEnd: 16,   // 4:00 PM
-  },
-  { 
-    name: 'Dinner', 
-    windowStart: 17, // 5:00 PM
-    windowEnd: 22,   // 10:00 PM
-  }
+  { name: 'Breakfast', windowStart: 7,  windowEnd: 11, triggerHour: 10 },
+  { name: 'Lunch',     windowStart: 11, windowEnd: 16, triggerHour: 15 },
+  { name: 'Dinner',    windowStart: 17, windowEnd: 22, triggerHour: 21 },
 ];
 
-function buildWindow(schedule) {
-  const start = new Date();
-  start.setHours(schedule.windowStart, 0, 0, 0);
-  const end = new Date();
-  end.setHours(schedule.windowEnd, 0, 0, 0);
-  return { startIso: start.toISOString(), endIso: end.toISOString() };
+function buildWindowIso(schedule) {
+  const dateKey = mytDateKey();
+  return {
+    dateKey,
+    startIso: mytToUtcIso(dateKey, schedule.windowStart, 0, 0, 0),
+    endIso: mytToUtcIso(dateKey, schedule.windowEnd, 0, 0, 0),
+  };
 }
 
 async function runMeal(schedule) {
-  console.log(`[MealReminder] ${schedule.name} pid=${process.pid} now=${new Date().toString()}`);
+  const now = new Date();
+  console.log(`[MealReminder] ${schedule.name} pid=${process.pid} now=${now.toString()} iso=${now.toISOString()}`);
 
-  const { startIso, endIso } = buildWindow(schedule);
+  const { dateKey, startIso, endIso } = buildWindowIso(schedule);
 
-  const { data: users, error } = await supabase
-  .from('users').
-  select('user_id');
+  const { data: users, error } = await supabase.from('users').select('user_id');
   if (error || !users) {
-    console.error("Error fetching users for reminder:", error);
+    console.error('[MealReminder] Error fetching users:', error);
     return;
   }
+
+  const mealKey = schedule.name.toLowerCase();
 
   for (const u of users) {
     const { count, error: cErr } = await supabase
@@ -50,26 +65,30 @@ async function runMeal(schedule) {
       .eq('user_id', u.user_id)
       .gte('created_at', startIso)
       .lt('created_at', endIso);
-      
-    console.log(`User ${u.user_id} has ${count} meal logs for ${schedule.name} window.`);
 
     if (cErr) {
-      console.log("Error fetching meal logs for user:", u.user_id, cErr);
+      console.error('[MealReminder] Error counting meal logs:', { user: u.user_id, cErr });
       continue;
     }
 
     if ((count ?? 0) === 0) {
+      const dedupeKey = `meal:${mealKey}:${dateKey}:${u.user_id}`;
+
       await sendNotification(
         u.user_id,
         'reminder',
         `Don't forget to log your ${schedule.name}!`,
-        '/chatbot'
+        '/chatbot',
+        dedupeKey
       );
-      console.log(`Sent ${schedule.name} reminder to ${u.user_id}`);
+
+      console.log(`[MealReminder] Sent ${schedule.name} reminder to ${u.user_id} dedupeKey=${dedupeKey}`);
     }
   }
 }
 
-cron.schedule('0 10 * * *', () => runMeal(MEAL_SCHEDULES[0]), { timezone: TZ }); // Breakfast
-cron.schedule('0 15 * * *', () => runMeal(MEAL_SCHEDULES[1]), { timezone: TZ }); // Lunch
-cron.schedule('0 21 * * *', () => runMeal(MEAL_SCHEDULES[2]), { timezone: TZ }); // Dinner
+for (const s of MEAL_SCHEDULES) {
+  cron.schedule(`0 ${s.triggerHour} * * *`, () => runMeal(s), { timezone: TZ });
+}
+
+console.log('[MealReminder] Cron registered (Breakfast/Lunch/Dinner). pid=', process.pid);

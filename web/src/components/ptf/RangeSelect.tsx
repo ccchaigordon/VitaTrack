@@ -38,12 +38,12 @@ return (
     {isOpen && (
       <>
         <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-        <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-100 py-1 z-20 overflow-hidden">
+        <div className="absolute right-0 mt-2 w-40 bg-white rounded-xl shadow-xl border border-gray-100 z-[100] overflow-hidden">
           {options.map((opt) => (
             <button
               key={String(opt.value)}
               onClick={() => handleSelect(opt)}
-              className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors hover:bg-green-50 hover:text-green-700
+              className={`w-full text-left px-4 py-2 text-xs font-medium transition-colors hover:bg-green-50 hover:text-green-700 cursor-pointer
                 ${opt.value === value ? "bg-green-50 text-green-800" : "text-gray-600"}`}
             >
               {opt.label}

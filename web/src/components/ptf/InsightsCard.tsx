@@ -4,6 +4,7 @@ type InsightResponse = {
   summary: string[] | string;
   nextFocus?: string | null;
   isFallback: boolean;
+  isEmpty?: boolean;
 };
 
 interface Props {
@@ -36,7 +37,7 @@ export function InsightsCard ({ insight }: Props) {
               ))
             ) : (
               <li className="text-sm text-gray-400 italic">
-                No insights available yet.
+                Log your meals and workouts to receive personalized AI insights.
               </li>
             )}
           </ul>

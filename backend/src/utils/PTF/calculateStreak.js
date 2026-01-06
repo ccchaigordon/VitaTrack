@@ -1,28 +1,36 @@
 async function calculateStreak(userId, supabase) {
-  const today = new Date();
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - 30); 
 
+  function toDateOnlyMY(date) {
+    return date.toLocaleDateString('en-CA'); 
+  }
+
+  const today = new Date();
+  today.setHours(today.getHours() + 8);
+  const pastDate = new Date(today);
+  pastDate.setDate(pastDate.getDate() - 30);
+
+  const today_MY = toDateOnlyMY(today);
+  const pastDate_MY = toDateOnlyMY(pastDate);
+ 
   const { data: workoutData, error } = await supabase
     .from('daily_metrics')
     .select('created_at, workout_completed')
     .eq('user_id', userId)
-    .gte('created_at', pastDate.toISOString())
-    .lte('created_at', today.toISOString());
+    .gte('created_at', pastDate_MY)
+    .lte('created_at', today_MY);
 
   if (error) throw error;
 
   const activeDates = new Set();
   workoutData.forEach(item => {
-    if (item.workout_completed > 0) {
-      const d = new Date(item.created_at);
-      const key = d.toLocaleDateString('en-CA'); 
-      activeDates.add(key);
+    if (item.workout_completed > 0 && item.created_at) {
+      activeDates.add(item.created_at);
     }
   });
 
   let streak = 0;
   let checkDate = new Date(); 
+  checkDate.setHours(checkDate.getHours() + 8);
 
   const todayKey = checkDate.toLocaleDateString('en-CA');
   const yesterdayDate = new Date(checkDate);
