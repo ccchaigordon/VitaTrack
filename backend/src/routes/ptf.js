@@ -25,7 +25,7 @@ async function fetchMetricsData(userId, startDate, endDate, supabase) {
 }
 
 function toDateOnlyMY(date) {
-  return date.toLocaleDateString('en-CA'); 
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); 
 }
 
 async function extractUserGoal(userId, supabase) {
@@ -41,10 +41,15 @@ async function extractUserGoal(userId, supabase) {
       return null;
     } 
 
-    const goalText = userProfile.goals;
+    let goalText = userProfile.goals;
+    if (typeof goalText === 'object') {
+      goalText = JSON.stringify(goalText);
+    }
+
+    console.log("Sending to Gemini:", goalText);
 
     const prompt = `
-      Analyze this user's fitness goal text: "${goalText}".
+      Analyze this user's fitness goal text: ${JSON.stringify(goalText)}.
       Determine if the user explicitly specified a numeric goal for "calories to be burned" or "active calories" (e.g., "burn 500 kcal daily", "burn 300 calories").
       
       Rules:
@@ -77,31 +82,43 @@ async function extractUserGoal(userId, supabase) {
   }
 }
 
+function todayMYDateOnly() {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kuala_Lumpur',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}
+
+function addDaysMY(dateOnly, deltaDays) {
+  const d = new Date(`${dateOnly}T00:00:00+08:00`);
+  d.setDate(d.getDate() + deltaDays);
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kuala_Lumpur',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(d);
+}
+
 // Endpoint 1: Macros Card
 router.get('/ptf/macros', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
   const days = req.query.days || 7;
-
   const range = Number(days);
-  const today = new Date();
-  today.setHours(today.getHours() + 8);
-  console.log('today', today);
-  
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - (range - 1));
-  
-  const prevPastDate = new Date(pastDate);
-  prevPastDate.setDate(prevPastDate.getDate() - range);
 
-  const today_MY = toDateOnlyMY(today);
-  const prevPastDate_MY = toDateOnlyMY(prevPastDate);
+  const today = todayMYDateOnly();
+  const startCurrent_MY = addDaysMY(today, -(range - 1));
+  const startPrev_MY = addDaysMY(startCurrent_MY, -range);
+  const end_MY = today;
 
   try {
-    const rawData = await fetchMetricsData(user_id, prevPastDate_MY, today_MY, supabase);
+    const rawData = await fetchMetricsData(user_id, startPrev_MY, end_MY, supabase);
 
-    const currentPeriod = rawData.filter(d => new Date(d.created_at) >= pastDate);
-    const prevPeriod = rawData.filter(d => new Date(d.created_at) < pastDate);
+    const currentPeriod = rawData.filter(d => d.created_at >= startCurrent_MY);
+    const prevPeriod = rawData.filter(d => d.created_at < startCurrent_MY);
 
     const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
     const calcTotals = arr => ({
@@ -145,8 +162,6 @@ router.get('/ptf/calories', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
   const days = req.query.days || 7;
-  console.log("user_id:", user_id, typeof user_id);
-  console.log("days:", days, typeof days);
 
   const weekOffset = (Number(days) / 7) - 1; // Convert days to week offset
   const today = new Date();
@@ -210,16 +225,12 @@ router.get('/ptf/workout', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
   const days = 14;
-  const today = new Date();
-  today.setHours(today.getHours() + 8);
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - (days - 1));
-
-  const pastDate_MY = toDateOnlyMY(pastDate);
-  const today_MY = toDateOnlyMY(today);
+  
+  const today = todayMYDateOnly();
+  const pastDate = addDaysMY(today, -(days - 1));
 
   try {
-    const workoutData = await fetchMetricsData(user_id, pastDate_MY, today_MY, supabase);
+    const workoutData = await fetchMetricsData(user_id, pastDate, today, supabase);
 
     const dataMap = {};
       workoutData.forEach(item => {
@@ -227,15 +238,12 @@ router.get('/ptf/workout', async (req, res) => {
         const dateKey = item.created_at;
         dataMap[dateKey] = item.workout_completed ?? 0;
       });
-
     const history = []; // Build 14-Day Series
     
     for (let i = 0; i < days; i++) {
-      const d = new Date(pastDate);
-      d.setDate(d.getDate() + i);
+      const dateKey = addDaysMY(pastDate, i);
       
-      const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      
+      const d = new Date(`${dateKey}T00:00:00+08:00`);
       const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 
       history.push({
@@ -250,7 +258,7 @@ router.get('/ptf/workout', async (req, res) => {
     return res.status(500).json({ error: err.message });
 }});
 
-  // Endpoint 4: Streak Days Card
+// Endpoint 4: Streak Days Card
 router.get('/ptf/streak', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
@@ -268,28 +276,25 @@ router.get('/ptf/insights', async (req, res) => {
   const supabase = getRlsClient(req);
   const user_id = req.user?.id || req.user?.user_id;
 
-  const today = new Date();
-  today.setHours(today.getHours() + 8);
+  const now = new Date();
+  const mytDateString = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kuala_Lumpur' }); 
+  const today = new Date(`${mytDateString}T00:00:00`);
   const currentDay = today.getDay(); 
   const diffToMonday = currentDay === 0 ? 6 : currentDay - 1;
 
   const currentMonday = new Date(today);
   currentMonday.setDate(today.getDate() - diffToMonday);
-  currentMonday.setHours(0, 0, 0, 0);
 
   // Date range for THIS week: current Mon ~ today
   const thisWeekStart = new Date(currentMonday);
   const thisWeekEnd = new Date(today);
-  thisWeekEnd.setHours(23, 59, 59, 999);
 
   // Date range for LAST week: previous Mon ~ previous Sun
   const lastWeekStart = new Date(currentMonday);
   lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-  lastWeekStart.setHours(0, 0, 0, 0);
 
   const lastWeekEnd = new Date(currentMonday);
   lastWeekEnd.setDate(lastWeekEnd.getDate() - 1); // Sunday before currentMonday
-  lastWeekEnd.setHours(23, 59, 59, 999);
 
   const lastWeekStart_MY = toDateOnlyMY(lastWeekStart);
   const lastWeekEnd_MY = toDateOnlyMY(lastWeekEnd);
@@ -324,6 +329,7 @@ router.get('/ptf/insights', async (req, res) => {
     const totalBurnedThisWeek = thisWeekTotals.calories_burned;
     const totalBurnedLastWeek = lastWeekTotals.calories_burned;
     const deltaBurned = calcDeltaPct(totalBurnedThisWeek, totalBurnedLastWeek);
+    console.log("Total Burned This Week:", totalBurnedThisWeek, "Last Week:", totalBurnedLastWeek, "Delta %:", deltaBurned);
 
     const macroDeltas = [
       {

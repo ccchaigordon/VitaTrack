@@ -24,9 +24,9 @@ function mytDateKey(now = new Date()) {
   }).format(now); 
 }
 
-function mytToUtcIso(dateKey, hour, min = 0, sec = 0, ms = 0) {
+function myt(dateKey, hour, min = 0, sec = 0, ms = 0) {
   const [yy, mm, dd] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(yy, mm - 1, dd, hour - 8, min, sec, ms)).toISOString();
+  return new Date(Date.UTC(yy, mm - 1, dd, hour, min, sec, ms)).toISOString();
 }
 
 function addDaysDateKey(dateKey, days) {
@@ -42,8 +42,8 @@ function buildMytDayWindowIso() {
 
   return {
     dateKey,
-    startIso: mytToUtcIso(dateKey, 0, 0, 0, 0),
-    endIso: mytToUtcIso(nextDateKey, 0, 0, 0, 0),
+    startIso: myt(dateKey, 0, 0, 0, 0),
+    endIso: myt(nextDateKey, 0, 0, 0, 0),
   };
 }
 
@@ -60,17 +60,15 @@ async function runWorkoutReminder() {
   }
 
   for (const u of users) {
-    const startIso_MY = new Date(new Date(startIso).getTime() + 8 * 60 * 60 * 1000).toISOString();
-    const endIso_MY = new Date(new Date(endIso).getTime() + 8 * 60 * 60 * 1000).toISOString();
 
     const { data: rows, error: mErr } = await supabase
       .from('daily_metrics')
       .select('workout_completed')
       .eq('user_id', u.user_id)
-      .gte('created_at', startIso_MY)
-      .lt('created_at', endIso_MY);
+      .gte('created_at', startIso)
+      .lt('created_at', endIso);
 
-      console.log('[WorkoutReminder] daily_metrics query result:', { user: u.user_id, rows, mErr, startIso_MY, endIso_MY });
+      console.log('[WorkoutReminder] daily_metrics query result:', { user: u.user_id, rows, mErr, startIso, endIso });
 
     if (mErr) {
       console.error('[WorkoutReminder] daily_metrics query error:', { user: u.user_id, mErr, startIso, endIso });

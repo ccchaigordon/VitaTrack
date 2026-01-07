@@ -1,23 +1,35 @@
 async function calculateStreak(userId, supabase) {
 
-  function toDateOnlyMY(date) {
-    return date.toLocaleDateString('en-CA'); 
+  function todayMYDateOnly() {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kuala_Lumpur',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(new Date());
   }
 
-  const today = new Date();
-  today.setHours(today.getHours() + 8);
-  const pastDate = new Date(today);
-  pastDate.setDate(pastDate.getDate() - 30);
+  function addDaysMY(dateOnly, deltaDays) {
+    const d = new Date(`${dateOnly}T00:00:00+08:00`);
+    d.setDate(d.getDate() + deltaDays);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Kuala_Lumpur',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  }
 
-  const today_MY = toDateOnlyMY(today);
-  const pastDate_MY = toDateOnlyMY(pastDate);
+  const today = todayMYDateOnly();
+  const pastDate = addDaysMY(today, -30);
+  console.log("Date range:", pastDate, "to", today);
  
   const { data: workoutData, error } = await supabase
     .from('daily_metrics')
     .select('created_at, workout_completed')
     .eq('user_id', userId)
-    .gte('created_at', pastDate_MY)
-    .lte('created_at', today_MY);
+    .gte('created_at', pastDate)
+    .lte('created_at', today);
 
   if (error) throw error;
 
@@ -29,26 +41,20 @@ async function calculateStreak(userId, supabase) {
   });
 
   let streak = 0;
-  let checkDate = new Date(); 
-  checkDate.setHours(checkDate.getHours() + 8);
+  let checkDate = today;
+  const yesterday = addDaysMY(today, -1);
 
-  const todayKey = checkDate.toLocaleDateString('en-CA');
-  const yesterdayDate = new Date(checkDate);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayKey = yesterdayDate.toLocaleDateString('en-CA');
-
-  if (activeDates.has(todayKey)) {
-  } else if (activeDates.has(yesterdayKey)) {
-     checkDate.setDate(checkDate.getDate() - 1);
+  if (activeDates.has(checkDate)) {
+  } else if (activeDates.has(yesterday)) {
+     checkDate = yesterday;
   } else {
      return 0;
   }
 
   while (true) {
-    const key = checkDate.toLocaleDateString('en-CA');
-    if (activeDates.has(key)) {
+    if (activeDates.has(checkDate)) {
       streak++;
-      checkDate.setDate(checkDate.getDate() - 1);
+      checkDate = addDaysMY(checkDate, -1);
     } else {
       break;
     }

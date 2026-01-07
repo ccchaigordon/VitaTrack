@@ -24,9 +24,9 @@ function mytDateKey(now = new Date()) {
   }).format(now); 
 }
 
-function mytToUtcIso(dateKey, hour, min = 0, sec = 0, ms = 0) {
+function myt(dateKey, hour, min = 0, sec = 0, ms = 0) {
   const [yy, mm, dd] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(yy, mm - 1, dd, hour - 8, min, sec, ms)).toISOString();
+  return new Date(Date.UTC(yy, mm - 1, dd, hour, min, sec, ms)).toISOString();
 }
 
 const MEAL_SCHEDULES = [
@@ -39,8 +39,8 @@ function buildWindowIso(schedule) {
   const dateKey = mytDateKey();
   return {
     dateKey,
-    startIso: mytToUtcIso(dateKey, schedule.windowStart, 0, 0, 0),
-    endIso: mytToUtcIso(dateKey, schedule.windowEnd, 0, 0, 0),
+    startIso: myt(dateKey, schedule.windowStart, 0, 0, 0),
+    endIso: myt(dateKey, schedule.windowEnd, 0, 0, 0),
   };
 }
 
@@ -65,6 +65,8 @@ async function runMeal(schedule) {
       .eq('user_id', u.user_id)
       .gte('created_at', startIso)
       .lt('created_at', endIso);
+
+      console.log(`[MealReminder] Checked meal logs for user=${u.user_id} meal=${schedule.name} start=${startIso} end=${endIso} count=${count}`);
 
     if (cErr) {
       console.error('[MealReminder] Error counting meal logs:', { user: u.user_id, cErr });
