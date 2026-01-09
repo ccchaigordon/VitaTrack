@@ -4,6 +4,7 @@ const { queryGemini } = require('../services/geminiClient');
 const recommendWellness = require('../utils/PTF/recommendWellness');
 const recommendRecipes = require('../utils/PTF/recommendRecipes');
 const calculateStreak = require('../utils/PTF/calculateStreak'); 
+const { add } = require('@tensorflow/tfjs');
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -627,15 +628,14 @@ router.get('/ptf/today', async (req, res) => {
   const user_id = req.user?.id || req.user?.user_id;
 
   try {
-    const today = new Date();
-    today.setHours(today.getHours() + 8);
-    const startOfToday = new Date(today);
-    startOfToday.setHours(0, 0, 0, 0);
-    
-    const endOfToday = new Date(today);
-    endOfToday.setHours(23, 59, 59, 999);
+    const today = todayMYDateOnly();
+    const startOfToday = today;
+    const endOfToday = addDaysMY(today, 1);
+
+    console.log("Fetching today's metrics for user:", user_id, "from", startOfToday, "to", endOfToday);
 
     const todayData = await fetchMetricsData(user_id, startOfToday, endOfToday, supabase);
+    console.log("Today's Data:", todayData);
 
     const sum = (arr, field) => arr.reduce((acc, curr) => acc + (curr[field] || 0), 0);
     

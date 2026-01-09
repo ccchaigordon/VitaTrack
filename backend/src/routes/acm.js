@@ -1080,6 +1080,15 @@ router.post("/chat", upload.any(), async (req, res) => {
   if (intent === 'chat') {
     console.log('Querying Gemini for message:', message);
     
+    const now = new Date();
+
+    const currentTime = `
+    Current system time:
+    - ISO: ${now.toISOString()}
+    - Local: ${now.toLocaleString('en-MY', { timeZone: 'Asia/Kuala_Lumpur' })}
+    - Timezone: Asia/Kuala_Lumpur (UTC+8)
+    `;
+
     let prompt = `You are a friendly wellness assistant for VitaTrack, a fitness and nutrition tracking app.
 
     Your role:
@@ -1103,6 +1112,9 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     User goal:
     "${goal || 'Not specified'}"
+
+    Current time:
+    ${currentTime}
 
     If contextual data from uploaded files is provided, use it as the primary source of truth for nutrition or workout analysis. Do NOT guess nutrition or workout details beyond the provided context. MENTION based on the uploaded files.
 
@@ -1149,7 +1161,7 @@ router.post("/chat", upload.any(), async (req, res) => {
       You are explicitly ALLOWED to infer typical values based on common fitness standards.
       This is NOT considered guessing.
     
-    If nutrition details are mentioned in user message, include your analysis of the nutrition details in the meal_analysis array. Include all items, with reasonable estimates if exact values are unknown.
+    If nutrition details are mentioned in user message, include your analysis of the nutrition details in the meal_analysis array. Include all items, with reasonable estimates if exact values are unknown. If NO meal time is mentioned, infer based on ${currentTime}.
     If workout or exercise details are mentioned in user message, include your analysis of the workout details in the workout_analysis array. Include all exercises, with reasonable estimates if exact values are unknown.
 
     If NO workout is mentioned at all, return an empty workout_analysis array.
