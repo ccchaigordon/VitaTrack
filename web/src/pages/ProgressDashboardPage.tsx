@@ -482,11 +482,13 @@ export function ProgressDashboardPage() {
       setLoadingCalories(true);
       setCaloriesError(false);
       try {
-        const caloriesData = await apiFetch<CaloriesResponse>(`/ptf/calories?days=${caloriesRange}`);
+        const currentGoal = metrics.goals.calorieGoal;
+        const shouldFetchGoal = currentGoal === null || currentGoal === 0;
+        const caloriesData = await apiFetch<CaloriesResponse>(`/ptf/calories?days=${caloriesRange}&include_goal=${shouldFetchGoal}`);
         setMetrics(prev => ({ 
           ...prev, 
           caloriesActivity: caloriesData.history,
-          goals: { ...prev.goals, calorieGoal: caloriesData.goal }
+          goals: { ...prev.goals, calorieGoal: caloriesData.goal !== null ? caloriesData.goal : prev.goals.calorieGoal }
         }));
       } catch (err) { 
         console.error(err); 

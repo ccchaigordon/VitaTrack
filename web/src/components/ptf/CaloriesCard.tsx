@@ -29,6 +29,7 @@ export function CaloriesCard ({ data, goal, rangeValue, onRangeChange }: Props) 
   const currentGoal = goal || 0;
   const remaining = Math.max(0, currentGoal - totalBurned);
   const isGoalMet = hasGoal && remaining === 0;
+  const isCurrentWeek = rangeValue === 7;
 
   const chartData = data.map(d => ({
     label: d.dayName,
@@ -38,79 +39,106 @@ export function CaloriesCard ({ data, goal, rangeValue, onRangeChange }: Props) 
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-200 h-full">
-      <div className="flex justify-between items-end mb-4">
+      <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-left text-xl font-bold text-gray-800">Calories Activities</h3>
-          {/* CASE 1: NO GOAL SET */}
-          {!hasGoal && (
+          
+          {!isCurrentWeek && (
+             <div className="flex flex-col items-start gap-1 mt-2">
+               <div className="flex items-center gap-2">
+                 <span className="text-2xl font-bold text-gray-900">
+                    {totalBurned.toLocaleString()}
+                 </span>
+                 <span className="text-sm text-gray-400 font-medium">kcal burned</span>
+               </div>
+               {hasGoal && (
+                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                   totalBurned >= currentGoal 
+                     ? "bg-green-100 text-green-700" 
+                     : "bg-gray-100 text-gray-500"
+                 }`}>
+                   {totalBurned >= currentGoal ? "Goal met 🎉" : "Goal missed"}
+                 </span>
+               )}
+             </div>
+          )}
+
+          {isCurrentWeek && (
             <>
-              <div className="flex items-center gap-2 my-1">
-                <span className="text-2xl font-bold text-gray-900">0</span>
-                <span className="text-sm text-gray-400 font-medium">kcal left</span>
-              </div>
-              <div>
-                 <button
-                    onClick={() => navigate('/profile/edit')}
-                    className="bg-orange-100 hover:bg-orange-200 text-orange-600 font-medium py-1 px-3 rounded-full text-xs transition-colors flex items-center gap-1 cursor-pointer"
-                  >
-                    Set goal ✏️
+              {/* Case A: No Goal */}
+              {!hasGoal && (
+                <>
+                  <div className="flex items-center gap-2 my-1">
+                    <span className="text-2xl font-bold text-gray-900">0</span>
+                    <span className="text-sm text-gray-400 font-medium">kcal left</span>
+                  </div>
+                  <button
+                      onClick={() => navigate('/profile/edit')}
+                      className="bg-orange-100 hover:bg-orange-200 text-orange-600 font-medium py-1 px-3 rounded-full text-xs transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      Set goal ✏️
                   </button>
-              </div>
-            </>
-          )}
+                </>
+              )}
 
-          {/* CASE 2: GOAL EXISTS, IN PROGRESS */}
-          {hasGoal && !isGoalMet && (
-            <>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-gray-900">{remaining.toLocaleString()}</span>
-                <span className="text-sm text-gray-400 font-medium">kcal left</span>
-              </div>
-              <div className="flex flex-row items-center gap-2 mb-2">
-                <span className="text-sm text-gray-500 font-medium">
-                  Goal: {currentGoal.toLocaleString()} kcal / week
-                </span>
-                <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium text-sm">
-                  Burned so far: {totalBurned.toLocaleString()} kcal
-                </span>
-              </div>
-            </>
-          )}
+              {/* Case B: In Progress */}
+              {hasGoal && !isGoalMet && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-gray-900">{remaining.toLocaleString()}</span>
+                    <span className="text-sm text-gray-400 font-medium">kcal left</span>
+                  </div>
+                  <div className="flex flex-col items-start gap-2 mb-2">
+                    <span className="text-sm text-gray-500 font-medium">
+                      Goal: {currentGoal.toLocaleString()} kcal / week
+                    </span>
+                    <span className="bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium text-sm">
+                      Burned so far: {totalBurned.toLocaleString()} kcal
+                    </span>
+                  </div>
+                </>
+              )}
 
-          {/* CASE 3: GOAL REACHED */}
-          {hasGoal && isGoalMet && (
-            <>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-bold text-gray-900">0</span>
-                <span className="text-sm text-gray-400 font-medium">kcal left</span>
-              </div>
-                <div className="flex flex-row gap-2 mb-2">
-                <span className="text-sm text-gray-400  flex items-center gap-1">
-                  Goal met! {currentGoal.toLocaleString()} kcal burned this week🎉
-                </span>
-                <button
-                   onClick={() => navigate('/profile/edit')}
-                   className="bg-[#CDEE6E] hover:bg-[#bfe05e] text-black text-xs px-3 py-1 rounded-full font-medium transition-colors flex items-center gap-1 cursor-pointer w-fit"
-                >
-                  Set new goal✏️
-                </button>
-              </div>
+              {/* Case C: Goal Met */}
+              {hasGoal && isGoalMet && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-gray-900">0</span>
+                    <span className="text-sm text-gray-400 font-medium">kcal left</span>
+                  </div>
+                  <div className="flex flex-col items-start gap-2 mb-2">
+                    <span className="text-sm text-gray-400 flex items-center gap-1">
+                      Goal met! {totalBurned.toLocaleString()} kcal burned this week🎉
+                    </span>
+                    <button
+                      onClick={() => navigate('/profile/edit')}
+                      className="bg-[#CDEE6E] hover:bg-[#bfe05e] text-black text-xs px-3 py-1 rounded-full font-medium transition-colors flex items-center gap-1 cursor-pointer w-fit"
+                    >
+                      Set new goal✏️
+                    </button>
+                  </div>
+                </>
+              )}
             </>
           )}
         </div>
 
-      <div className="flex flex-col gap-1 text-[12px] text-gray-400 mr-2">
-        <div className="mb-4">
-        <RangeSelect
-          value={rangeValue}
-          options={caloriesOptions}
-          onChange={onRangeChange}
-        />
+        <div className="flex flex-col gap-1 text-[12px] text-gray-400 mr-2">
+          <div className="mb-4">
+            <RangeSelect
+              value={rangeValue}
+              options={caloriesOptions}
+              onChange={onRangeChange}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+             <div className="w-3 h-3 rounded-full bg-[#FCD34D]"></div> Consumed
+          </div>
+          <div className="flex items-center gap-2">
+             <div className="w-3 h-3 rounded-full bg-[#FB923C]"></div> Burned
+          </div>
         </div>
-        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#FCD34D]"></div> Consumed</div>
-        <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-[#FB923C]"></div> Burned</div>
       </div>
-    </div>
       <BarChart data={chartData} />
     </div>
   );
