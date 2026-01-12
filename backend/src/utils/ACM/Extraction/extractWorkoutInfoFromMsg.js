@@ -26,11 +26,11 @@ async function extractWorkoutInfoFromMsg(message) {
         - If calories are explicitly stated, use that value.
         - If a sport or cardio activity has a valid duration but calories are given as 0, ignore the stated value and estimate calories. Tell the user that you have estimated the calories based on duration.
         - If calories are not stated:
-        - Estimate calories ONLY if duration is provided.
+        - Estimate calories ONLY if duration is provided or if sets or reps is provided.
         - Use reasonable average values for a typical adult.
-        - Sports and cardio activities MUST have estimated calories only if duration exists.
+        - Sports and cardio activities MUST have estimated calories only if duration exists. HOWEVER, For calisthenics (e.g. jumping jacks, burpees, mountain climbers, etc.), if reps or sets are provided but duration is missing, estimate calories based on average time per rep or per set.
         - Calories_burned must NEVER be null if duration is available.
-        - Do NOT guess or invent duration. If duration is missing, set "duration": null and "calories_burned": 0.
+        - Do NOT guess or invent duration. If duration is missing, set "duration": null and "calories_burned": 0. (except for calisthenics as mentioned above).
 
         Other rules:
         - For sports or cardio activities, sets and reps are usually null.

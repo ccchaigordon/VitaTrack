@@ -17,12 +17,17 @@ let conversationState = new Map();
 let multimodalContext = null;
 
 function hasRecommendations(state) {
+  const rec = state.get("recommended");
+
   return (
     state instanceof Map &&
-    Array.isArray(state.get("recommended")) &&
-    state.get("recommended").length > 0
+    (
+      (Array.isArray(rec) && rec.length > 0) ||
+      (!Array.isArray(rec) && rec != null)
+    )
   );
 }
+
 
 function getRlsClient(req) {
   console.log('Creating RLS client with access token:', req.user.accessToken);
@@ -946,6 +951,7 @@ router.post("/chat", upload.any(), async (req, res) => {
   if (intent === "select_recommendation") {
     const state = conversationState.get(user.id);
     console.log("State at select recommendation:", state);
+    console.log("hasRecommendation?", hasRecommendations(state));
 
     if (!hasRecommendations(state)) {
       const choices = ["Log meal", "View meals log", "Log workout", "View workouts log", "Meal recommendation", "Workout recommendation"];
@@ -996,17 +1002,24 @@ router.post("/chat", upload.any(), async (req, res) => {
 
     const currentIndex = state.get("selectedIndex") ?? 0;
     const recommendedList = state.get("recommended") ?? [];
+    console.log("Recommended list at select recommendation:", recommendedList);
     const item = recommendedList[currentIndex];
     let prompt = "";
     let recipe_id = null;
     let resource_id = null;
     let type = state.get("type");
+    console.log("Type at select recommendation:", type);
     
     if (type === "MEAL") {
       const meal = item.meal;
       recipe_id = meal.recipe_id;
 
       prompt = `
+        IMPORTANT:
+        Do NOT explain your reasoning.
+        Do NOT simulate thinking.
+        ONLY output the final friendly message to the user.
+
         You are a friendly fitness assistant chatbot.
         Context:
         The user selected a meal recommendation.
@@ -1025,10 +1038,15 @@ router.post("/chat", upload.any(), async (req, res) => {
         `;
     }
 
-    if (state.type === "WORKOUT") {
-      resource_id = item.resource_id;
+    if (type === "WORKOUT") {
+      console.log("Check item at select recommendation:", item);
 
       prompt = `
+        IMPORTANT:
+        Do NOT explain your reasoning.
+        Do NOT simulate thinking.
+        ONLY output the final friendly message to the user.
+
         You are a friendly fitness assistant chatbot.
         Context:
         The user selected a workout recommendation.

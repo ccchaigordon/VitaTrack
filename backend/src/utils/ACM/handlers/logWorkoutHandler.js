@@ -53,6 +53,8 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       };
     }
 
+    console.log("Check if workoutData is empty", isEmptyWorkout(workoutData));
+
     if (isEmptyWorkout(workoutData)) {
       const prompt = `
         You are a friendly fitness assistant chatbot.
@@ -157,6 +159,7 @@ async function logWorkoutHandler(message, multimodalContext, conversationState, 
       Important:
       - If user mention about reps or sets for sports exercises (e.g. basketball, badminton, etc.), gently correct them by saying sets/reps usually do not apply for sports activities.
       - If you had to estimate calories based on duration, inform the user about it in a friendly manner.  Tell them that 0 calories is not logical for activities with duration.
+      - If user did not provide duration, but provided sets and reps only, you can estimate calories based on average calories burned for similar exercises.
         
         `;
       
