@@ -360,7 +360,7 @@ function ChatBubble({
                     a: ({ href, children }) => (
                       <a
                         href={href}
-                        target="_blank"
+                        
                         rel="noopener noreferrer"
                         className="text-[#2A4A2D] underline hover:text-[#1A381D]"
                       >

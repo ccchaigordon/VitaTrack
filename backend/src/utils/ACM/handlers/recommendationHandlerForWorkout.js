@@ -230,10 +230,12 @@ async function recommendationHandlerForWorkout(message, user_id, conversationSta
         
         gResponse = await queryGemini(prompt);
 
+        console.log("Recommended workout", workout);
+
         conversationState.set(user_id, {
             state: "SHOWING_RESULTS",
             type: "WORKOUT",
-            recommended: workout,
+            recommended: recommendations,
             multimodalContext: {
                 meals: [],
                 workouts: workout ? [workout] : []
