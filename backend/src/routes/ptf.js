@@ -243,9 +243,11 @@ router.get('/ptf/workout', async (req, res) => {
     
     for (let i = 0; i < days; i++) {
       const dateKey = addDaysMY(pastDate, i);
-      
-      const d = new Date(`${dateKey}T00:00:00+08:00`);
-      const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+      const [year, month, day] = dateKey.split('-');
+      const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthShort = monthNames[parseInt(month) - 1];
+      const label = `${day} ${monthShort}`;
 
       history.push({
         date: dateKey,       
@@ -395,7 +397,7 @@ router.get('/ptf/insights', async (req, res) => {
         summary: [],
         nextFocus: null,
         isFallback: true,
-        isEmpty: true, // <-- important
+        isEmpty: true,
       });
     }
 
